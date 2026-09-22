@@ -56,7 +56,12 @@ export class NewsError extends Error {
 
 /** A missing article must 404. Every other failure may serve the last good copy. */
 export function shouldServeLastKnown(error: unknown): boolean {
-  return !(error instanceof NewsError && error.status === 404);
+  const status = error instanceof NewsError
+    ? error.status
+    : error && typeof error === "object" && "status" in error
+      ? (error as { status: unknown }).status
+      : undefined;
+  return status !== 404;
 }
 
 /**

@@ -56,6 +56,18 @@ export {
   shortText,
 } from "./analytics";
 export { referralCode, resolveCoupon } from "./commerce";
+export {
+  acceptRemoteRecord,
+  acceptSnapshot,
+  parseSnapshot,
+  publicationFromSnapshot,
+  publicationRecord,
+  readSnapshotFile,
+  snapshotFromRecord,
+  syncPublication,
+  syncPublicationFile,
+  writeSnapshotFile,
+} from "./snapshot";
 export type { Attribution } from "./analytics";
 export type {
   ArticleCitation,
@@ -80,3 +92,4 @@ export type {
   StoryDisplay,
   TagRef,
 } from "./types";
+export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";

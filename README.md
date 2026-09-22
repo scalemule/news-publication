@@ -26,6 +26,14 @@ export const napaGate = definePublication({
 
 `resolveLayout(publication, cookie)` returns the paper default for crawlers and readers with no cookie. A reader preference is kept only when that paper listed the layout in `layouts`. The cookie name is `news_publication_layout`.
 
+## Config sync
+
+The application record is the source of truth. The site stores the last accepted copy in `publication.snapshot.json` and ships that file with the deployment. `syncPublicationFile` writes a new file only after a complete record for that paper arrives. A timeout, a 500, a truncated body, or another paper's payload leaves the file untouched.
+
+That snapshot does not expire. A paper whose application API is unreachable for several days, including across restarts, keeps serving the last synced name, towns, theme, and flags. The result reports `source: "retained"` and how old the snapshot is, so the outage can be logged. The only paper that cannot render is one that has never synced.
+
+Code hooks such as `matchTag` are attached in the site after the snapshot loads. They are not part of the stored file.
+
 ## What a paper turns on
 
 | Flag | Default | Meaning |

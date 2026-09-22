@@ -73,7 +73,7 @@ export function briefSummary(article: NewsItem, selection: HomepageSelection = {
   const excerpt = article.excerpt?.trim();
   if (!excerpt) return "";
   const first = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(excerpt)][0]?.segment.trim() ?? "";
-  return Array.from(first).length <= 280 && /[.!?。！？]["']?$/u.test(first) ? first : "";
+  return Array.from(first).length <= 280 && /[.!?。！？][”’"']?$/u.test(first) ? first : "";
 }
 
 export function normalizedText(value: string): string {
