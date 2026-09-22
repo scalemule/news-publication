@@ -2,7 +2,8 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { syncPublication, syncPublicationFile, type PublicationRecord } from "./snapshot";
+import { syncPublication, type PublicationRecord } from "./snapshot";
+import { syncPublicationFile } from "./snapshot-file";
 
 const record: PublicationRecord = {
   slug: "walnutcreektimes",

@@ -62,11 +62,8 @@ export {
   parseSnapshot,
   publicationFromSnapshot,
   publicationRecord,
-  readSnapshotFile,
   snapshotFromRecord,
   syncPublication,
-  syncPublicationFile,
-  writeSnapshotFile,
 } from "./snapshot";
 export type { Attribution } from "./analytics";
 export type {
