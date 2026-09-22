@@ -28,7 +28,7 @@ export const napaGate = definePublication({
 
 ## Config sync
 
-The application record is the source of truth. The site stores the last accepted copy in `publication.snapshot.json` and ships that file with the deployment. `syncPublicationFile` writes a new file only after a complete record for that paper arrives. A timeout, a 500, a truncated body, or another paper's payload leaves the file untouched.
+The application record is the source of truth. The site stores the last accepted copy in `publication.snapshot.json` and ships that file with the deployment. `syncPublicationFile` from `@scalemule/news-publication/snapshot-file` writes a new file only after a complete record for that paper arrives. The main package entry stays free of Node file APIs so client components can import it. A timeout, a 500, a truncated body, or another paper's payload leaves the file untouched.
 
 That snapshot does not expire. A paper whose application API is unreachable for several days, including across restarts, keeps serving the last synced name, towns, theme, and flags. The result reports `source: "retained"` and how old the snapshot is, so the outage can be logged. The only paper that cannot render is one that has never synced.
 

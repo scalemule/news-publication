@@ -1,5 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
-
 /**
  * Cache policy verified on walnutcreektimes.com.
  * Feeds refresh every 30s, articles every 60s, and the edge holds a page for
@@ -88,10 +86,14 @@ export async function withLastKnown<T>(
 
 export function secretsMatch(provided: string | null | undefined, secret: string | null | undefined): boolean {
   if (!provided || !secret) return false;
-  const left = Buffer.from(provided);
-  const right = Buffer.from(secret);
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
+  const left = Array.from(provided);
+  const right = Array.from(secret);
+  let mismatch = left.length === right.length ? 0 : 1;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (left[index]?.codePointAt(0) ?? 0) ^ (right[index]?.codePointAt(0) ?? 0);
+  }
+  return mismatch === 0;
 }
 
 export type RevalidateDecision = {
