@@ -1,0 +1,61 @@
+/*
+ * Broadsheet type scale from Walnut Creek Times.
+ * Source Serif 4 (`--font-editorial`) and Inter (`--font-inter`) apply at every
+ * width. The site loads those faces in its root layout. Georgia and Arial are
+ * the fallback before the files arrive.
+ * A paper overrides --pub-accent and --pub-serif on `.publication`.
+ */
+.publication {
+  --pub-paper: #fff;
+  --pub-ink: #171917;
+  --pub-muted: #545c55;
+  --pub-accent: #bb171d;
+  --pub-rule: #d7dcd7;
+  --pub-soft: #f5f6f3;
+  --pub-sponsor: #173d32;
+  --pub-serif: var(--font-editorial), Georgia, "Times New Roman", serif;
+  --pub-editorial: var(--font-editorial), Georgia, "Times New Roman", serif;
+  --pub-sans: var(--font-inter), Arial, Helvetica, sans-serif;
+  --pub-width: 1240px;
+  --pub-reading: 720px;
+  --pub-gutter: clamp(16px, 3vw, 40px);
+  --pub-space-1: 8px;
+  --pub-space-2: 16px;
+  --pub-space-3: 24px;
+  --pub-space-4: 32px;
+  --pub-space-5: 48px;
+  --pub-space-6: 64px;
+  --pub-small: 0.75rem;
+  --pub-label: 0.8125rem;
+  --pub-navigation: 0.9375rem;
+  --pub-front-lead: clamp(2rem, 3.2vw, 2.75rem);
+  --pub-front-secondary: 1.625rem;
+  --pub-front-brief: 1.25rem;
+  --pub-body: 1.125rem;
+  --pub-deck: 1.25rem;
+  --pub-headline: clamp(1.5rem, 2.1vw, 1.875rem);
+  --pub-major: clamp(1.875rem, 3vw, 2.5rem);
+  --pub-lead: clamp(2rem, 4vw, 3.25rem);
+  background: var(--pub-paper);
+  color: var(--pub-ink);
+  font-family: var(--pub-sans);
+  font-size: var(--pub-body);
+  line-height: 1.5;
+  min-height: 100dvh;
+  overflow-wrap: break-word;
+}
+.publication *, .publication *::before, .publication *::after { box-sizing: border-box; }
+.publication :focus-visible { outline: 3px solid #a95c00; outline-offset: 4px; }
+.publication a, .publication button, .publication summary { touch-action: manipulation; }
+.publication img { max-width: 100%; }
+.publication h1, .publication h2, .publication h3 {
+  font-family: var(--pub-serif);
+  font-weight: 600;
+  line-height: 1.15;
+  text-wrap: pretty;
+}
+.publication [id] { scroll-margin-top: 24px; }
+.publication ::selection { background: #f6dcdd; color: var(--pub-ink); }
+@media (min-width: 960px) {
+  .publication { --pub-width: 1280px; }
+}

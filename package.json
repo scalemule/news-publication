@@ -1,0 +1,56 @@
+{
+  "name": "@scalemule/news-publication",
+  "version": "0.0.1",
+  "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./tokens.css": "./tokens/broadsheet.css"
+  },
+  "files": [
+    "dist",
+    "tokens",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "node -e \"const v=require('./package.json').version; if(!/^0\\.(0|1)\\.\\d+$/.test(v)){console.error('ERR: SDK '+v+' violates patch-only policy (0.0.x or 0.1.x only). See CONTRIBUTING.md SDK versioning section.');process.exit(1)}\" && npm run lint && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "keywords": [
+    "scalemule",
+    "news",
+    "publication",
+    "napsite"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scalemule/news-publication.git"
+  },
+  "author": "ScaleMule Inc. <support@scalemule.com>",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
