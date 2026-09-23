@@ -3,6 +3,7 @@ import {
   LAYOUT_COOKIE,
   NEWS_CACHE,
   NewsError,
+  articleMeta,
   attribution,
   briefSummary,
   composeEdition,
@@ -184,6 +185,23 @@ describe("search metadata", () => {
     expect(graph.publisher).toMatchObject({ "@type": "NewsMediaOrganization", name: "Walnut Creek Times" });
     expect(graph.url).toBe("https://walnutcreektimes.com/news/tenant-rights");
     expect(llmsText(walnutCreekTimes, "https://walnutcreektimes.com")).toContain("Walnut Creek, Rossmoor, Saranap, Pleasant Hill");
+  });
+
+  it("preserves syndicated cross-domain canonical URL when present", () => {
+    const syndicatedArticle = article({
+      id: "syndicated-1",
+      slug: "concord-taco-trail",
+      title: "Concord's Taco Trail is open",
+      canonical_url: "https://concordchronicle.com/news/concord-taco-trail",
+    });
+
+    // When rendered on Walnut Creek Times, canonical points to Concord Chronicle
+    const meta = articleMeta(walnutCreekTimes, syndicatedArticle, "https://walnutcreektimes.com", true);
+    expect(meta.canonical).toBe("https://concordchronicle.com/news/concord-taco-trail");
+
+    const jsonLd = newsArticleJsonLd(walnutCreekTimes, syndicatedArticle, "https://walnutcreektimes.com");
+    expect(jsonLd.mainEntityOfPage).toBe("https://concordchronicle.com/news/concord-taco-trail");
+    expect(jsonLd.url).toBe("https://walnutcreektimes.com/news/concord-taco-trail");
   });
 
   it("drops credentials and collapses private paths", () => {

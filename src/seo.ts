@@ -23,6 +23,7 @@ export function newsArticleJsonLd(
   authorName?: string | null,
 ) {
   const url = articleUrl(canonical, article.slug);
+  const canonicalUrl = publicHttps(article.canonical_url) ?? url;
   const image = publicHttps(article.cover_image_url);
   return {
     "@context": "https://schema.org",
@@ -32,7 +33,7 @@ export function newsArticleJsonLd(
     datePublished: article.published_at,
     dateModified: article.updated_at,
     image: image ? [image] : undefined,
-    mainEntityOfPage: url,
+    mainEntityOfPage: canonicalUrl,
     url,
     author: { "@type": "Organization", name: authorName || publication.name },
     publisher: { "@type": "NewsMediaOrganization", name: publication.name, url: canonical },
@@ -73,11 +74,12 @@ export function publicationMeta(publication: NewsPublication, canonical: string,
 
 export function articleMeta(publication: NewsPublication, article: NewsArticle, canonical: string, indexable: boolean) {
   const url = articleUrl(canonical, article.slug);
+  const canonicalUrl = publicHttps(article.canonical_url) ?? url;
   const image = publicHttps(article.og_image_url) ?? publicHttps(article.cover_image_url);
   return {
     title: article.seo_title ?? article.title,
     description: article.seo_description ?? article.excerpt ?? publication.description,
-    canonical: url,
+    canonical: canonicalUrl,
     indexable: indexable && !article.no_index,
     openGraph: {
       type: "article" as const,
