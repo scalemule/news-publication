@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -17,17 +17,35 @@
       "types": "./dist/snapshot-file.d.ts",
       "import": "./dist/snapshot-file.js",
       "require": "./dist/snapshot-file.cjs"
-    }
+    },
+    "./marketplace": {
+      "types": "./dist/marketplace-view.d.ts",
+      "import": "./dist/marketplace-view.js",
+      "require": "./dist/marketplace-view.cjs"
+    },
+    "./marketplace-forms": {
+      "types": "./dist/marketplace-forms.d.ts",
+      "import": "./dist/marketplace-forms.js",
+      "require": "./dist/marketplace-forms.cjs"
+    },
+    "./marketplace.css": "./marketplace.css"
   },
   "files": [
     "dist",
     "tokens",
+    "marketplace.css",
     "README.md",
     "LICENSE"
   ],
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true }
+  },
   "scripts": {
     "prepare": "npm run build",
-    "build": "tsup",
+    "build": "tsup && node scripts/mark-client-forms.mjs",
     "dev": "tsup --watch",
     "test": "vitest run",
     "lint": "tsc --noEmit",
@@ -35,6 +53,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "react": "^19.1.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

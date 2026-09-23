@@ -17,6 +17,6 @@ export const walnutCreekTimes = definePublication({
   description: "Local news, independent businesses and community voices from Walnut Creek, Rossmoor, Saranap and Pleasant Hill.",
   layout: "broadsheet",
   layouts: ["broadsheet"],
-  features: { smile: true },
+  features: { smile: true, jobs: true, classifieds: true },
   modules: { home: ["daily-smile"] },
 });
