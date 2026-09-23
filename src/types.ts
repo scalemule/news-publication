@@ -115,6 +115,7 @@ export type NewsItem = {
   no_index: boolean;
   section: string | null;
   author_name: string | null;
+  canonical_url?: string | null;
   tags?: TagRef[];
   categories?: CategoryRef[];
 };
