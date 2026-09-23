@@ -1,4 +1,4 @@
-import { activityLabel, type PreparedMeetup } from "./meet";
+import { activityLabel, MEET_ACTIVITIES, type PreparedMeetup } from "./meet";
 
 export type MeetupCard = PreparedMeetup & {
   id: string;
@@ -54,7 +54,5 @@ export function MeetupDetail({ meetup, joined }: { meetup: MeetupCard; joined: b
 }
 
 export function activityChoices() {
-  return [
-    "coffee", "walk", "hike", "pickleball", "tennis", "bike", "dogs", "books", "games", "kids", "volunteer", "other",
-  ].map(value => ({ value, label: activityLabel(value) }));
+  return MEET_ACTIVITIES.map(item => ({ value: item.value, label: activityLabel(item.value) }));
 }
