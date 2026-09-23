@@ -6,6 +6,7 @@ export const MEET_ACTIVITIES = [
   { value: "hike", label: "Hike" },
   { value: "pickleball", label: "Pickleball" },
   { value: "tennis", label: "Tennis" },
+  { value: "soccer", label: "Soccer" },
   { value: "bike", label: "Bike ride" },
   { value: "dogs", label: "Dog walk" },
   { value: "books", label: "Book club" },
