@@ -47,7 +47,7 @@ export type Attribution = Partial<Record<(typeof UTM_FIELDS)[number], string>> &
 const PUBLIC_PATHS = new Set([
   "/", "/news", "/this-week", "/newsletter", "/advertise", "/pricing", "/contact",
   "/book", "/preview", "/about", "/coverage", "/story-tip", "/corrections",
-  "/how-it-works", "/privacy", "/smile", "/subscribe",
+  "/how-it-works", "/privacy", "/smile", "/subscribe", "/jobs", "/jobs/post", "/classifieds", "/classifieds/post",
 ]);
 
 export function shortText(value: unknown, max = 100): string | undefined {
@@ -72,7 +72,11 @@ export function publicUrl(value: unknown, originOnly = false): string | undefine
           ? "/news/article"
           : /^\/smile\/[^/]+$/.test(url.pathname)
             ? "/smile"
-            : "/other";
+            : /^\/jobs\/[^/]+$/.test(url.pathname)
+              ? "/jobs/opening"
+              : /^\/classifieds\/[^/]+$/.test(url.pathname)
+                ? "/classifieds/listing"
+                : "/other";
     return url.origin + path;
   } catch {
     return undefined;

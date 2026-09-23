@@ -57,6 +57,24 @@ export {
 } from "./analytics";
 export { referralCode, resolveCoupon } from "./commerce";
 export {
+  CLASSIFIED_CATEGORIES,
+  JOB_EMPLOYMENT_TYPES,
+  categoryLabel,
+  classifiedPath,
+  classifiedSearchPath,
+  clipChars,
+  employmentLabel,
+  isClassifiedCategory,
+  isEmploymentType,
+  jobEmployerBody,
+  jobOpeningBody,
+  jobPostingBody,
+  prepareClassified,
+  prepareJobPost,
+  publicJobPath,
+  publicJobsPath,
+} from "./marketplace";
+export {
   acceptRemoteRecord,
   acceptSnapshot,
   parseSnapshot,
@@ -90,3 +108,4 @@ export type {
   TagRef,
 } from "./types";
 export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";
+export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicJob } from "./marketplace";
