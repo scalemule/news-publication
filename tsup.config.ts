@@ -6,6 +6,8 @@ export default defineConfig({
     "snapshot-file": "src/snapshot-file.ts",
     "marketplace-view": "src/marketplace-view.tsx",
     "marketplace-forms": "src/marketplace-forms.tsx",
+    "meet-view": "src/meet-view.tsx",
+    "meet-forms": "src/meet-forms.tsx",
   },
   format: ["esm", "cjs"],
   dts: true,
