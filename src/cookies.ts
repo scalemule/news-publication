@@ -1,62 +1,96 @@
-export type CookieCategory = "essential" | "performance" | "functional" | "advertising";
+import {
+  acceptAllCookies,
+  rejectOptionalCookies,
+  setCookieConsent,
+  getCookieConsent,
+  clearCookieConsent,
+  hasConsented,
+  isCategoryAllowed,
+  isGeoConsentRequired,
+  checkUrlConsentBridge,
+  decorateNetworkUrl,
+  queryNetworkConsentHub,
+  setNetworkConsentHub,
+  recordConsentToCompliance as baseRecordConsentToCompliance,
+  COOKIE_CONSENT_KEY,
+  COOKIE_CONSENT_BACKUP_KEY,
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_MAX_AGE_SECONDS,
+  DEFAULT_CONSENT_HUB_URL,
+  NETWORK_CONSENT_STORAGE_KEY,
+  DEFAULT_PREFERENCES_ACCEPTED,
+  DEFAULT_PREFERENCES_REJECTED,
+  EU_EEA_UK_COUNTRIES,
+  getLegalAcceptance,
+  recordLegalAcceptance,
+  isLegalAcceptanceCurrent,
+  clearLegalAcceptance,
+} from "@scalemule/compliance";
+import type {
+  CookieCategory,
+  CookieCategoryDefinition,
+  CookieConsentRecord,
+  CookieDisclosure,
+  CookiePreferences,
+  LegalAcceptanceRecord,
+  LegalVersionConfig,
+  ComplianceConfig,
+} from "@scalemule/compliance";
 
-export interface CookiePreferences {
-  /** Strictly necessary cookies required for core site operation and security. Always true. */
-  essential: true;
-  /** Analytics and performance measurement to improve community coverage and site speed. */
-  performance: boolean;
-  /** Personalization features such as narration audio speed, text sizing, and town filters. */
-  functional: boolean;
-  /** Local sponsorship delivery and partner campaign frequency capping. */
-  advertising: boolean;
+export async function recordConsentToCompliance(
+  record: CookieConsentRecord,
+  options?: {
+    endpoint?: string;
+    applicationId?: string;
+    publicationSlug?: string;
+  }
+): Promise<void> {
+  return baseRecordConsentToCompliance(record, options);
 }
 
-export interface CookieConsentRecord {
-  version: 1;
-  preferences: CookiePreferences;
-  timestamp: string;
-  anonymous_id?: string;
-  source: "banner_accept" | "banner_reject" | "settings_save";
-}
-
-export interface CookieDisclosure {
-  name: string;
-  provider: string;
-  purpose: string;
-  duration: string;
-  type: "HTTP Cookie" | "Local Storage" | "Session Storage";
-}
-
-export interface CookieCategoryDefinition {
-  id: CookieCategory;
-  title: string;
-  shortDescription: string;
-  fullDescription: string;
-  required: boolean;
-  cookies: CookieDisclosure[];
-}
-
-export const COOKIE_CONSENT_KEY = "sm_cookie_consent_v1";
-export const COOKIE_CONSENT_BACKUP_KEY = "napsite_cookie_consent_v1";
-export const COOKIE_CONSENT_EVENT = "scalemule-cookie-consent-change";
-export const COOKIE_CONSENT_MAX_AGE_SECONDS = 365 * 24 * 60 * 60; // 1 year
-export const DEFAULT_CONSENT_HUB_URL = "https://bayareachronicle.com/consent-bridge.html";
-export const NETWORK_CONSENT_STORAGE_KEY = "sm_network_consent_status";
-
-export const DEFAULT_PREFERENCES_REJECTED: CookiePreferences = {
-  essential: true,
-  performance: false,
-  functional: false,
-  advertising: false,
+export {
+  COOKIE_CONSENT_KEY,
+  COOKIE_CONSENT_BACKUP_KEY,
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_MAX_AGE_SECONDS,
+  DEFAULT_CONSENT_HUB_URL,
+  NETWORK_CONSENT_STORAGE_KEY,
+  DEFAULT_PREFERENCES_ACCEPTED,
+  DEFAULT_PREFERENCES_REJECTED,
+  EU_EEA_UK_COUNTRIES,
+  getCookieConsent,
+  setCookieConsent,
+  acceptAllCookies,
+  rejectOptionalCookies,
+  clearCookieConsent,
+  hasConsented,
+  isCategoryAllowed,
+  isGeoConsentRequired,
+  checkUrlConsentBridge,
+  decorateNetworkUrl,
+  queryNetworkConsentHub,
+  setNetworkConsentHub,
+  getLegalAcceptance,
+  recordLegalAcceptance,
+  isLegalAcceptanceCurrent,
+  clearLegalAcceptance,
 };
 
-export const DEFAULT_PREFERENCES_ACCEPTED: CookiePreferences = {
-  essential: true,
-  performance: true,
-  functional: true,
-  advertising: true,
+export type {
+  CookieCategory,
+  CookieCategoryDefinition,
+  CookieConsentRecord,
+  CookieDisclosure,
+  CookiePreferences,
+  LegalAcceptanceRecord,
+  LegalVersionConfig,
+  ComplianceConfig,
 };
 
+/**
+ * News-publication specific cookie category disclosures.
+ * Defaults configured for ScaleMule community newsrooms and broadsheet publications.
+ */
 export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
   {
     id: "essential",
@@ -169,501 +203,3 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
     ],
   },
 ];
-
-let memoryConsent: CookieConsentRecord | null = null;
-
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function writeCookie(name: string, value: string, maxAgeSeconds: number): void {
-  if (typeof document === "undefined") return;
-  const secure = typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
-}
-
-/**
- * Retrieve the current cookie consent record.
- * Checks HTTP cookie first, then localStorage fallback, then in-memory state.
- */
-export function getCookieConsent(): CookieConsentRecord | null {
-  if (typeof window === "undefined") return memoryConsent;
-  try {
-    const raw = readCookie(COOKIE_CONSENT_KEY) || readCookie(COOKIE_CONSENT_BACKUP_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as CookieConsentRecord;
-      if (parsed && parsed.version === 1 && parsed.preferences) {
-        memoryConsent = parsed;
-        return parsed;
-      }
-    }
-    const stored = window.localStorage?.getItem(COOKIE_CONSENT_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as CookieConsentRecord;
-      if (parsed && parsed.version === 1 && parsed.preferences) {
-        memoryConsent = parsed;
-        return parsed;
-      }
-    }
-  } catch {
-    // Malformed storage is ignored
-  }
-  return memoryConsent;
-}
-
-/**
- * ISO 3166-1 alpha-2 country codes for EU/EEA member states and the UK/Switzerland
- * subject to the GDPR and ePrivacy Directive prior-consent requirement.
- */
-export const EU_EEA_UK_COUNTRIES = new Set([
-  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
-  "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES",
-  "SE", "IS", "LI", "NO", "GB", "CH"
-]);
-
-/**
- * Determine if cookie consent prior-opt-in banner is required based on visitor geography.
- * For US readers (including California CCPA/CPRA), opt-in banners are not required.
- * Returns true ONLY if the visitor is identified as being within an EU/EEA/UK jurisdiction.
- */
-export function isGeoConsentRequired(countryCode?: string | null): boolean {
-  // 1. If an explicit country code is provided (e.g. from server headers or GeoIP):
-  if (countryCode && typeof countryCode === "string") {
-    const code = countryCode.trim().toUpperCase();
-    if (code.length === 2) {
-      return EU_EEA_UK_COUNTRIES.has(code);
-    }
-  }
-
-  // 2. Client-side heuristics if running in the browser
-  if (typeof window !== "undefined") {
-    try {
-      // Check cached geo choice if present
-      const cached = readCookie("sm_geo_country") || window.localStorage?.getItem("sm_geo_country");
-      if (cached && typeof cached === "string" && cached.length === 2) {
-        return EU_EEA_UK_COUNTRIES.has(cached.toUpperCase());
-      }
-
-      // Check browser timezone (100% reliable for local Bay Area / US readers)
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) {
-        // North American timezones (US, Canada, Mexico) -> No prior consent banner required
-        if (/^(America|US|Canada|Pacific)\//i.test(tz)) {
-          return false;
-        }
-        // European timezones -> Prior consent banner required under GDPR / ePrivacy
-        if (/^(Europe|Atlantic\/Reykjavik|Atlantic\/Canary|Atlantic\/Faeroe|Atlantic\/Madeira|Atlantic\/Azores|WET|CET|EET|GMT)/i.test(tz)) {
-          return true;
-        }
-      }
-    } catch {
-      // Ignore client heuristic error
-    }
-  }
-
-  // For California local news publications, default to false (US reader assumption)
-  return false;
-}
-
-/**
- * Checks for a cross-domain network consent signal in the URL query (?sm_consent=accepted|rejected|1|0).
- * If present, silently records the consent choice locally and removes the param from the address bar.
- * Returns true if a consent signal was processed.
- */
-export function checkUrlConsentBridge(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const url = new URL(window.location.href);
-    const param = url.searchParams.get("sm_consent");
-    if (!param) return false;
-
-    if (param === "accepted" || param === "1" || param === "all") {
-      acceptAllCookies();
-    } else if (param === "rejected" || param === "0" || param === "essential") {
-      rejectOptionalCookies();
-    } else {
-      return false;
-    }
-
-    // Clean URL query parameter without triggering page reload
-    url.searchParams.delete("sm_consent");
-    const newSearch = url.searchParams.toString() ? `?${url.searchParams.toString()}` : "";
-    window.history.replaceState(null, "", `${url.pathname}${newSearch}${url.hash}`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Appends the current consent decision to an outgoing URL within the newspaper network
- * so sister publications can adopt the user's choice without requiring a new banner prompt.
- */
-export function decorateNetworkUrl(targetUrl: string): string {
-  const consent = getCookieConsent();
-  if (!consent) return targetUrl;
-  try {
-    const base = typeof window !== "undefined" ? window.location.origin : "https://localhost";
-    const url = new URL(targetUrl, base);
-    const value = consent.preferences.performance || consent.preferences.advertising ? "1" : "0";
-    url.searchParams.set("sm_consent", value);
-    return url.toString();
-  } catch {
-    return targetUrl;
-  }
-}
-
-/**
- * Queries the central network iframe hub to retrieve the reader's cross-domain consent choice.
- * If running on the hub origin directly, reads from local storage without an iframe.
- */
-export function queryNetworkConsentHub(
-  hubUrl: string = DEFAULT_CONSENT_HUB_URL,
-  timeoutMs: number = 1000
-): Promise<"accepted" | "rejected" | null> {
-  if (typeof window === "undefined") return Promise.resolve(null);
-
-  try {
-    const hubOrigin = new URL(hubUrl).origin;
-
-    // If already on the hub origin, read directly from localStorage
-    if (window.location.origin === hubOrigin) {
-      try {
-        const direct = window.localStorage?.getItem(NETWORK_CONSENT_STORAGE_KEY);
-        if (direct === "accepted" || direct === "rejected") {
-          return Promise.resolve(direct);
-        }
-      } catch {
-        // Storage disabled or quota
-      }
-      return Promise.resolve(null);
-    }
-
-    return new Promise((resolve) => {
-      let settled = false;
-      let iframe: HTMLIFrameElement | null = null;
-      let timer: number | null = null;
-
-      const finish = (result: "accepted" | "rejected" | null) => {
-        if (settled) return;
-        settled = true;
-        if (timer !== null) window.clearTimeout(timer);
-        window.removeEventListener("message", onMessage);
-        if (iframe && iframe.parentNode) {
-          try {
-            iframe.parentNode.removeChild(iframe);
-          } catch {
-            // ignore
-          }
-        }
-        resolve(result);
-      };
-
-      const sendGet = () => {
-        try {
-          iframe?.contentWindow?.postMessage({ type: "SM_CONSENT_GET" }, hubOrigin);
-        } catch {
-          // Cross-origin access restriction
-        }
-      };
-
-      const onMessage = (event: MessageEvent) => {
-        if (event.origin !== hubOrigin) return;
-        const data = event.data;
-        if (!data || typeof data !== "object") return;
-
-        if (data.type === "SM_CONSENT_STATUS") {
-          const status = data.status === "accepted" || data.status === "rejected" ? data.status : null;
-          finish(status);
-        } else if (data.type === "SM_CONSENT_BRIDGE_READY") {
-          sendGet();
-        }
-      };
-
-      window.addEventListener("message", onMessage);
-
-      timer = window.setTimeout(() => {
-        finish(null);
-      }, timeoutMs);
-
-      try {
-        iframe = document.createElement("iframe");
-        iframe.src = hubUrl;
-        iframe.style.position = "absolute";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        iframe.style.display = "none";
-        iframe.style.visibility = "hidden";
-        iframe.setAttribute("aria-hidden", "true");
-        iframe.setAttribute("tabindex", "-1");
-
-        iframe.onload = () => {
-          sendGet();
-        };
-
-        iframe.onerror = () => {
-          finish(null);
-        };
-
-        const target = document.body || document.documentElement;
-        target.appendChild(iframe);
-      } catch {
-        finish(null);
-      }
-    });
-  } catch {
-    return Promise.resolve(null);
-  }
-}
-
-/**
- * Propagates a consent decision to the central network iframe hub so all sister publications adopt it.
- */
-export function setNetworkConsentHub(
-  status: "accepted" | "rejected" | null,
-  hubUrl: string = DEFAULT_CONSENT_HUB_URL
-): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    const hubOrigin = new URL(hubUrl).origin;
-
-    // If on the hub domain itself, store directly
-    if (window.location.origin === hubOrigin) {
-      try {
-        if (status) {
-          window.localStorage?.setItem(NETWORK_CONSENT_STORAGE_KEY, status);
-        } else {
-          window.localStorage?.removeItem(NETWORK_CONSENT_STORAGE_KEY);
-        }
-      } catch {
-        // Storage disabled or quota
-      }
-      return;
-    }
-
-    let iframe: HTMLIFrameElement | null = null;
-    let timer: number | null = null;
-
-    const cleanup = () => {
-      if (timer !== null) window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-      if (iframe && iframe.parentNode) {
-        try {
-          iframe.parentNode.removeChild(iframe);
-        } catch {
-          // ignore
-        }
-      }
-    };
-
-    const sendSet = () => {
-      try {
-        iframe?.contentWindow?.postMessage({ type: "SM_CONSENT_SET", status }, hubOrigin);
-      } catch {
-        // ignore
-      }
-    };
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== hubOrigin) return;
-      const data = event.data;
-      if (!data || typeof data !== "object") return;
-
-      if (data.type === "SM_CONSENT_SAVED") {
-        cleanup();
-      } else if (data.type === "SM_CONSENT_BRIDGE_READY") {
-        sendSet();
-      }
-    };
-
-    window.addEventListener("message", onMessage);
-
-    timer = window.setTimeout(cleanup, 2500);
-
-    try {
-      iframe = document.createElement("iframe");
-      iframe.src = hubUrl;
-      iframe.style.position = "absolute";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.style.display = "none";
-      iframe.style.visibility = "hidden";
-      iframe.setAttribute("aria-hidden", "true");
-      iframe.setAttribute("tabindex", "-1");
-
-      iframe.onload = () => {
-        sendSet();
-      };
-
-      iframe.onerror = cleanup;
-
-      const target = document.body || document.documentElement;
-      target.appendChild(iframe);
-    } catch {
-      cleanup();
-    }
-  } catch {
-    // Ignore iframe communication errors
-  }
-}
-
-/**
- * Check if the user has already provided an explicit consent decision.
- */
-export function hasConsented(): boolean {
-  return getCookieConsent() !== null;
-}
-
-/**
- * Check if a specific cookie category is currently permitted.
- * Essential is always permitted.
- */
-export function isCategoryAllowed(category: CookieCategory): boolean {
-  if (category === "essential") return true;
-  const consent = getCookieConsent();
-  if (!consent) {
-    // Check Global Privacy Control or DNT before explicit consent
-    if (typeof navigator !== "undefined") {
-      const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
-      if (nav.globalPrivacyControl || nav.doNotTrack === "1") {
-        return false;
-      }
-    }
-    return false;
-  }
-  return Boolean(consent.preferences[category]);
-}
-
-/**
- * Record cookie consent choices.
- * Updates both HTTP cookies, localStorage, and fires a window event.
- */
-export function setCookieConsent(
-  preferences: Partial<CookiePreferences>,
-  source: CookieConsentRecord["source"] = "settings_save",
-): CookieConsentRecord {
-  const mergedPreferences: CookiePreferences = {
-    essential: true,
-    performance: Boolean(preferences.performance),
-    functional: Boolean(preferences.functional),
-    advertising: Boolean(preferences.advertising),
-  };
-
-  let anonymous_id: string | undefined;
-  if (typeof window !== "undefined") {
-    try {
-      anonymous_id = window.localStorage?.getItem("napsite_visitor_v1") || undefined;
-    } catch {
-      // ignore
-    }
-  }
-
-  const record: CookieConsentRecord = {
-    version: 1,
-    preferences: mergedPreferences,
-    timestamp: new Date().toISOString(),
-    anonymous_id,
-    source,
-  };
-
-  memoryConsent = record;
-  const serialized = JSON.stringify(record);
-  writeCookie(COOKIE_CONSENT_KEY, serialized, COOKIE_CONSENT_MAX_AGE_SECONDS);
-  writeCookie(COOKIE_CONSENT_BACKUP_KEY, serialized, COOKIE_CONSENT_MAX_AGE_SECONDS);
-
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage?.setItem(COOKIE_CONSENT_KEY, serialized);
-    } catch {
-      // LocalStorage might be disabled or full
-    }
-    // Synchronize to the cross-domain network consent hub
-    const networkStatus: "accepted" | "rejected" =
-      mergedPreferences.performance || mergedPreferences.advertising ? "accepted" : "rejected";
-    setNetworkConsentHub(networkStatus);
-
-    // Notify in-process listeners
-    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_EVENT, { detail: record }));
-  }
-
-  return record;
-}
-
-/**
- * Accepts all cookies (essential, performance, functional, advertising).
- */
-export function acceptAllCookies(): CookieConsentRecord {
-  return setCookieConsent(DEFAULT_PREFERENCES_ACCEPTED, "banner_accept");
-}
-
-/**
- * Rejects all optional cookies (preserves essential cookies only).
- */
-export function rejectOptionalCookies(): CookieConsentRecord {
-  return setCookieConsent(DEFAULT_PREFERENCES_REJECTED, "banner_reject");
-}
-
-/**
- * Clear consent record (used when resetting choices).
- */
-export function clearCookieConsent(): void {
-  memoryConsent = null;
-  if (typeof document !== "undefined") {
-    document.cookie = `${COOKIE_CONSENT_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-    document.cookie = `${COOKIE_CONSENT_BACKUP_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
-  }
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage?.removeItem(COOKIE_CONSENT_KEY);
-    } catch {
-      // ignore
-    }
-    setNetworkConsentHub(null);
-    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_EVENT, { detail: null }));
-  }
-}
-
-/**
- * Forward the user consent choice to ScaleMule compliance service.
- * Respects customer security boundary: uses relative /api/compliance/consent proxy or client endpoint.
- */
-export async function recordConsentToCompliance(
-  record: CookieConsentRecord,
-  options?: {
-    endpoint?: string;
-    publicationSlug?: string;
-  },
-): Promise<void> {
-  if (typeof window === "undefined") return;
-  const endpoint = options?.endpoint || "/api/compliance/consent";
-  try {
-    const payload = {
-      consent_type: "cookie_policy",
-      granted: record.preferences.performance || record.preferences.advertising,
-      preferences: record.preferences,
-      source: record.source,
-      anonymous_id: record.anonymous_id,
-      timestamp: record.timestamp,
-      url: window.location.href,
-      user_agent: window.navigator.userAgent,
-    };
-
-    if (typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon(endpoint, new Blob([JSON.stringify(payload)], { type: "application/json" }));
-    } else {
-      await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-        keepalive: true,
-      });
-    }
-  } catch {
-    // Non-blocking: failure to reach compliance API must never break reader experience
-  }
-}
