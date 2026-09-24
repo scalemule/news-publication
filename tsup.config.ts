@@ -12,6 +12,8 @@ export default defineConfig({
     "cookie-settings-view": "src/cookie-settings-view.tsx",
     "theme-toggle": "src/theme-toggle.tsx",
     compliance: "src/compliance.ts",
+    network: "src/network.ts",
+    "network-bar": "src/network-bar.tsx",
   },
   format: ["esm", "cjs"],
   dts: true,
