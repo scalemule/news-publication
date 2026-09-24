@@ -91,6 +91,34 @@ export {
   snapshotFromRecord,
   syncPublication,
 } from "./snapshot";
+export {
+  COOKIE_CATEGORIES,
+  COOKIE_CONSENT_BACKUP_KEY,
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_KEY,
+  COOKIE_CONSENT_MAX_AGE_SECONDS,
+  DEFAULT_PREFERENCES_ACCEPTED,
+  DEFAULT_PREFERENCES_REJECTED,
+  acceptAllCookies,
+  clearCookieConsent,
+  getCookieConsent,
+  hasConsented,
+  isCategoryAllowed,
+  recordConsentToCompliance,
+  rejectOptionalCookies,
+  setCookieConsent,
+} from "./cookies";
+export { CookieConsentBanner } from "./cookie-consent-banner";
+export { CookieSettingsView } from "./cookie-settings-view";
+export type {
+  CookieCategory,
+  CookieCategoryDefinition,
+  CookieConsentRecord,
+  CookieDisclosure,
+  CookiePreferences,
+} from "./cookies";
+export type { CookieConsentBannerProps } from "./cookie-consent-banner";
+export type { CookieSettingsViewProps } from "./cookie-settings-view";
 export type { Attribution } from "./analytics";
 export type {
   ArticleCitation,
@@ -118,3 +146,4 @@ export type {
 export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";
 export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicJob } from "./marketplace";
 export type { MeetActivity, MeetupInput, PreparedMeetup, PublicPlace } from "./meet";
+

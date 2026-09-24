@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -38,12 +38,24 @@
       "types": "./dist/meet-forms.d.ts",
       "import": "./dist/meet-forms.js",
       "require": "./dist/meet-forms.cjs"
-    }
+    },
+    "./cookie-consent-banner": {
+      "types": "./dist/cookie-consent-banner.d.ts",
+      "import": "./dist/cookie-consent-banner.js",
+      "require": "./dist/cookie-consent-banner.cjs"
+    },
+    "./cookie-settings-view": {
+      "types": "./dist/cookie-settings-view.d.ts",
+      "import": "./dist/cookie-settings-view.js",
+      "require": "./dist/cookie-settings-view.cjs"
+    },
+    "./cookie-consent.css": "./cookie-consent.css"
   },
   "files": [
     "dist",
     "tokens",
     "marketplace.css",
+    "cookie-consent.css",
     "README.md",
     "LICENSE"
   ],
