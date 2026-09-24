@@ -174,4 +174,15 @@ export type {
 export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";
 export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicDeal, PublicDealOffer, PublicJob } from "./marketplace";
 export type { MeetActivity, MeetupInput, PreparedMeetup, PublicPlace } from "./meet";
+export {
+  localPublications,
+  listedPublications,
+  communityPublications,
+  findPublicationBySlug,
+  findPublicationByHost,
+  getNetworkPublicationUrl,
+} from "./network";
+export type { PublicationNetworkItem } from "./network";
+export { LocalNetworkBar } from "./network-bar";
+export type { LocalNetworkBarProps } from "./network-bar";
 
