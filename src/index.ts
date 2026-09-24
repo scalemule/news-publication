@@ -100,9 +100,11 @@ export {
   COOKIE_CONSENT_EVENT,
   COOKIE_CONSENT_KEY,
   COOKIE_CONSENT_MAX_AGE_SECONDS,
+  DEFAULT_CONSENT_HUB_URL,
   DEFAULT_PREFERENCES_ACCEPTED,
   DEFAULT_PREFERENCES_REJECTED,
   EU_EEA_UK_COUNTRIES,
+  NETWORK_CONSENT_STORAGE_KEY,
   acceptAllCookies,
   checkUrlConsentBridge,
   clearCookieConsent,
@@ -111,9 +113,11 @@ export {
   hasConsented,
   isCategoryAllowed,
   isGeoConsentRequired,
+  queryNetworkConsentHub,
   recordConsentToCompliance,
   rejectOptionalCookies,
   setCookieConsent,
+  setNetworkConsentHub,
 } from "./cookies";
 export { CookieConsentBanner } from "./cookie-consent-banner";
 export { CookieSettingsView } from "./cookie-settings-view";

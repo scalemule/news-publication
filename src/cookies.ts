@@ -40,6 +40,8 @@ export const COOKIE_CONSENT_KEY = "sm_cookie_consent_v1";
 export const COOKIE_CONSENT_BACKUP_KEY = "napsite_cookie_consent_v1";
 export const COOKIE_CONSENT_EVENT = "scalemule-cookie-consent-change";
 export const COOKIE_CONSENT_MAX_AGE_SECONDS = 365 * 24 * 60 * 60; // 1 year
+export const DEFAULT_CONSENT_HUB_URL = "https://bayareachronicle.com/consent-bridge.html";
+export const NETWORK_CONSENT_STORAGE_KEY = "sm_network_consent_status";
 
 export const DEFAULT_PREFERENCES_REJECTED: CookiePreferences = {
   essential: true,
@@ -314,6 +316,203 @@ export function decorateNetworkUrl(targetUrl: string): string {
 }
 
 /**
+ * Queries the central network iframe hub to retrieve the reader's cross-domain consent choice.
+ * If running on the hub origin directly, reads from local storage without an iframe.
+ */
+export function queryNetworkConsentHub(
+  hubUrl: string = DEFAULT_CONSENT_HUB_URL,
+  timeoutMs: number = 1000
+): Promise<"accepted" | "rejected" | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+
+  try {
+    const hubOrigin = new URL(hubUrl).origin;
+
+    // If already on the hub origin, read directly from localStorage
+    if (window.location.origin === hubOrigin) {
+      try {
+        const direct = window.localStorage?.getItem(NETWORK_CONSENT_STORAGE_KEY);
+        if (direct === "accepted" || direct === "rejected") {
+          return Promise.resolve(direct);
+        }
+      } catch {
+        // Storage disabled or quota
+      }
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let iframe: HTMLIFrameElement | null = null;
+      let timer: number | null = null;
+
+      const finish = (result: "accepted" | "rejected" | null) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) window.clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        if (iframe && iframe.parentNode) {
+          try {
+            iframe.parentNode.removeChild(iframe);
+          } catch {
+            // ignore
+          }
+        }
+        resolve(result);
+      };
+
+      const sendGet = () => {
+        try {
+          iframe?.contentWindow?.postMessage({ type: "SM_CONSENT_GET" }, hubOrigin);
+        } catch {
+          // Cross-origin access restriction
+        }
+      };
+
+      const onMessage = (event: MessageEvent) => {
+        if (event.origin !== hubOrigin) return;
+        const data = event.data;
+        if (!data || typeof data !== "object") return;
+
+        if (data.type === "SM_CONSENT_STATUS") {
+          const status = data.status === "accepted" || data.status === "rejected" ? data.status : null;
+          finish(status);
+        } else if (data.type === "SM_CONSENT_BRIDGE_READY") {
+          sendGet();
+        }
+      };
+
+      window.addEventListener("message", onMessage);
+
+      timer = window.setTimeout(() => {
+        finish(null);
+      }, timeoutMs);
+
+      try {
+        iframe = document.createElement("iframe");
+        iframe.src = hubUrl;
+        iframe.style.position = "absolute";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        iframe.style.display = "none";
+        iframe.style.visibility = "hidden";
+        iframe.setAttribute("aria-hidden", "true");
+        iframe.setAttribute("tabindex", "-1");
+
+        iframe.onload = () => {
+          sendGet();
+        };
+
+        iframe.onerror = () => {
+          finish(null);
+        };
+
+        const target = document.body || document.documentElement;
+        target.appendChild(iframe);
+      } catch {
+        finish(null);
+      }
+    });
+  } catch {
+    return Promise.resolve(null);
+  }
+}
+
+/**
+ * Propagates a consent decision to the central network iframe hub so all sister publications adopt it.
+ */
+export function setNetworkConsentHub(
+  status: "accepted" | "rejected" | null,
+  hubUrl: string = DEFAULT_CONSENT_HUB_URL
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const hubOrigin = new URL(hubUrl).origin;
+
+    // If on the hub domain itself, store directly
+    if (window.location.origin === hubOrigin) {
+      try {
+        if (status) {
+          window.localStorage?.setItem(NETWORK_CONSENT_STORAGE_KEY, status);
+        } else {
+          window.localStorage?.removeItem(NETWORK_CONSENT_STORAGE_KEY);
+        }
+      } catch {
+        // Storage disabled or quota
+      }
+      return;
+    }
+
+    let iframe: HTMLIFrameElement | null = null;
+    let timer: number | null = null;
+
+    const cleanup = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      if (iframe && iframe.parentNode) {
+        try {
+          iframe.parentNode.removeChild(iframe);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    const sendSet = () => {
+      try {
+        iframe?.contentWindow?.postMessage({ type: "SM_CONSENT_SET", status }, hubOrigin);
+      } catch {
+        // ignore
+      }
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== hubOrigin) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "SM_CONSENT_SAVED") {
+        cleanup();
+      } else if (data.type === "SM_CONSENT_BRIDGE_READY") {
+        sendSet();
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    timer = window.setTimeout(cleanup, 2500);
+
+    try {
+      iframe = document.createElement("iframe");
+      iframe.src = hubUrl;
+      iframe.style.position = "absolute";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.display = "none";
+      iframe.style.visibility = "hidden";
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.setAttribute("tabindex", "-1");
+
+      iframe.onload = () => {
+        sendSet();
+      };
+
+      iframe.onerror = cleanup;
+
+      const target = document.body || document.documentElement;
+      target.appendChild(iframe);
+    } catch {
+      cleanup();
+    }
+  } catch {
+    // Ignore iframe communication errors
+  }
+}
+
+/**
  * Check if the user has already provided an explicit consent decision.
  */
 export function hasConsented(): boolean {
@@ -383,6 +582,11 @@ export function setCookieConsent(
     } catch {
       // LocalStorage might be disabled or full
     }
+    // Synchronize to the cross-domain network consent hub
+    const networkStatus: "accepted" | "rejected" =
+      mergedPreferences.performance || mergedPreferences.advertising ? "accepted" : "rejected";
+    setNetworkConsentHub(networkStatus);
+
     // Notify in-process listeners
     window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_EVENT, { detail: record }));
   }
@@ -419,6 +623,7 @@ export function clearCookieConsent(): void {
     } catch {
       // ignore
     }
+    setNetworkConsentHub(null);
     window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_EVENT, { detail: null }));
   }
 }
