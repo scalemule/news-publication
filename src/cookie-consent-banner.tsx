@@ -7,6 +7,8 @@ import {
   hasConsented,
   recordConsentToCompliance,
   COOKIE_CONSENT_EVENT,
+  isGeoConsentRequired,
+  checkUrlConsentBridge,
 } from "./cookies";
 
 export interface CookieConsentBannerProps {
@@ -22,6 +24,10 @@ export interface CookieConsentBannerProps {
   publicationSlug?: string;
   /** Compliance recording endpoint. Default: "/api/compliance/consent" */
   complianceEndpoint?: string;
+  /** Explicit ISO 3166-1 alpha-2 country code (e.g. from server headers or GeoIP) */
+  countryCode?: string | null;
+  /** Force display of banner regardless of visitor geography */
+  forceShow?: boolean;
 }
 
 export function CookieConsentBanner({
@@ -31,19 +37,40 @@ export function CookieConsentBanner({
   className = "",
   publicationSlug,
   complianceEndpoint = "/api/compliance/consent",
+  countryCode,
+  forceShow = false,
 }: CookieConsentBannerProps) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Only display if user hasn't already made a recorded choice
-    if (!hasConsented()) {
-      // Small timeout for smooth entrance animation after page load
-      const timer = window.setTimeout(() => setVisible(true), 300);
-      return () => window.clearTimeout(timer);
+
+    // 1. Process any cross-domain network consent signal in the URL (?sm_consent=1|0)
+    if (checkUrlConsentBridge()) {
+      setVisible(false);
+      return;
     }
 
+    // 2. Only display if user hasn't already made a recorded choice
+    if (hasConsented()) {
+      setVisible(false);
+      return;
+    }
+
+    // 3. Geo-Location requirement: only show if visitor is in EU/EEA/UK jurisdiction
+    // (US/California readers operate on CCPA opt-out via footer, no popup required)
+    if (!forceShow && !isGeoConsentRequired(countryCode)) {
+      setVisible(false);
+      return;
+    }
+
+    // Small timeout for smooth entrance animation after page load
+    const timer = window.setTimeout(() => setVisible(true), 300);
+    return () => window.clearTimeout(timer);
+  }, [countryCode, forceShow]);
+
+  useEffect(() => {
     const onConsentChange = () => {
       if (hasConsented()) {
         setVisible(false);
@@ -75,13 +102,12 @@ export function CookieConsentBanner({
 
   const defaultText = (
     <>
-      We use cookies and process data from your device to analyze website performance,
-      personalize ad content, and improve your experience. Your consent includes data
-      transfers outside of the country you’re located. View{" "}
+      We use cookies and device data to analyze performance, support local sponsors,
+      and remember your reading preferences across our news network. View{" "}
       <a href={settingsUrl} className="sm-cookie-banner-link">
         Cookie Settings
       </a>{" "}
-      for more information.
+      for details.
     </>
   );
 

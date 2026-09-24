@@ -10,6 +10,10 @@ import {
   clearCookieConsent,
   acceptAllCookies,
   rejectOptionalCookies,
+  EU_EEA_UK_COUNTRIES,
+  isGeoConsentRequired,
+  checkUrlConsentBridge,
+  decorateNetworkUrl,
 } from "./cookies";
 
 describe("Cookie Consent State & Disclosures", () => {
@@ -73,3 +77,59 @@ describe("Cookie Consent State & Disclosures", () => {
     expect(saved?.source).toBe("settings_save");
   });
 });
+
+describe("Geo-Location Prior-Consent Requirements", () => {
+  it("recognizes EU/EEA/UK member state country codes", () => {
+    expect(EU_EEA_UK_COUNTRIES.has("FR")).toBe(true);
+    expect(EU_EEA_UK_COUNTRIES.has("DE")).toBe(true);
+    expect(EU_EEA_UK_COUNTRIES.has("GB")).toBe(true);
+    expect(EU_EEA_UK_COUNTRIES.has("IE")).toBe(true);
+    expect(EU_EEA_UK_COUNTRIES.has("IT")).toBe(true);
+
+    // Non-EU jurisdictions
+    expect(EU_EEA_UK_COUNTRIES.has("US")).toBe(false);
+    expect(EU_EEA_UK_COUNTRIES.has("CA")).toBe(false);
+    expect(EU_EEA_UK_COUNTRIES.has("AU")).toBe(false);
+    expect(EU_EEA_UK_COUNTRIES.has("JP")).toBe(false);
+  });
+
+  it("isGeoConsentRequired returns true for EU/EEA/UK country codes and false for US", () => {
+    expect(isGeoConsentRequired("FR")).toBe(true);
+    expect(isGeoConsentRequired("de")).toBe(true); // Case-insensitive
+    expect(isGeoConsentRequired("gb")).toBe(true);
+
+    expect(isGeoConsentRequired("US")).toBe(false);
+    expect(isGeoConsentRequired("us")).toBe(false);
+    expect(isGeoConsentRequired("CA")).toBe(false);
+    expect(isGeoConsentRequired("")).toBe(false);
+    expect(isGeoConsentRequired(null)).toBe(false);
+    expect(isGeoConsentRequired(undefined)).toBe(false);
+  });
+});
+
+describe("Cross-Domain Network Consent Bridge", () => {
+  beforeEach(() => {
+    clearCookieConsent();
+  });
+
+  it("decorateNetworkUrl appends sm_consent=1 when consent is accepted", () => {
+    acceptAllCookies();
+    const target = "https://concordchronicle.com/";
+    const decorated = decorateNetworkUrl(target);
+    expect(decorated).toBe("https://concordchronicle.com/?sm_consent=1");
+  });
+
+  it("decorateNetworkUrl appends sm_consent=0 when optional cookies are rejected", () => {
+    rejectOptionalCookies();
+    const target = "https://concordchronicle.com/";
+    const decorated = decorateNetworkUrl(target);
+    expect(decorated).toBe("https://concordchronicle.com/?sm_consent=0");
+  });
+
+  it("decorateNetworkUrl leaves url untouched if no consent has been given", () => {
+    const target = "https://concordchronicle.com/";
+    const decorated = decorateNetworkUrl(target);
+    expect(decorated).toBe("https://concordchronicle.com/");
+  });
+});
+

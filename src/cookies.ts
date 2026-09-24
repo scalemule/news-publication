@@ -212,6 +212,108 @@ export function getCookieConsent(): CookieConsentRecord | null {
 }
 
 /**
+ * ISO 3166-1 alpha-2 country codes for EU/EEA member states and the UK/Switzerland
+ * subject to the GDPR and ePrivacy Directive prior-consent requirement.
+ */
+export const EU_EEA_UK_COUNTRIES = new Set([
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
+  "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES",
+  "SE", "IS", "LI", "NO", "GB", "CH"
+]);
+
+/**
+ * Determine if cookie consent prior-opt-in banner is required based on visitor geography.
+ * For US readers (including California CCPA/CPRA), opt-in banners are not required.
+ * Returns true ONLY if the visitor is identified as being within an EU/EEA/UK jurisdiction.
+ */
+export function isGeoConsentRequired(countryCode?: string | null): boolean {
+  // 1. If an explicit country code is provided (e.g. from server headers or GeoIP):
+  if (countryCode && typeof countryCode === "string") {
+    const code = countryCode.trim().toUpperCase();
+    if (code.length === 2) {
+      return EU_EEA_UK_COUNTRIES.has(code);
+    }
+  }
+
+  // 2. Client-side heuristics if running in the browser
+  if (typeof window !== "undefined") {
+    try {
+      // Check cached geo choice if present
+      const cached = readCookie("sm_geo_country") || window.localStorage?.getItem("sm_geo_country");
+      if (cached && typeof cached === "string" && cached.length === 2) {
+        return EU_EEA_UK_COUNTRIES.has(cached.toUpperCase());
+      }
+
+      // Check browser timezone (100% reliable for local Bay Area / US readers)
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) {
+        // North American timezones (US, Canada, Mexico) -> No prior consent banner required
+        if (/^(America|US|Canada|Pacific)\//i.test(tz)) {
+          return false;
+        }
+        // European timezones -> Prior consent banner required under GDPR / ePrivacy
+        if (/^(Europe|Atlantic\/Reykjavik|Atlantic\/Canary|Atlantic\/Faeroe|Atlantic\/Madeira|Atlantic\/Azores|WET|CET|EET|GMT)/i.test(tz)) {
+          return true;
+        }
+      }
+    } catch {
+      // Ignore client heuristic error
+    }
+  }
+
+  // For California local news publications, default to false (US reader assumption)
+  return false;
+}
+
+/**
+ * Checks for a cross-domain network consent signal in the URL query (?sm_consent=accepted|rejected|1|0).
+ * If present, silently records the consent choice locally and removes the param from the address bar.
+ * Returns true if a consent signal was processed.
+ */
+export function checkUrlConsentBridge(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const url = new URL(window.location.href);
+    const param = url.searchParams.get("sm_consent");
+    if (!param) return false;
+
+    if (param === "accepted" || param === "1" || param === "all") {
+      acceptAllCookies();
+    } else if (param === "rejected" || param === "0" || param === "essential") {
+      rejectOptionalCookies();
+    } else {
+      return false;
+    }
+
+    // Clean URL query parameter without triggering page reload
+    url.searchParams.delete("sm_consent");
+    const newSearch = url.searchParams.toString() ? `?${url.searchParams.toString()}` : "";
+    window.history.replaceState(null, "", `${url.pathname}${newSearch}${url.hash}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Appends the current consent decision to an outgoing URL within the newspaper network
+ * so sister publications can adopt the user's choice without requiring a new banner prompt.
+ */
+export function decorateNetworkUrl(targetUrl: string): string {
+  const consent = getCookieConsent();
+  if (!consent) return targetUrl;
+  try {
+    const base = typeof window !== "undefined" ? window.location.origin : "https://localhost";
+    const url = new URL(targetUrl, base);
+    const value = consent.preferences.performance || consent.preferences.advertising ? "1" : "0";
+    url.searchParams.set("sm_consent", value);
+    return url.toString();
+  } catch {
+    return targetUrl;
+  }
+}
+
+/**
  * Check if the user has already provided an explicit consent decision.
  */
 export function hasConsented(): boolean {
