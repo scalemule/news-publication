@@ -8,6 +8,8 @@ export default defineConfig({
     "marketplace-forms": "src/marketplace-forms.tsx",
     "meet-view": "src/meet-view.tsx",
     "meet-forms": "src/meet-forms.tsx",
+    "cookie-consent-banner": "src/cookie-consent-banner.tsx",
+    "cookie-settings-view": "src/cookie-settings-view.tsx",
   },
   format: ["esm", "cjs"],
   dts: true,
