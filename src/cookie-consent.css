@@ -417,3 +417,134 @@
   align-items: center;
   gap: 0.75rem;
 }
+
+/* ==========================================================================
+   Dark Theme (Evening Edition) support
+   ========================================================================== */
+:root[data-theme="dark"] .sm-cookie-banner-card,
+[data-theme="dark"] .sm-cookie-banner-card,
+.publication[data-theme="dark"] .sm-cookie-banner-card {
+  background: rgba(22, 26, 23, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #eaece8;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .sm-cookie-banner-title,
+[data-theme="dark"] .sm-cookie-banner-title,
+.publication[data-theme="dark"] .sm-cookie-banner-title {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-banner-text,
+[data-theme="dark"] .sm-cookie-banner-text,
+.publication[data-theme="dark"] .sm-cookie-banner-text {
+  color: #c5cbc6;
+}
+
+:root[data-theme="dark"] .sm-cookie-banner-link,
+[data-theme="dark"] .sm-cookie-banner-link,
+.publication[data-theme="dark"] .sm-cookie-banner-link {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-btn-secondary,
+[data-theme="dark"] .sm-cookie-btn-secondary,
+.publication[data-theme="dark"] .sm-cookie-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+:root[data-theme="dark"] .sm-cookie-btn-secondary:hover,
+[data-theme="dark"] .sm-cookie-btn-secondary:hover,
+.publication[data-theme="dark"] .sm-cookie-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme="dark"] .sm-cookie-details-modal,
+[data-theme="dark"] .sm-cookie-details-modal,
+.publication[data-theme="dark"] .sm-cookie-details-modal {
+  background: #161a17;
+  color: #eaece8;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] .sm-cookie-details-header,
+[data-theme="dark"] .sm-cookie-details-header,
+.publication[data-theme="dark"] .sm-cookie-details-header {
+  border-bottom-color: #29302a;
+}
+
+:root[data-theme="dark"] .sm-cookie-details-title,
+[data-theme="dark"] .sm-cookie-details-title,
+.publication[data-theme="dark"] .sm-cookie-details-title {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-details-close,
+[data-theme="dark"] .sm-cookie-details-close,
+.publication[data-theme="dark"] .sm-cookie-details-close {
+  color: #959e96;
+}
+
+:root[data-theme="dark"] .sm-cookie-details-close:hover,
+[data-theme="dark"] .sm-cookie-details-close:hover,
+.publication[data-theme="dark"] .sm-cookie-details-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-category,
+[data-theme="dark"] .sm-cookie-category,
+.publication[data-theme="dark"] .sm-cookie-category {
+  background: #1a1e1b;
+  border-color: #29302a;
+}
+
+:root[data-theme="dark"] .sm-cookie-cat-title,
+[data-theme="dark"] .sm-cookie-cat-title,
+.publication[data-theme="dark"] .sm-cookie-cat-title {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-cat-desc,
+[data-theme="dark"] .sm-cookie-cat-desc,
+.publication[data-theme="dark"] .sm-cookie-cat-desc {
+  color: #959e96;
+}
+
+:root[data-theme="dark"] .sm-cookie-table-wrapper,
+[data-theme="dark"] .sm-cookie-table-wrapper,
+.publication[data-theme="dark"] .sm-cookie-table-wrapper {
+  border-color: #29302a;
+}
+
+:root[data-theme="dark"] .sm-cookie-table th,
+[data-theme="dark"] .sm-cookie-table th,
+.publication[data-theme="dark"] .sm-cookie-table th {
+  background: #131514;
+  color: #959e96;
+  border-bottom-color: #29302a;
+}
+
+:root[data-theme="dark"] .sm-cookie-table td,
+[data-theme="dark"] .sm-cookie-table td,
+.publication[data-theme="dark"] .sm-cookie-table td {
+  color: #eaece8;
+  border-bottom-color: #29302a;
+}
+
+:root[data-theme="dark"] .sm-cookie-code,
+[data-theme="dark"] .sm-cookie-code,
+.publication[data-theme="dark"] .sm-cookie-code {
+  background: #252b27;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sm-cookie-save-bar,
+[data-theme="dark"] .sm-cookie-save-bar,
+.publication[data-theme="dark"] .sm-cookie-save-bar {
+  border-top-color: #29302a;
+}
