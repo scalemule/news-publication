@@ -58,6 +58,12 @@
   --pub-soft: #f5f6f3;
   --pub-sponsor: #173d32;
   --pub-selection-bg: #f6dcdd;
+  --pub-tag-topic-bg: #ffffff;
+  --pub-tag-topic-text: #4b5563;
+  --pub-tag-topic-border: #e2ded4;
+  --pub-tag-hood-bg: #f4f7f5;
+  --pub-tag-hood-text: #1a4237;
+  --pub-tag-hood-border: #cadcd3;
 }
 
 /* Broadsheet Evening Edition: Dark Mode */
@@ -72,6 +78,12 @@
   --pub-soft: #1a1e1b;
   --pub-sponsor: #244b3e;
   --pub-selection-bg: #52191d;
+  --pub-tag-topic-bg: #1c211e;
+  --pub-tag-topic-text: #c5cbc6;
+  --pub-tag-topic-border: #323b34;
+  --pub-tag-hood-bg: rgba(36, 75, 62, 0.35);
+  --pub-tag-hood-text: #8ed6b2;
+  --pub-tag-hood-border: #2a5242;
 }
 
 /* System Preference Mode (Default when not explicitly forced) */
@@ -86,6 +98,12 @@
     --pub-soft: #1a1e1b;
     --pub-sponsor: #244b3e;
     --pub-selection-bg: #52191d;
+    --pub-tag-topic-bg: #1c211e;
+    --pub-tag-topic-text: #c5cbc6;
+    --pub-tag-topic-border: #323b34;
+    --pub-tag-hood-bg: rgba(36, 75, 62, 0.35);
+    --pub-tag-hood-text: #8ed6b2;
+    --pub-tag-hood-border: #2a5242;
   }
 }
 
@@ -101,6 +119,16 @@
 }
 .publication [id] { scroll-margin-top: 24px; }
 .publication ::selection { background: var(--pub-selection-bg, #f6dcdd); color: var(--pub-ink); }
+
+/* Base broadsheet form & input styles */
+.publication input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.publication select,
+.publication textarea {
+  background-color: var(--pub-paper);
+  color: var(--pub-ink);
+  border: 1px solid var(--pub-rule);
+}
+
 @media (min-width: 960px) {
   .publication { --pub-width: 1280px; }
 }
