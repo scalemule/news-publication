@@ -48,6 +48,50 @@ export async function recordConsentToCompliance(
   return baseRecordConsentToCompliance(record, options);
 }
 
+import { isNetworkHostname } from "./network";
+
+let delegationInstalled = false;
+
+/**
+ * Installs a global delegated click listener on `document` that automatically decorates
+ * any outgoing link to any publication in the ScaleMule news network with the reader's
+ * current consent status (?sm_consent=1 or ?sm_consent=0).
+ *
+ * This guarantees seamless cross-domain consent transfer without requiring repeated
+ * consent prompts across the 11 publications in modern browsers with partitioned storage.
+ */
+export function setupNetworkConsentDelegation(): void {
+  if (typeof window === "undefined" || delegationInstalled) return;
+  delegationInstalled = true;
+
+  document.addEventListener(
+    "click",
+    (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest("a");
+      if (!anchor || !anchor.href) return;
+
+      try {
+        const url = new URL(anchor.href, window.location.href);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
+        if (isNetworkHostname(url.hostname)) {
+          const consent = getCookieConsent();
+          if (consent) {
+            const decorated = decorateNetworkUrl(anchor.href);
+            if (decorated !== anchor.href) {
+              anchor.href = decorated;
+            }
+          }
+        }
+      } catch {
+        // Ignore invalid URL
+      }
+    },
+    { capture: true }
+  );
+}
+
 export {
   COOKIE_CONSENT_KEY,
   COOKIE_CONSENT_BACKUP_KEY,
@@ -74,6 +118,7 @@ export {
   recordLegalAcceptance,
   isLegalAcceptanceCurrent,
   clearLegalAcceptance,
+  isNetworkHostname,
 };
 
 export type {

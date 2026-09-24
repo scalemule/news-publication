@@ -11,6 +11,7 @@ import {
   checkUrlConsentBridge,
   queryNetworkConsentHub,
   setNetworkConsentHub,
+  setupNetworkConsentDelegation,
   DEFAULT_CONSENT_HUB_URL,
 } from "./cookies";
 
@@ -51,6 +52,7 @@ export function CookieConsentBanner({
 
   useEffect(() => {
     setMounted(true);
+    setupNetworkConsentDelegation();
 
     // 1. Process any cross-domain network consent signal in the URL (?sm_consent=1|0)
     if (checkUrlConsentBridge()) {
