@@ -9,6 +9,9 @@ import {
   COOKIE_CONSENT_EVENT,
   isGeoConsentRequired,
   checkUrlConsentBridge,
+  queryNetworkConsentHub,
+  setNetworkConsentHub,
+  DEFAULT_CONSENT_HUB_URL,
 } from "./cookies";
 
 export interface CookieConsentBannerProps {
@@ -28,6 +31,8 @@ export interface CookieConsentBannerProps {
   countryCode?: string | null;
   /** Force display of banner regardless of visitor geography */
   forceShow?: boolean;
+  /** URL of the central network consent iframe bridge. Default: "https://bayareachronicle.com/consent-bridge.html" */
+  consentHubUrl?: string;
 }
 
 export function CookieConsentBanner({
@@ -39,6 +44,7 @@ export function CookieConsentBanner({
   complianceEndpoint = "/api/compliance/consent",
   countryCode,
   forceShow = false,
+  consentHubUrl = DEFAULT_CONSENT_HUB_URL,
 }: CookieConsentBannerProps) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -52,23 +58,48 @@ export function CookieConsentBanner({
       return;
     }
 
-    // 2. Only display if user hasn't already made a recorded choice
+    // 2. Only display if user hasn't already made a recorded choice locally
     if (hasConsented()) {
       setVisible(false);
       return;
     }
 
-    // 3. Geo-Location requirement: only show if visitor is in EU/EEA/UK jurisdiction
-    // (US/California readers operate on CCPA opt-out via footer, no popup required)
+    // 3. Geo-Location requirement:
+    // If visitor is in California/US, prior consent is not legally required (CCPA opt-out model)
     if (!forceShow && !isGeoConsentRequired(countryCode)) {
       setVisible(false);
+      // Silently sync with the network hub in the background without prompting the reader
+      void queryNetworkConsentHub(consentHubUrl, 1200).then((networkStatus) => {
+        if (networkStatus === "accepted") {
+          acceptAllCookies();
+        } else if (networkStatus === "rejected") {
+          rejectOptionalCookies();
+        }
+      });
       return;
     }
 
-    // Small timeout for smooth entrance animation after page load
-    const timer = window.setTimeout(() => setVisible(true), 300);
-    return () => window.clearTimeout(timer);
-  }, [countryCode, forceShow]);
+    // 4. Visitors in EU/EEA/UK (where prior opt-in is legally required):
+    // First query the cross-domain network hub via hidden iframe to check if user already consented on another network paper
+    let cancelled = false;
+    void queryNetworkConsentHub(consentHubUrl, 1000).then((networkStatus) => {
+      if (cancelled) return;
+      if (networkStatus === "accepted") {
+        acceptAllCookies();
+        setVisible(false);
+      } else if (networkStatus === "rejected") {
+        rejectOptionalCookies();
+        setVisible(false);
+      } else {
+        // No network consent found, and visitor is in GDPR jurisdiction -> show banner
+        setVisible(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [countryCode, forceShow, consentHubUrl]);
 
   useEffect(() => {
     const onConsentChange = () => {
@@ -89,6 +120,7 @@ export function CookieConsentBanner({
       endpoint: complianceEndpoint,
       publicationSlug,
     });
+    setNetworkConsentHub("accepted", consentHubUrl);
   };
 
   const handleReject = () => {
@@ -98,6 +130,7 @@ export function CookieConsentBanner({
       endpoint: complianceEndpoint,
       publicationSlug,
     });
+    setNetworkConsentHub("rejected", consentHubUrl);
   };
 
   const defaultText = (

@@ -14,6 +14,10 @@ import {
   isGeoConsentRequired,
   checkUrlConsentBridge,
   decorateNetworkUrl,
+  NETWORK_CONSENT_STORAGE_KEY,
+  DEFAULT_CONSENT_HUB_URL,
+  queryNetworkConsentHub,
+  setNetworkConsentHub,
 } from "./cookies";
 
 describe("Cookie Consent State & Disclosures", () => {
@@ -130,6 +134,56 @@ describe("Cross-Domain Network Consent Bridge", () => {
     const target = "https://concordchronicle.com/";
     const decorated = decorateNetworkUrl(target);
     expect(decorated).toBe("https://concordchronicle.com/");
+  });
+
+  it("queryNetworkConsentHub reads from localStorage directly when running on hub origin", async () => {
+    const hubOrigin = new URL(DEFAULT_CONSENT_HUB_URL).origin;
+    const store = new Map<string, string>();
+    store.set(NETWORK_CONSENT_STORAGE_KEY, "accepted");
+
+    (globalThis as any).window = {
+      location: { origin: hubOrigin },
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+        removeItem: (k: string) => store.delete(k),
+      },
+      removeEventListener: () => {},
+      addEventListener: () => {},
+    };
+
+    const status = await queryNetworkConsentHub(DEFAULT_CONSENT_HUB_URL, 100);
+    expect(status).toBe("accepted");
+
+    store.delete(NETWORK_CONSENT_STORAGE_KEY);
+    const emptyStatus = await queryNetworkConsentHub(DEFAULT_CONSENT_HUB_URL, 100);
+    expect(emptyStatus).toBe(null);
+
+    delete (globalThis as any).window;
+  });
+
+  it("setNetworkConsentHub writes to localStorage directly when running on hub origin", () => {
+    const hubOrigin = new URL(DEFAULT_CONSENT_HUB_URL).origin;
+    const store = new Map<string, string>();
+
+    (globalThis as any).window = {
+      location: { origin: hubOrigin },
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+        removeItem: (k: string) => store.delete(k),
+      },
+      removeEventListener: () => {},
+      addEventListener: () => {},
+    };
+
+    setNetworkConsentHub("rejected", DEFAULT_CONSENT_HUB_URL);
+    expect(store.get(NETWORK_CONSENT_STORAGE_KEY)).toBe("rejected");
+
+    setNetworkConsentHub(null, DEFAULT_CONSENT_HUB_URL);
+    expect(store.get(NETWORK_CONSENT_STORAGE_KEY)).toBe(undefined);
+
+    delete (globalThis as any).window;
   });
 });
 
