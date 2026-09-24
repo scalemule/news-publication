@@ -77,6 +77,9 @@ export {
   jobEmployerBody,
   jobOpeningBody,
   jobPostingBody,
+  dealDollars,
+  dealGoPath,
+  dealsFeedPath,
   prepareClassified,
   prepareJobPost,
   publicJobPath,
@@ -144,6 +147,6 @@ export type {
   TagRef,
 } from "./types";
 export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";
-export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicJob } from "./marketplace";
+export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicDeal, PublicDealOffer, PublicJob } from "./marketplace";
 export type { MeetActivity, MeetupInput, PreparedMeetup, PublicPlace } from "./meet";
 

@@ -30,6 +30,36 @@ export type PublicJob = {
   published_at?: string | null;
 };
 
+export type PublicDealOffer = {
+  id: string;
+  merchant: string;
+  price_cents?: number | null;
+};
+
+export type PublicDeal = {
+  id: string;
+  title: string;
+  body: string;
+  price_cents?: number | null;
+  compare_at_cents?: number | null;
+  coupon_code?: string | null;
+  image_url?: string | null;
+  locality?: string | null;
+  offers: PublicDealOffer[];
+};
+
+export function dealsFeedPath(): string {
+  return "/v1/deals/feed";
+}
+
+export function dealGoPath(offerId: string): string {
+  return `/v1/deals/go/${encodeURIComponent(offerId)}`;
+}
+
+export function dealDollars(cents?: number | null): string | null {
+  return cents != null ? `$${(cents / 100).toFixed(2)}` : null;
+}
+
 export type ClassifiedListing = {
   id: string;
   title: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clipChars, prepareClassified, prepareJobPost, publicJobsPath } from "./marketplace";
+import { clipChars, dealDollars, prepareClassified, prepareJobPost, publicJobsPath } from "./marketplace";
 
 const towns = ["Walnut Creek", "Rossmoor"];
 
@@ -38,6 +38,8 @@ describe("marketplace", () => {
     }, towns, "Walnut Creek", new Date("2026-09-22T00:00:00.000Z"));
     expect(listing.location.region).toBe("Walnut Creek");
     expect(listing.expires_at.startsWith("2026-10-22")).toBe(true);
+    expect(dealDollars(1053)).toBe("$10.53");
+    expect(dealDollars(null)).toBeNull();
     expect(listing.price).toBe(40);
   });
 });

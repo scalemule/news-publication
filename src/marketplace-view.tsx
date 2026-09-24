@@ -1,8 +1,10 @@
 import {
   categoryLabel,
   CLASSIFIED_CATEGORIES,
+  dealDollars,
   employmentLabel,
   type ClassifiedListing,
+  type PublicDeal,
   type PublicJob,
 } from "./marketplace";
 
@@ -56,15 +58,41 @@ export function JobArticle({ job }: { job: PublicJob }) {
   );
 }
 
+function DealsBlock({ deals }: { deals: PublicDeal[] }) {
+  if (deals.length === 0) return null;
+  return (
+    <section className="deals" aria-label="Deals">
+      <h2>Deals</h2>
+      <p className="meta">We may earn a commission when you use these links.</p>
+      <div className="list">
+        {deals.map(deal => {
+          const offer = deal.offers[0];
+          if (!offer) return null;
+          const stores = deal.offers.map(item => item.merchant).filter(Boolean).join(", ");
+          return (
+            <a key={deal.id} className="item" href={`/classifieds/out/${encodeURIComponent(offer.id)}`}>
+              <h2>{deal.title}</h2>
+              <p className="meta">{[stores, dealDollars(deal.price_cents ?? offer.price_cents), deal.coupon_code ? `Code ${deal.coupon_code}` : null, deal.locality].filter(Boolean).join(" · ")}</p>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function ClassifiedsBoard({
   region,
   listings,
   category,
+  deals = [],
 }: {
   region: string;
   listings: ClassifiedListing[];
   category: string;
+  deals?: PublicDeal[];
 }) {
+  const dealsFirst = listings.length < 8;
   return (
     <div className="np-market">
       <h1>Classifieds</h1>
@@ -79,11 +107,16 @@ export function ClassifiedsBoard({
           <a key={item.value} className={category === item.value ? "on" : undefined} href={`/classifieds?category=${item.value}`}>{item.label}</a>
         ))}
       </nav>
+      {dealsFirst ? <DealsBlock deals={deals} /> : null}
       {listings.length === 0 ? (
-        <section className="empty">
-          <h2>No classifieds yet.</h2>
-          <p>Post something neighbors might need.</p>
-        </section>
+        deals.length === 0 ? (
+          <section className="empty">
+            <h2>No classifieds yet.</h2>
+            <p>Post something neighbors might need.</p>
+          </section>
+        ) : (
+          <p className="meta">No neighbor listings yet. <a href="/classifieds/post">Place a listing</a>.</p>
+        )
       ) : (
         <div className="list">
           {listings.map(listing => (
@@ -94,6 +127,7 @@ export function ClassifiedsBoard({
           ))}
         </div>
       )}
+      {dealsFirst ? null : <DealsBlock deals={deals} />}
     </div>
   );
 }
