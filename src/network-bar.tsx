@@ -1,7 +1,11 @@
 "use client";
-import { useId, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { listedPublications } from "./network";
-import { decorateNetworkUrl } from "./cookies";
+import {
+  decorateNetworkUrl,
+  setupNetworkConsentDelegation,
+  COOKIE_CONSENT_EVENT,
+} from "./cookies";
 
 export interface LocalNetworkBarProps {
   currentSlug: string;
@@ -15,8 +19,20 @@ export interface LocalNetworkBarProps {
  */
 export function LocalNetworkBar({ currentSlug, className = "", style }: LocalNetworkBarProps) {
   const [open, setOpen] = useState(false);
+  const [, setConsentVersion] = useState(0);
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setupNetworkConsentDelegation();
+    const handleConsent = () => setConsentVersion((v) => v + 1);
+    window.addEventListener(COOKIE_CONSENT_EVENT, handleConsent);
+    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, handleConsent);
+  }, []);
+
+  const prepareLink = (e: React.MouseEvent<HTMLAnchorElement>, pubUrl: string) => {
+    e.currentTarget.href = decorateNetworkUrl(pubUrl + "/");
+  };
 
   return (
     <nav
@@ -51,6 +67,8 @@ export function LocalNetworkBar({ currentSlug, className = "", style }: LocalNet
                 <a
                   href={targetUrl}
                   aria-current={isCurrent ? "true" : undefined}
+                  onMouseDown={(e) => !isCurrent && prepareLink(e, publication.url)}
+                  onClick={(e) => !isCurrent && prepareLink(e, publication.url)}
                 >
                   {publication.name}
                 </a>

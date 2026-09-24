@@ -122,3 +122,25 @@ export function getNetworkPublicationUrl(slug: string): string | null {
   if (!pub) return null;
   return decorateNetworkUrl(pub.url + "/");
 }
+
+const NETWORK_HOSTNAMES = new Set(
+  localPublications.map((p) => {
+    try {
+      return new URL(p.url).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      return `${p.slug}.com`;
+    }
+  })
+);
+
+/** Check whether a given hostname belongs to any publication in the ScaleMule news network. */
+export function isNetworkHostname(hostname: string): boolean {
+  if (!hostname) return false;
+  const clean = hostname.replace(/^www\./, "").toLowerCase();
+  return (
+    NETWORK_HOSTNAMES.has(clean) ||
+    clean.endsWith(".bayareachronicle.com") ||
+    clean.endsWith(".napsite.com") ||
+    clean.endsWith(".site.scalemule.com")
+  );
+}

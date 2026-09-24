@@ -6,6 +6,7 @@ import {
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
+  isNetworkHostname,
 } from "./network";
 
 describe("publication network", () => {
@@ -52,5 +53,25 @@ describe("publication network", () => {
     const url = getNetworkPublicationUrl("alamoweekly");
     expect(url).toBeTruthy();
     expect(url).toContain("https://alamoweekly.com/");
+  });
+
+  it("identifies network hostnames across all 11 publications", () => {
+    expect(isNetworkHostname("bayareachronicle.com")).toBe(true);
+    expect(isNetworkHostname("www.bayareachronicle.com")).toBe(true);
+    expect(isNetworkHostname("concordchronicle.com")).toBe(true);
+    expect(isNetworkHostname("walnutcreektimes.com")).toBe(true);
+    expect(isNetworkHostname("lamorindapost.com")).toBe(true);
+    expect(isNetworkHostname("alamoweekly.com")).toBe(true);
+    expect(isNetworkHostname("danvilletimes.com")).toBe(true);
+    expect(isNetworkHostname("sanramontimes.com")).toBe(true);
+    expect(isNetworkHostname("diablovalleynews.com")).toBe(true);
+    expect(isNetworkHostname("trivalleyweekly.com")).toBe(true);
+    expect(isNetworkHostname("eastbaypost.com")).toBe(true);
+    expect(isNetworkHostname("napagate.com")).toBe(true);
+    expect(isNetworkHostname("preview.napsite.com")).toBe(true);
+
+    expect(isNetworkHostname("google.com")).toBe(false);
+    expect(isNetworkHostname("facebook.com")).toBe(false);
+    expect(isNetworkHostname("nytimes.com")).toBe(false);
   });
 });
