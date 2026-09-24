@@ -113,6 +113,23 @@ export {
 } from "./cookies";
 export { CookieConsentBanner } from "./cookie-consent-banner";
 export { CookieSettingsView } from "./cookie-settings-view";
+export {
+  THEME_COOKIE,
+  THEME_STORAGE_KEY,
+  THEME_EVENT,
+  THEME_MAX_AGE_SECONDS,
+  getSystemTheme,
+  resolveEffectiveTheme,
+  getStoredTheme,
+  applyTheme,
+  setTheme,
+  clearTheme,
+  subscribeTheme,
+  themeInitScript,
+} from "./theme";
+export { ThemeToggle } from "./theme-toggle";
+export type { ThemeMode, EffectiveTheme } from "./theme";
+export type { ThemeToggleProps } from "./theme-toggle";
 export type {
   CookieCategory,
   CookieCategoryDefinition,

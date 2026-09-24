@@ -13,6 +13,7 @@
   --pub-rule: #d7dcd7;
   --pub-soft: #f5f6f3;
   --pub-sponsor: #173d32;
+  --pub-selection-bg: #f6dcdd;
   --pub-serif: var(--font-editorial), Georgia, "Times New Roman", serif;
   --pub-editorial: var(--font-editorial), Georgia, "Times New Roman", serif;
   --pub-sans: var(--font-inter), Arial, Helvetica, sans-serif;
@@ -43,7 +44,51 @@
   line-height: 1.5;
   min-height: 100dvh;
   overflow-wrap: break-word;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Explicit Light Mode Override */
+:root[data-theme="light"] .publication,
+.publication[data-theme="light"] {
+  --pub-paper: #ffffff;
+  --pub-ink: #171917;
+  --pub-muted: #545c55;
+  --pub-accent: #bb171d;
+  --pub-rule: #d7dcd7;
+  --pub-soft: #f5f6f3;
+  --pub-sponsor: #173d32;
+  --pub-selection-bg: #f6dcdd;
+}
+
+/* Broadsheet Evening Edition: Dark Mode */
+:root[data-theme="dark"] .publication,
+.publication[data-theme="dark"],
+[data-theme="dark"] {
+  --pub-paper: #131514;
+  --pub-ink: #eaece8;
+  --pub-muted: #959e96;
+  --pub-accent: #e54b51;
+  --pub-rule: #29302a;
+  --pub-soft: #1a1e1b;
+  --pub-sponsor: #244b3e;
+  --pub-selection-bg: #52191d;
+}
+
+/* System Preference Mode (Default when not explicitly forced) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .publication,
+  .publication:not([data-theme="light"]) {
+    --pub-paper: #131514;
+    --pub-ink: #eaece8;
+    --pub-muted: #959e96;
+    --pub-accent: #e54b51;
+    --pub-rule: #29302a;
+    --pub-soft: #1a1e1b;
+    --pub-sponsor: #244b3e;
+    --pub-selection-bg: #52191d;
+  }
+}
+
 .publication *, .publication *::before, .publication *::after { box-sizing: border-box; }
 .publication :focus-visible { outline: 3px solid #a95c00; outline-offset: 4px; }
 .publication a, .publication button, .publication summary { touch-action: manipulation; }
@@ -55,7 +100,138 @@
   text-wrap: pretty;
 }
 .publication [id] { scroll-margin-top: 24px; }
-.publication ::selection { background: #f6dcdd; color: var(--pub-ink); }
+.publication ::selection { background: var(--pub-selection-bg, #f6dcdd); color: var(--pub-ink); }
 @media (min-width: 960px) {
   .publication { --pub-width: 1280px; }
+}
+
+/*
+ * Broadsheet Theme Toggle Controls
+ */
+.pub-theme-toggle-container {
+  display: inline-flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.pub-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--pub-rule);
+  background: var(--pub-soft);
+  border-radius: 4px;
+  font-family: var(--pub-sans);
+  line-height: 1;
+  user-select: none;
+}
+
+.pub-theme-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 8px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  color: var(--pub-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.pub-theme-toggle button:hover {
+  color: var(--pub-ink);
+}
+
+.pub-theme-toggle button[aria-pressed="true"],
+.pub-theme-toggle button[data-active="true"] {
+  background: var(--pub-paper);
+  color: var(--pub-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.pub-theme-toggle svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Compact variant (ideal for top utility bar) */
+.pub-theme-toggle[data-variant="compact"] {
+  padding: 1px;
+  gap: 1px;
+}
+
+.pub-theme-toggle[data-variant="compact"] button {
+  padding: 3px 6px;
+  height: 22px;
+  min-width: 24px;
+}
+
+.pub-theme-toggle[data-variant="compact"] svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Inline variant (for reading toolbar on article pages) */
+.pub-theme-toggle[data-variant="inline"] {
+  border-color: var(--pub-rule);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  gap: 0;
+}
+
+.pub-theme-toggle[data-variant="inline"] button {
+  height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--pub-rule);
+  border-radius: 0;
+  background: var(--pub-paper);
+  font-size: 12px;
+}
+
+.pub-theme-toggle[data-variant="inline"] button:not(:first-child) {
+  margin-left: -1px;
+}
+
+.pub-theme-toggle[data-variant="inline"] button[aria-pressed="true"],
+.pub-theme-toggle[data-variant="inline"] button[data-active="true"] {
+  background: var(--pub-soft);
+  color: var(--pub-ink);
+  border-color: var(--pub-ink);
+  z-index: 1;
+}
+
+/* Reader promotion / device sync prompt banner */
+.pub-theme-promo {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  border: 1px solid var(--pub-rule);
+  background: var(--pub-paper);
+  color: var(--pub-ink);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.pub-theme-promo a {
+  color: var(--pub-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

@@ -127,6 +127,13 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
         type: "Local Storage",
       },
       {
+        name: "news_publication_theme",
+        provider: "First-Party",
+        purpose: "Remembers your reading theme preference (light, dark, or system).",
+        duration: "1 year",
+        type: "HTTP Cookie",
+      },
+      {
         name: "audio_narration_speed",
         provider: "First-Party",
         purpose: "Stores your preferred audio player playback rate (e.g. 1.0x, 1.25x).",
