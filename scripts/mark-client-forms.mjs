@@ -6,6 +6,7 @@ const targeted = new Set([
   "meet-forms.js", "meet-forms.cjs",
   "cookie-consent-banner.js", "cookie-consent-banner.cjs",
   "cookie-settings-view.js", "cookie-settings-view.cjs",
+  "theme-toggle.js", "theme-toggle.cjs",
 ]);
 
 for (const name of readdirSync("dist")) {
