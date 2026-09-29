@@ -10,10 +10,10 @@ export function ArticleProvenance({ metadata }: Pick<NewsArticle, 'metadata'>) {
   const credit = reporting?.credit?.trim()
   const byline = reporting?.original_byline?.trim()
   const wire = reporting?.wire_credit?.trim()
-  if (!label && !credit && !wire && !sources.length && !related.length) return null
+  if (!label && !credit && !byline && !wire && !sources.length && !related.length) return null
   return <aside aria-label="About this reporting" className="article-provenance">
     {label && <p className="article-provenance__label">{label}</p>}
-    {credit && <p>{credit}{byline ? ` · ${byline}` : ''}</p>}
+    {(credit || byline) && <p>{[credit, byline].filter(Boolean).join(' · ')}</p>}
     {wire && <p>{wire}</p>}
     {!!sources.length && <details><summary>Sources</summary><ul>{sources.map(source => <li key={source.url}><a href={source.url} rel="noopener noreferrer" target="_blank">{source.title || source.publisher || new URL(source.url).hostname}</a></li>)}</ul></details>}
     {!!related.length && <details><summary>Related reporting</summary><ul>{related.map(link => <li key={link.url}><a href={link.url} rel="noopener noreferrer">{new URL(link.url).hostname}{new URL(link.url).pathname}</a></li>)}</ul></details>}
@@ -29,7 +29,14 @@ export function readerSources(input: unknown): { url: string; title?: string; pu
       const url = new URL(value.url)
       if (url.protocol !== 'https:' || url.username || url.password || seen.has(url.href)) continue
       seen.add(url.href)
-      output.push({ url: url.href, title: typeof value.title === 'string' ? Array.from(value.title).slice(0, 500).join('') : undefined, publisher: typeof value.publisher === 'string' ? Array.from(value.publisher).slice(0, 255).join('') : undefined })
+      // Trim before truncating so a whitespace-only label falls back to the
+      // hostname instead of producing an anchor with no accessible name.
+      const text = (raw: unknown, limit: number) => {
+        if (typeof raw !== 'string') return undefined
+        const trimmed = raw.trim()
+        return trimmed ? Array.from(trimmed).slice(0, limit).join('') : undefined
+      }
+      output.push({ url: url.href, title: text(value.title, 500), publisher: text(value.publisher, 255) })
       if (output.length === 5) break
     } catch { continue }
   }
