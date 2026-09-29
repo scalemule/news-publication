@@ -146,6 +146,8 @@ export type NewsArticle = NewsItem & {
   og_image_url?: string;
   audio?: { url?: string; duration_ms?: number | null };
   metadata?: {
+    editorial_origin?: 'UNKNOWN' | 'ORIGINAL_REPORTING' | 'DOCUMENT_REPORTING' | 'PRESS_RELEASE_BASED' | 'NEWS_PICKUP' | 'ANALYSIS' | 'COMMENTARY' | 'LICENSED_WIRE' | 'NETWORK_SYNDICATED' | 'COMMUNITY_SUBMISSION';
+    reporting?: { edition_id: string; story_id: string; story_revision: number; originating_publication_id: string; original_byline?: string; credit?: string; related_links?: string[]; wire_credit?: string; canonical_origin?: string; origin?: string };
     cover_image?: CoverImageMetadata;
     citations?: ArticleCitation[];
     resources?: {

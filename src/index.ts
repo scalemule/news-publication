@@ -186,3 +186,5 @@ export type { PublicationNetworkItem } from "./network";
 export { LocalNetworkBar } from "./network-bar";
 export type { LocalNetworkBarProps } from "./network-bar";
 
+
+export { ArticleProvenance, readerSources } from "./article-provenance";

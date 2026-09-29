@@ -72,3 +72,16 @@ The React front page still lives in the Walnut Creek Times repository. This pack
 ## Versioning
 
 Patch only (`0.0.x` or `0.1.x`) until a stable release is explicitly approved. Publishing is manual: `npm publish` from this directory.
+
+
+### Reporting credit and sources
+
+`ArticleProvenance` renders the public reporting projection: analysis/commentary labels, network and wire credit, and up to five deduplicated source links. It accepts `NewsArticle.metadata` and never renders internal claim mappings, reporter notes or source artifacts. Syndicated commentary keeps its canonical commentary label.
+
+```tsx
+import { ArticleProvenance } from '@scalemule/news-publication'
+
+<ArticleProvenance metadata={article.metadata} />
+```
+
+The component inherits the publication's typography. Optional styling hooks are `article-provenance` and `article-provenance__label`. `readerSources()` is available when an existing publication component owns source-list rendering.
