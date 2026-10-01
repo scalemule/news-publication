@@ -15,7 +15,7 @@ export function articleUrl(canonical: string, slug: string): string {
   return `${canonical.replace(/\/$/, "")}/news/${encodeURIComponent(slug)}`;
 }
 
-/** Same NewsArticle graph Walnut Creek Times emits on an indexable story. */
+/** Describe the local edition while retaining the designated reporting source. */
 export function newsArticleJsonLd(
   publication: NewsPublication,
   article: NewsArticle,
@@ -31,11 +31,16 @@ export function newsArticleJsonLd(
     headline: article.title,
     description: article.excerpt ?? undefined,
     datePublished: article.published_at,
-    dateModified: article.updated_at,
+    // updated_at also changes for media/operational maintenance. A trusted
+    // editorial modification timestamp is required before emitting dateModified.
     image: image ? [image] : undefined,
-    mainEntityOfPage: canonicalUrl,
+    mainEntityOfPage: url,
     url,
-    author: { "@type": "Organization", name: authorName || publication.name },
+    ...(canonicalUrl !== url ? { isBasedOn: canonicalUrl } : {}),
+    articleSection: article.section || undefined,
+    // The publication byline is known to be an organization. Do not infer a
+    // person's identity or classify an untyped external byline as a newsroom.
+    author: { ...(!authorName || authorName === publication.name ? { "@type": "Organization" } : {}), name: authorName || publication.name },
     publisher: { "@type": "NewsMediaOrganization", name: publication.name, url: canonical },
   };
 }
@@ -77,17 +82,17 @@ export function articleMeta(publication: NewsPublication, article: NewsArticle, 
   const canonicalUrl = publicHttps(article.canonical_url) ?? url;
   const image = publicHttps(article.og_image_url) ?? publicHttps(article.cover_image_url);
   return {
-    title: article.seo_title ?? article.title,
+    title: article.title,
     description: article.seo_description ?? article.excerpt ?? publication.description,
     canonical: canonicalUrl,
     indexable: indexable && !article.no_index,
     openGraph: {
       type: "article" as const,
+      siteName: publication.name,
       title: article.title,
       description: article.excerpt ?? undefined,
       url,
       publishedTime: article.published_at,
-      modifiedTime: article.updated_at,
       images: image ? [image] : [],
     },
   };

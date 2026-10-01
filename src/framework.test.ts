@@ -184,6 +184,11 @@ describe("search metadata", () => {
     expect(graph["@type"]).toBe("NewsArticle");
     expect(graph.publisher).toMatchObject({ "@type": "NewsMediaOrganization", name: "Walnut Creek Times" });
     expect(graph.url).toBe("https://walnutcreektimes.com/news/tenant-rights");
+    expect(graph).not.toHaveProperty("dateModified");
+    const meta = articleMeta(walnutCreekTimes, { ...storyArticle, seo_title: "Tenant ri" }, "https://walnutcreektimes.com", true);
+    expect(meta.title).toBe(storyArticle.title);
+    expect(meta.openGraph).not.toHaveProperty("modifiedTime");
+    expect(meta.openGraph.siteName).toBe(walnutCreekTimes.name);
     expect(llmsText(walnutCreekTimes, "https://walnutcreektimes.com")).toContain("Walnut Creek, Rossmoor, Saranap, Pleasant Hill");
   });
 
@@ -200,7 +205,8 @@ describe("search metadata", () => {
     expect(meta.canonical).toBe("https://concordchronicle.com/news/concord-taco-trail");
 
     const jsonLd = newsArticleJsonLd(walnutCreekTimes, syndicatedArticle, "https://walnutcreektimes.com");
-    expect(jsonLd.mainEntityOfPage).toBe("https://concordchronicle.com/news/concord-taco-trail");
+    expect(jsonLd.mainEntityOfPage).toBe("https://walnutcreektimes.com/news/concord-taco-trail");
+    expect(jsonLd.isBasedOn).toBe("https://concordchronicle.com/news/concord-taco-trail");
     expect(jsonLd.url).toBe("https://walnutcreektimes.com/news/concord-taco-trail");
   });
 
