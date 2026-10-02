@@ -190,3 +190,6 @@ export type { LocalNetworkBarProps } from "./network-bar";
 
 
 export { ArticleProvenance, readerSources } from "./article-provenance";
+
+export { publicationListeningTrack, publicationListeningCandidates } from './listening'
+export type { ListeningArticle } from './listening'
