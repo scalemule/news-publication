@@ -85,3 +85,18 @@ import { ArticleProvenance } from '@scalemule/news-publication'
 ```
 
 The component inherits the publication's typography. Optional styling hooks are `article-provenance` and `article-provenance__label`. `readerSources()` is available when an existing publication component owns source-list rendering.
+
+### Verified Community Cards
+
+`VerifiedCardSection` and `VerifiedCardComponent` render broadsheet-styled fact sheets for verified entities (`PLACE`, `ACTIVITY`, `EVENT`, `ORGANIZATION`, `PRODUCT`). Verified cards display confirmed operating hours, venues, contact details, dates, and primary action links (tickets, registration, maps) validated by newsroom staff.
+
+```tsx
+import { VerifiedCardSection, getArticleCards } from '@scalemule/news-publication'
+
+const cards = getArticleCards(article.metadata?.cards)
+
+<VerifiedCardSection cards={cards} />
+```
+
+Styles adhere to the publication theme (`--pub-paper`, `--pub-ink`, `--pub-accent`, `--pub-rule`, `--pub-soft`) and are included in `@scalemule/news-publication/tokens.css` or available standalone via `@scalemule/news-publication/verified-card.css`.
+

@@ -138,6 +138,49 @@ export type CoverImageMetadata = {
 
 export type ArticleCitation = { url: string; title?: string; publisher?: string };
 
+export type CardType = "PLACE" | "ACTIVITY" | "EVENT" | "ORGANIZATION" | "PRODUCT";
+
+export type VerifiedCardAction = {
+  label: string;
+  url: string;
+  primary?: boolean;
+};
+
+export type VerifiedCardFact = {
+  label: string;
+  value: string;
+  href?: string;
+};
+
+export type VerifiedCardImage = {
+  file_id?: string;
+  master_url?: string;
+  url?: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+  caption?: string;
+  attribution?: string;
+  label?: string;
+  ai_generated?: boolean;
+};
+
+export type VerifiedCard = {
+  id: string;
+  cardType: CardType;
+  kicker: string;
+  title: string;
+  subtitle?: string;
+  summary?: string;
+  badge?: string;
+  facts: VerifiedCardFact[];
+  actions: VerifiedCardAction[];
+  verificationNote: string;
+  verifiedAt: string;
+  image?: VerifiedCardImage;
+  rating?: number | string;
+};
+
 export type NewsArticle = NewsItem & {
   content_html: string;
   subtitle?: string;
@@ -157,6 +200,7 @@ export type NewsArticle = NewsItem & {
       attribution: string;
       ai_generated: boolean;
     }[];
+    cards?: VerifiedCard[] | unknown[];
   };
 };
 
