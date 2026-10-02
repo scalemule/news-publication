@@ -17,6 +17,7 @@ export {
   withLastKnown,
 } from "./cache";
 export {
+  EDITORIAL_SECTION_ORDER,
   activeNearby,
   briefSummary,
   composeEdition,
@@ -26,6 +27,7 @@ export {
   matchesStoryTag,
   nearbyUpdates,
   normalizedText,
+  orderedSections,
   sectionDefinition,
   sectionId,
   sectionPath,
