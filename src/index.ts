@@ -193,3 +193,18 @@ export { ArticleProvenance, readerSources } from "./article-provenance";
 
 export { publicationListeningTrack, publicationListeningCandidates } from './listening'
 export type { ListeningArticle } from './listening'
+
+export {
+  VerifiedCardComponent,
+  VerifiedCardSection,
+  getArticleCards,
+  isSafeActionUrl,
+} from "./verified-card";
+export type {
+  CardType,
+  VerifiedCard,
+  VerifiedCardAction,
+  VerifiedCardFact,
+  VerifiedCardImage,
+} from "./types";
+
