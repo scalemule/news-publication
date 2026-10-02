@@ -17,8 +17,10 @@ import {
   publicUrl,
   referralCode,
   resolveCoupon,
+  orderedSections,
   resolveLayout,
   revalidateDecision,
+  sectionDefinition,
   sectionId,
   shortDeck,
   storyTowns,
@@ -142,6 +144,18 @@ describe("front page", () => {
     expect(Array.from(shortDeck("😀😀😀 hello", 2)).length).toBeLessThanOrEqual(3);
     expect(sectionId("市区")).toBe("section-市区");
     expect(sectionId("Food & places")).toBe("section-food-places");
+  });
+
+  it("labels sections for readers and keeps slugs stable", () => {
+    expect(sectionDefinition("Local businesses")).toMatchObject({ label: "Business", id: "section-local-businesses" });
+    expect(sectionDefinition("Events")).toMatchObject({ label: "Things to do", id: "section-events" });
+    expect(sectionDefinition("Real Estate")).toMatchObject({ label: "Real Estate", id: "section-real-estate" });
+  });
+
+  it("orders sections canonically with unknown names after, alphabetically", () => {
+    const names = ["Health", "Opinion", "Real Estate", "Local news", "Bridge club", "Civic life", "Aquatics"];
+    expect(orderedSections(names.map(name => ({ name }))).map(section => section.name))
+      .toEqual(["Civic life", "Real Estate", "Health", "Opinion", "Aquatics", "Bridge club"]);
   });
 
   it("finds covered towns in Cyrillic and English copy", () => {

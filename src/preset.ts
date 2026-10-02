@@ -13,7 +13,7 @@ export const walnutCreekTimes = definePublication({
   regionLabel: "Walnut Creek",
   towns: ["Walnut Creek", "Rossmoor", "Saranap", "Pleasant Hill"],
   nearbyTowns: ["Martinez", "Concord", "Contra Costa"],
-  sections: ["Civic life", "Community", "Local businesses", "Events", "Food & places"],
+  sections: ["Civic life", "Community", "Local businesses", "Real Estate", "Food & places", "Events", "Health"],
   description: "Local news, independent businesses and community voices from Walnut Creek, Rossmoor, Saranap and Pleasant Hill.",
   layout: "broadsheet",
   layouts: ["broadsheet"],

@@ -1,9 +1,38 @@
 import type { EditorialSection, HomepageSelection, NewsItem, NewsPublication } from "./types";
 
 const labels: Record<string, string> = {
-  "Local businesses": "Local business",
+  "Local businesses": "Business",
+  "Events": "Things to do",
   "Food & places": "Food & drink",
 };
+
+/**
+ * Canonical reader-facing order for editorial sections across the network.
+ * Names not listed here sort after these, alphabetically. "Schools" and
+ * "Opinion" are reserved so future sections slot in without a release.
+ */
+export const EDITORIAL_SECTION_ORDER = [
+  "Civic life",
+  "Community",
+  "Local businesses",
+  "Real Estate",
+  "Food & places",
+  "Events",
+  "Health",
+  "Schools",
+  "Opinion",
+] as const;
+
+/** Sorts sections into the canonical order, dropping the implicit "Local news" bucket. */
+export function orderedSections<T extends { name: string }>(sections: T[], order: readonly string[] = EDITORIAL_SECTION_ORDER): T[] {
+  return sections.filter(section => section.name !== "Local news").slice().sort((left, right) => {
+    const leftRank = order.indexOf(left.name);
+    const rightRank = order.indexOf(right.name);
+    const leftOrder = leftRank === -1 ? order.length : leftRank;
+    const rightOrder = rightRank === -1 ? order.length : rightRank;
+    return leftOrder - rightOrder || left.name.localeCompare(right.name);
+  });
+}
 
 export function sectionId(name: string): string {
   return "section-" + name.normalize("NFKD").replace(/\p{Mark}/gu, "").toLowerCase().replace(/[^\p{Letter}\p{Number}]+/gu, "-").replace(/^-|-$/g, "");
