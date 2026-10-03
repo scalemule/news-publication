@@ -5,6 +5,7 @@ import type {
   VerifiedCardFact,
   VerifiedCardImage,
 } from "./types";
+import { CURATED_COMMUNITY_CARDS } from "./curated-cards";
 
 const ALLOWED_CARD_TYPES = new Set<CardType>([
   "PLACE",
@@ -81,11 +82,9 @@ export function isSafeActionUrl(raw: unknown): boolean {
 }
 
 /**
- * Sanitize and project raw API metadata cards into strictly validated `VerifiedCard[]`.
+ * Internal parser for raw card objects.
  */
-export function getArticleCards(rawCards?: unknown): VerifiedCard[] {
-  if (!Array.isArray(rawCards) || rawCards.length === 0) return [];
-
+function parseRawCards(rawCards: unknown[]): VerifiedCard[] {
   const cards: VerifiedCard[] = [];
 
   for (const item of rawCards) {
@@ -230,6 +229,23 @@ export function getArticleCards(rawCards?: unknown): VerifiedCard[] {
   }
 
   return cards;
+}
+
+/**
+ * Sanitize and project raw API metadata cards into strictly validated `VerifiedCard[]`.
+ * If rawCards is empty or absent and a slug is provided, checks the curated community cards registry.
+ */
+export function getArticleCards(rawCards?: unknown, slug?: string): VerifiedCard[] {
+  if (Array.isArray(rawCards) && rawCards.length > 0) {
+    const fromRaw = parseRawCards(rawCards);
+    if (fromRaw.length > 0) return fromRaw;
+  }
+
+  if (slug && CURATED_COMMUNITY_CARDS[slug]) {
+    return parseRawCards(CURATED_COMMUNITY_CARDS[slug]);
+  }
+
+  return [];
 }
 
 export function VerifiedCardComponent({

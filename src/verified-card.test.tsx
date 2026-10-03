@@ -122,4 +122,37 @@ describe("verified-card functionality and security", () => {
     expect(VerifiedCardSection({})).toBeNull();
     expect(VerifiedCardSection({ cards: [] })).toBeNull();
   });
+
+  it("resolves curated community cards by article slug as fallback", () => {
+    // Danville Times story slug
+    const danvilleCards = getArticleCards(
+      undefined,
+      "dublin-trail-challenge-adds-a-cycling-option-for-its-fall-return"
+    );
+    expect(danvilleCards.length).toBe(1);
+    expect(danvilleCards[0].id).toBe("card-dublin-trail-2026");
+    expect(danvilleCards[0].title).toBe("2026 Dublin Trail Challenge");
+    expect(danvilleCards[0].cardType).toBe("ACTIVITY");
+    expect(danvilleCards[0].actions[0].url).toBe(
+      "https://runsignup.com/Race/CA/Dublin/DublinTrailChallenge"
+    );
+
+    // Unregistered slug returns empty
+    expect(getArticleCards(undefined, "unknown-local-slug-12345")).toEqual([]);
+
+    // Custom raw cards always take precedence over curated registry
+    const override = getArticleCards(
+      [
+        {
+          id: "custom-db-card",
+          title: "Database Projected Card",
+          card_type: "ORGANIZATION",
+        },
+      ],
+      "dublin-trail-challenge-adds-a-cycling-option-for-its-fall-return"
+    );
+    expect(override.length).toBe(1);
+    expect(override[0].id).toBe("custom-db-card");
+    expect(override[0].title).toBe("Database Projected Card");
+  });
 });
