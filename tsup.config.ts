@@ -14,6 +14,7 @@ export default defineConfig({
     compliance: "src/compliance.ts",
     network: "src/network.ts",
     "network-bar": "src/network-bar.tsx",
+    "network-copyright": "src/network-copyright.tsx",
     "verified-card": "src/verified-card.tsx",
   },
   format: ["esm", "cjs"],

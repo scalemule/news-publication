@@ -7,9 +7,16 @@ import {
   findPublicationByHost,
   getNetworkPublicationUrl,
   isNetworkHostname,
+  NETWORK_PARENT,
 } from "./network";
 
 describe("publication network", () => {
+  it("defines the parent institutional network entity", () => {
+    expect(NETWORK_PARENT.name).toBe("Bay Area News Network");
+    expect(NETWORK_PARENT.url).toBe("https://bayareanewsnetwork.com");
+    expect(NETWORK_PARENT.tagline).toBe("Local stories. Stronger communities.");
+  });
+
   it("includes all 11 publications in the Bay Area network", () => {
     expect(localPublications.length).toBe(11);
     const slugs = localPublications.map((p) => p.slug);

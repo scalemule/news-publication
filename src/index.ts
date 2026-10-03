@@ -183,10 +183,13 @@ export {
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
+  NETWORK_PARENT,
 } from "./network";
-export type { PublicationNetworkItem } from "./network";
+export type { PublicationNetworkItem, NetworkParent } from "./network";
 export { LocalNetworkBar } from "./network-bar";
 export type { LocalNetworkBarProps } from "./network-bar";
+export { NetworkCopyrightNotice } from "./network-copyright";
+export type { NetworkCopyrightNoticeProps } from "./network-copyright";
 
 
 export { ArticleProvenance, readerSources } from "./article-provenance";
