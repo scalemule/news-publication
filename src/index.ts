@@ -200,6 +200,7 @@ export {
   getArticleCards,
   isSafeActionUrl,
 } from "./verified-card";
+export { CURATED_COMMUNITY_CARDS } from "./curated-cards";
 export type {
   CardType,
   VerifiedCard,
