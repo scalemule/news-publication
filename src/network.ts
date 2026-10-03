@@ -1,5 +1,22 @@
 import { decorateNetworkUrl } from "./cookies";
 
+export interface NetworkParent {
+  name: string;
+  url: string;
+  tagline: string;
+  description: string;
+}
+
+/**
+ * The institutional parent news organization behind all member publications.
+ */
+export const NETWORK_PARENT: NetworkParent = {
+  name: "Bay Area News Network",
+  url: "https://bayareanewsnetwork.com",
+  tagline: "Local stories. Stronger communities.",
+  description: "The institutional network of independent local publications covering the San Francisco Bay Area.",
+} as const;
+
 export interface PublicationNetworkItem {
   slug: string;
   name: string;
@@ -19,7 +36,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Bay Area Chronicle",
     url: "https://bayareachronicle.com",
     area: "San Francisco Bay Area",
-    description: "The parent home for our local community publications.",
+    description: "Regional reporting and in-depth investigations covering the nine-county San Francisco Bay Area.",
   },
   {
     slug: "concordchronicle",
@@ -138,6 +155,8 @@ export function isNetworkHostname(hostname: string): boolean {
   if (!hostname) return false;
   const clean = hostname.replace(/^www\./, "").toLowerCase();
   return (
+    clean === "bayareanewsnetwork.com" ||
+    clean.endsWith(".bayareanewsnetwork.com") ||
     NETWORK_HOSTNAMES.has(clean) ||
     clean.endsWith(".bayareachronicle.com") ||
     clean.endsWith(".napsite.com") ||
