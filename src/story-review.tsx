@@ -367,6 +367,7 @@ export function StoryReview({
     selectedAfter = revisions.find(
       (r) => r.id === (compareTo || review?.revision.id),
     );
+  const errorMessage = error ? <p ref={errorRef} tabIndex={-1} role="alert" className="sm-review-alert">{error}</p> : null;
   return (
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
@@ -390,11 +391,7 @@ export function StoryReview({
         <span>{review?.publication.name || publicationName}</span>
       </header></div>}
       <main className={`sm-story-review${celebration ? " sm-review-celebration" : ""}`}>
-      {error && (
-        <p ref={errorRef} tabIndex={-1} role="alert" className="sm-review-alert">
-          {error}
-        </p>
-      )}
+      {(!review || panel === "article" || verification) && errorMessage}
       {notice && !(approved && finalEditor && notice === approvalThanks) && (
         <p ref={noticeRef} tabIndex={-1} role="status" className="sm-review-notice">
           {notice}
@@ -681,7 +678,7 @@ export function StoryReview({
             {file && !pending.some(([name]) => name === "media") && <button onClick={() => setPanel("media")}>Continue your photo upload</button>}
           </aside>}
           {panel === "share" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Share private preview">
-            <h2>Share with your family</h2>
+            <h2>Share with your family</h2>{errorMessage}
             <p>Anyone with this link can read the private preview. To send feedback or photos, they will enter their own name and verify their email. No account is needed.</p>
             <label htmlFor="review-share-url">Private preview link</label>
             <input id="review-share-url" readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
@@ -689,7 +686,7 @@ export function StoryReview({
             <button onClick={() => setPanel("article")}>Back to the story</button>
           </section>}
           {panel === "identity" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Introduce yourself">
-            <h2>{identityStep === "code" ? "Check your email" : "Who is helping with the story?"}</h2>
+            <h2>{identityStep === "code" ? "Check your email" : "Who is helping with the story?"}</h2>{errorMessage}
             <p>Your name will accompany your feedback for the newsroom. Your email stays private. No password or account is needed.</p>
             {identityStep === "name" ? <form onSubmit={async e => {
               e.preventDefault(); setBusy(true); setError("");
@@ -714,7 +711,7 @@ export function StoryReview({
             <button disabled={busy} onClick={() => setPanel("article")}>Just read the story</button>
           </section>}
           {panel === "feedback" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Family feedback">
-            <h2>Looks good to you?</h2><p>We'll send your feedback as {review.reviewer}. The newsroom will request approval from the designated family reviewer separately. This will not publish the story.</p>
+            <h2>Looks good to you?</h2>{errorMessage}<p>We'll send your feedback as {review.reviewer}. The newsroom will request approval from the designated family reviewer separately. This will not publish the story.</p>
             <button disabled={busy} onClick={() => void send({ action: "COMMENT", message: "This draft looks good to me.", target: { kind: "STORY" } }, "Thank you. Your feedback has been sent to the newsroom. The story is still private.")}>Send my feedback</button>
             <button disabled={busy} onClick={() => setPanel("article")}>Back to the story</button>
           </section>}
@@ -747,6 +744,7 @@ export function StoryReview({
                   Close
                 </button>
               </div>
+              {errorMessage}
               {panel !== "history" && <div className="sm-review-save-state" role="status" aria-live="polite">
                 {currentDraft?.status === "conflict" ? <>
                   <p>A response was saved in another tab or device. Your writing here is still available. Choose which version to keep.</p>
