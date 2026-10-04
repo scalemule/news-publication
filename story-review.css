@@ -609,7 +609,8 @@
 .sm-review-photo-picker input[hidden] { display: none; }
 .sm-review-selected-photo { padding: 16px; border: 1px solid var(--pub-rule, #d7dcd7); }
 .sm-review-selected-photo img { display: block; width: 100%; max-height: 320px; object-fit: contain; }
-.sm-review-send-bar { position: sticky; bottom: 0; background: var(--pub-paper, #fff); border-top: 1px solid var(--pub-rule, #d7dcd7); padding: 12px 0 max(12px, env(safe-area-inset-bottom)); }
+.sm-review-send-bar { position: static; bottom: 0; background: var(--pub-paper, #fff); border-top: 1px solid var(--pub-rule, #d7dcd7); padding: 12px 0 max(12px, env(safe-area-inset-bottom)); }
+.sm-review-send-bar.is-ready { position: sticky; }
 .sm-review-send-bar p { margin: 0 0 8px; }
 .sm-review-send-bar progress { display: block; width: 100%; }
 .sm-review-form input[type=file]::file-selector-button { min-height: 44px; font: inherit; }

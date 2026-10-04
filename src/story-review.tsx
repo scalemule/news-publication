@@ -905,7 +905,7 @@ export function StoryReview({
                     this media to {review.publication.name} for editorial
                     publication.
                   </label>
-                  <div className="sm-review-send-bar">
+                  <div className={`sm-review-send-bar${rights && file ? " is-ready" : ""}`}>
                     <p>{busy ? "Uploading your photo. Please keep this page open…" : !file ? "Choose a photo above to continue." : !rights ? "Tick the permission box above, then upload your photo." : "Ready. Tap Upload privately to send this photo to the newsroom."}</p>
                     {busy && <progress aria-label="Uploading photo" />}
                     <button className="sm-review-primary" disabled={busy || !rights || !file}>{busy ? "Uploading…" : "Upload privately"}</button>
