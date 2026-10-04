@@ -101,6 +101,7 @@ export function StoryReview({
     [editingMedia, setEditingMedia] = useState(""),
     [commentTarget, setCommentTarget] = useState("STORY");
   const responseRef = useRef<HTMLElement>(null);
+  const thanksRef = useRef<HTMLElement>(null);
   const [moreQuestions, setMoreQuestions] = useState(false);
   const [correctionKind, setCorrectionKind] = useState("Correct a detail");
   useEffect(() => {
@@ -208,6 +209,12 @@ export function StoryReview({
   const approved = review?.decision === "APPROVED";
   const finalEditor = review?.review_policy === "SUBJECT_APPROVAL_PLUS_EDITOR";
   const approvalThanks = `Thank you. We're glad to help commemorate this special occasion. This version has been sent to the ${review?.publication.name || publicationName} newsroom for final editorial review. It has not been published yet.`;
+  useEffect(() => {
+    if (approved && finalEditor && thanksRef.current) {
+      thanksRef.current.scrollIntoView({ block: "start" });
+      thanksRef.current.focus({ preventScroll: true });
+    }
+  }, [approved, finalEditor]);
   const approve = () => {
     if (
       celebration &&
@@ -279,7 +286,7 @@ export function StoryReview({
           {error}
         </p>
       )}
-      {notice && !(approved && finalEditor) && (
+      {notice && !(approved && finalEditor && notice === approvalThanks) && (
         <p role="status" className="sm-review-notice">
           {notice}
         </p>
@@ -382,7 +389,7 @@ export function StoryReview({
             </div>
           )}
           {approved && finalEditor && !review.published && (
-            <section className="sm-review-thanks" role="status">
+            <section ref={thanksRef} tabIndex={-1} className="sm-review-thanks" role="status">
               <h2>Thank you.</h2>
               <p>We're glad to help commemorate this special occasion.</p>
               <p>
@@ -466,6 +473,11 @@ export function StoryReview({
                   Prefer Not to Publish
                 </button>
               )}
+              {can("COMMENT") && (
+                <button className="sm-review-quiet" onClick={() => setPanel("comment")}>
+                  Leave a Comment
+                </button>
+              )}
             </section>
           )}
           <nav
@@ -490,6 +502,11 @@ export function StoryReview({
             {can("REQUEST_CHANGES") && (
               <button disabled={busy} onClick={() => setPanel("changes")}>
                 {celebration ? "Suggest a Change" : "Request changes"}
+              </button>
+            )}
+            {celebration && can("PROPOSE_EDITS") && !can("REQUEST_CHANGES") && (
+              <button disabled={busy} onClick={() => setPanel("edits")}>
+                Suggest a Change
               </button>
             )}
             {can("UPLOAD_MEDIA") && (
