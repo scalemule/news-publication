@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { proseDiff } from "./story-diff";
 
 type Media = {
@@ -70,14 +70,18 @@ type Review = {
   }[];
   review_policy: string;
   published: boolean;
+  celebration_type?: string | null;
+  decision?: string | null;
 };
 const human = (s: string) => s.toLowerCase().replaceAll("_", " ");
 export function StoryReview({
   sessionId,
   publicationName,
+  nameplateUrl,
 }: {
   sessionId: string;
   publicationName: string;
+  nameplateUrl?: string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
   const [review, setReview] = useState<Review | null>(null),
@@ -96,6 +100,21 @@ export function StoryReview({
     [compareTo, setCompareTo] = useState(""),
     [editingMedia, setEditingMedia] = useState(""),
     [commentTarget, setCommentTarget] = useState("STORY");
+  const responseRef = useRef<HTMLElement>(null);
+  const [moreQuestions, setMoreQuestions] = useState(false);
+  const [correctionKind, setCorrectionKind] = useState("Correct a detail");
+  useEffect(() => {
+    if (panel !== "article") {
+      responseRef.current?.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)")
+          .matches
+          ? "auto"
+          : "smooth",
+      });
+      responseRef.current?.focus({ preventScroll: true });
+    }
+  }, [panel]);
   const [mediaInfo, setMediaInfo] = useState({
     caption: "",
     who_is_pictured: "",
@@ -185,6 +204,19 @@ export function StoryReview({
     }
   }
   const can = (p: string) => review?.permissions.includes(p);
+  const celebration = !!review?.celebration_type;
+  const approved = review?.decision === "APPROVED";
+  const finalEditor = review?.review_policy === "SUBJECT_APPROVAL_PLUS_EDITOR";
+  const approvalThanks = `Thank you. We're glad to help commemorate this special occasion. This version has been sent to the ${review?.publication.name || publicationName} newsroom for final editorial review. It has not been published yet.`;
+  const approve = () => {
+    if (
+      celebration &&
+      finalEditor &&
+      !review?.questions.some((q) => q.required)
+    )
+      void send({ action: "APPROVE", message: null }, approvalThanks);
+    else setPanel("approve");
+  };
   async function upload() {
     if (!review || !file || !rights) return;
     setBusy(true);
@@ -221,24 +253,33 @@ export function StoryReview({
       (r) => r.id === (compareTo || review?.revision.id),
     );
   return (
-    <main className="sm-story-review">
+    <main
+      className={`sm-story-review${celebration ? " sm-review-celebration" : ""}`}
+    >
       <div className="sm-review-private">
-        <strong>Private story preview</strong>
+        <strong>
+          {review?.published
+            ? "Private review"
+            : "Private preview · Not published"}
+        </strong>
         <span>
           {review?.published
             ? "This revision has been published. This review link remains private."
-            : "This article has not been published."}
+            : `Prepared by ${publicationName} for ${celebration ? "family " : ""}review.`}
         </span>
       </div>
       <header className="sm-review-masthead">
-        {review?.publication.name || publicationName}
+        {nameplateUrl && (
+          <img src={nameplateUrl} alt="" width={80} height={80} />
+        )}
+        <span>{review?.publication.name || publicationName}</span>
       </header>
       {error && (
         <p role="alert" className="sm-review-alert">
           {error}
         </p>
       )}
-      {notice && (
+      {notice && !(approved && finalEditor) && (
         <p role="status" className="sm-review-notice">
           {notice}
         </p>
@@ -310,23 +351,53 @@ export function StoryReview({
       )}
       {review && document && (
         <>
-          <div className="sm-review-intro">
-            <p>
-              Prepared for {review.reviewer} · Version {review.revision.number}
-            </p>
-            <p>
-              {["FACT_CHECK", "CONTRIBUTOR_REVIEW"].includes(
-                review.review_policy,
-              )
-                ? "Please help us check the facts and represent your contribution accurately. The newsroom retains the final editorial decision."
-                : "This voluntary announcement requires subject approval before publication. You may request changes or decline participation."}
-            </p>
-          </div>
+          {celebration ? (
+            <div className="sm-review-intro">
+              {review.revision.number > 1 ? (
+                <p>
+                  <strong>Updated preview</strong> — We incorporated the
+                  information you sent us.
+                </p>
+              ) : (
+                <p>
+                  A special occasion, thoughtfully told. Read your announcement
+                  below.
+                </p>
+              )}
+              <a href="#review-options">Review options</a>
+            </div>
+          ) : (
+            <div className="sm-review-intro">
+              <p>
+                Prepared for {review.reviewer} · Version{" "}
+                {review.revision.number}
+              </p>
+              <p>
+                {["FACT_CHECK", "CONTRIBUTOR_REVIEW"].includes(
+                  review.review_policy,
+                )
+                  ? "Please help us check the facts and represent your contribution accurately. The newsroom retains the final editorial decision."
+                  : "Please review this announcement. You may suggest changes or decline participation."}
+              </p>
+            </div>
+          )}
+          {approved && finalEditor && !review.published && (
+            <section className="sm-review-thanks" role="status">
+              <h2>Thank you.</h2>
+              <p>We're glad to help commemorate this special occasion.</p>
+              <p>
+                This version has been sent to the {review.publication.name}{" "}
+                newsroom for final editorial review. It has not been published
+                yet.
+              </p>
+            </section>
+          )}
           <article className="sm-review-article">
-            <p>
-              {review.revision.document.section}
-              {review.revision.document.community &&
-                ` · ${review.revision.document.community}`}
+            <p className="sm-review-category">
+              <span>{review.revision.document.section}</span>
+              {celebration && (
+                <span>{human(review.celebration_type || "")}</span>
+              )}
             </p>
             <h1>{review.revision.document.title}</h1>
             <p className="sm-review-dek">{review.revision.document.subtitle}</p>
@@ -336,6 +407,24 @@ export function StoryReview({
               .map((m) => (
                 <PrivatePhoto key={m.file_id} media={m} base={base} />
               ))}
+            {celebration &&
+              !review.revision.document.media.some(
+                (m) => m.position === "hero",
+              ) &&
+              can("UPLOAD_MEDIA") && (
+                <aside
+                  className="sm-review-photo-invitation"
+                  aria-label="Family photograph"
+                >
+                  <div>
+                    <strong>A photograph makes it yours.</strong>
+                    <p>Family photograph may be added before publication.</p>
+                  </div>
+                  <button onClick={() => setPanel("media")}>
+                    + Add a photograph
+                  </button>
+                </aside>
+              )}
             <div
               className="sm-review-prose"
               dangerouslySetInnerHTML={{ __html: review.revision.content_html }}
@@ -346,52 +435,110 @@ export function StoryReview({
                 <PrivatePhoto key={m.file_id} media={m} base={base} />
               ))}
           </article>
-          <nav className="sm-review-actions" aria-label="Review actions">
+          {celebration && (
+            <section id="review-options" className="sm-review-welcome">
+              <h2>Help us make this just right</h2>
+              <p>
+                We prepared this announcement as a starting point so you don't
+                have to write anything yourself. If everything looks right, you
+                can simply approve it.
+              </p>
+              <p>
+                If you'd like, you can also correct a detail, add photographs,
+                or tell us a little more about the couple. We'll take care of
+                turning any additional information into the next draft.
+              </p>
+              {can("ANSWER_QUESTIONS") && review.questions.length > 0 && (
+                <button
+                  onClick={() => {
+                    setMoreQuestions(false);
+                    setPanel("questions");
+                  }}
+                >
+                  Tell Us More
+                </button>
+              )}
+              {can("DECLINE") && !review.published && (
+                <button
+                  className="sm-review-quiet"
+                  onClick={() => setPanel("decline")}
+                >
+                  Prefer Not to Publish
+                </button>
+              )}
+            </section>
+          )}
+          <nav
+            className={`sm-review-actions${celebration ? " sm-review-concierge-actions" : ""}${panel !== "article" ? " sm-review-actions-editing" : ""}`}
+            aria-label="Review actions"
+          >
             {can("APPROVE") && !review.published && (
-              <button disabled={busy} onClick={() => setPanel("approve")}>
-                {review.review_policy === "FACT_CHECK"
-                  ? "Confirm fact check"
-                  : "Approve draft"}
+              <button
+                className="sm-review-primary"
+                disabled={busy || approved || review.decision === "DECLINED"}
+                onClick={approve}
+              >
+                {approved
+                  ? "Thank you — Approved"
+                  : review.review_policy === "FACT_CHECK"
+                    ? "Confirm fact check"
+                    : celebration
+                      ? "Looks Good — Approve"
+                      : "Approve draft"}
               </button>
             )}
             {can("REQUEST_CHANGES") && (
               <button disabled={busy} onClick={() => setPanel("changes")}>
-                Request changes
-              </button>
-            )}
-            {can("PROPOSE_EDITS") && (
-              <button disabled={busy} onClick={() => setPanel("edits")}>
-                Suggest edits
-              </button>
-            )}
-            {can("ANSWER_QUESTIONS") && review.questions.length > 0 && (
-              <button disabled={busy} onClick={() => setPanel("questions")}>
-                Answer questions
+                {celebration ? "Suggest a Change" : "Request changes"}
               </button>
             )}
             {can("UPLOAD_MEDIA") && (
               <button disabled={busy} onClick={() => setPanel("media")}>
-                Add photos
+                {celebration ? "Add Photos" : "Add photos"}
               </button>
             )}
-            {can("COMMENT") && (
-              <button disabled={busy} onClick={() => setPanel("comment")}>
-                Leave a comment
-              </button>
-            )}
-            {can("VIEW_SELECTED_HISTORY") && review.history.length > 0 && (
-              <button onClick={() => setPanel("history")}>
-                Shared history
-              </button>
-            )}
-            {can("DOWNLOAD_PREVIEW") && (
-              <button onClick={() => window.print()}>
-                Print / save preview
-              </button>
+            {!celebration && (
+              <>
+                {can("PROPOSE_EDITS") && (
+                  <button disabled={busy} onClick={() => setPanel("edits")}>
+                    Suggest edits
+                  </button>
+                )}
+                {can("ANSWER_QUESTIONS") && review.questions.length > 0 && (
+                  <button disabled={busy} onClick={() => setPanel("questions")}>
+                    Answer questions
+                  </button>
+                )}
+                {can("COMMENT") && (
+                  <button disabled={busy} onClick={() => setPanel("comment")}>
+                    Leave a comment
+                  </button>
+                )}
+              </>
             )}
           </nav>
+          {((can("VIEW_SELECTED_HISTORY") && review.history.length > 0) ||
+            can("DOWNLOAD_PREVIEW")) && (
+            <div className="sm-review-utilities">
+              {can("VIEW_SELECTED_HISTORY") && review.history.length > 0 && (
+                <button onClick={() => setPanel("history")}>
+                  See previous previews
+                </button>
+              )}
+              {can("DOWNLOAD_PREVIEW") && (
+                <button onClick={() => window.print()}>
+                  Print / save preview
+                </button>
+              )}
+            </div>
+          )}
           {panel !== "article" && (
-            <section className="sm-review-form" aria-label="Your response">
+            <section
+              ref={responseRef}
+              tabIndex={-1}
+              className="sm-review-form"
+              aria-label="Your response"
+            >
               <div className="sm-review-form-heading">
                 <h2>
                   {panel === "approve"
@@ -401,13 +548,13 @@ export function StoryReview({
                       : panel === "media"
                         ? "Contribute a photograph"
                         : panel === "questions"
-                          ? "Your story, in your words"
+                          ? "Tell us a little more"
                           : panel === "history"
                             ? "Selected revision history"
                             : panel === "decline"
-                              ? "Decline participation"
+                              ? "Prefer not to publish"
                               : panel === "changes"
-                                ? "Request changes"
+                                ? "Suggest a change"
                                 : "Message the newsroom"}
                 </h2>
                 <button disabled={busy} onClick={() => setPanel("article")}>
@@ -430,7 +577,7 @@ export function StoryReview({
                     />
                   </label>
                   <label>
-                    Dek
+                    Short introduction
                     <input
                       value={document.subtitle}
                       onChange={(e) =>
@@ -476,29 +623,47 @@ export function StoryReview({
                     e.preventDefault();
                     void send(
                       { action: "ANSWER_QUESTIONS", answers },
-                      "Your answers have been saved for editorial review.",
+                      "Thank you for sharing. We'll take care of turning your answers into an updated draft.",
                     );
                   }}
                 >
                   <p>
-                    All questions are optional unless marked required. Share
-                    only what you would like considered for publication.
+                    {review.questions.some((q) => q.required)
+                      ? "Only questions marked required must be answered. Share what you would like considered for publication."
+                      : "Completely optional. Even one answer can help us make the announcement more personal."}
                   </p>
-                  {review.questions.map((q) => (
-                    <label key={q.id}>
-                      {q.prompt}
-                      {q.required ? " (required)" : " (optional)"}
-                      <textarea
-                        required={q.required}
-                        rows={3}
-                        value={answers[q.id] || ""}
-                        onChange={(e) =>
-                          setAnswers({ ...answers, [q.id]: e.target.value })
-                        }
-                      />
-                    </label>
-                  ))}
-                  <button disabled={busy}>Send answers</button>
+                  {review.questions
+                    .filter((q, i) => moreQuestions || i < 5 || q.required)
+                    .map((q) => (
+                      <label key={q.id}>
+                        {q.prompt}
+                        {q.required ? " (required)" : " (optional)"}
+                        <textarea
+                          required={q.required}
+                          rows={3}
+                          value={answers[q.id] || ""}
+                          onChange={(e) =>
+                            setAnswers({ ...answers, [q.id]: e.target.value })
+                          }
+                        />
+                      </label>
+                    ))}
+                  <button
+                    className="sm-review-primary"
+                    disabled={
+                      busy || !Object.values(answers).some((a) => a.trim())
+                    }
+                  >
+                    Send These Answers
+                  </button>
+                  {!moreQuestions && review.questions.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setMoreQuestions(true)}
+                    >
+                      Answer More Questions
+                    </button>
+                  )}
                 </form>
               )}
               {panel === "metadata" && (
@@ -558,14 +723,13 @@ export function StoryReview({
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                     />
                   </label>
+                  <p className="sm-review-help">
+                    Choose a photograph and confirm permission below. All
+                    descriptions are optional; we can help with the caption.
+                  </p>
                   {Object.entries({
-                    caption: "Caption",
-                    who_is_pictured: "Who is pictured?",
-                    creator: "Photographer / creator",
-                    when_taken: "When was it taken?",
-                    where_taken: "Where was it taken?",
-                    credit: "Credit line",
-                    alt: "Alt-text suggestion",
+                    caption: "Caption (optional)",
+                    credit: "Photographer / credit (optional)",
                   }).map(([key, label]) => (
                     <label key={key}>
                       {label}
@@ -577,6 +741,29 @@ export function StoryReview({
                       />
                     </label>
                   ))}
+                  <details className="sm-review-media-details">
+                    <summary>Add more photograph details (optional)</summary>
+                    {Object.entries({
+                      who_is_pictured: "Who is pictured?",
+                      creator: "Photographer / creator",
+                      when_taken: "When was it taken?",
+                      where_taken: "Where was it taken?",
+                      alt: "Describe the photograph for readers who cannot see it",
+                    }).map(([key, label]) => (
+                      <label key={key}>
+                        {label}
+                        <input
+                          value={mediaInfo[key as keyof typeof mediaInfo]}
+                          onChange={(e) =>
+                            setMediaInfo({
+                              ...mediaInfo,
+                              [key]: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </details>
                   <label className="sm-review-check">
                     <input
                       type="checkbox"
@@ -645,6 +832,38 @@ export function StoryReview({
                       </select>
                     </label>
                   )}
+                  {panel === "changes" && (
+                    <>
+                      <label>
+                        What would you like to change?
+                        <select
+                          value={correctionKind}
+                          onChange={(e) => setCorrectionKind(e.target.value)}
+                        >
+                          {[
+                            "Correct a detail",
+                            "Correct a name",
+                            "Correct a professional / education detail",
+                            "Remove something",
+                            "Rewrite something",
+                            "Add something",
+                            "General comment",
+                          ].map((kind) => (
+                            <option key={kind}>{kind}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <p>
+                        A sentence or two is enough. We'll take care of the
+                        wording.
+                      </p>
+                      {can("PROPOSE_EDITS") && (
+                        <button onClick={() => setPanel("edits")}>
+                          Or edit the wording directly
+                        </button>
+                      )}
+                    </>
+                  )}
                   <label>
                     {panel === "changes"
                       ? "What should change?"
@@ -672,7 +891,10 @@ export function StoryReview({
                                 : panel === "decline"
                                   ? "DECLINE"
                                   : "COMMENT",
-                          message: message || null,
+                          message:
+                            panel === "changes"
+                              ? `${correctionKind}: ${message}`
+                              : message || null,
                           ...(panel === "comment"
                             ? {
                                 target: {
@@ -684,9 +906,11 @@ export function StoryReview({
                             : {}),
                         },
                         panel === "approve"
-                          ? "Your approval has been recorded for this version."
+                          ? celebration && finalEditor
+                            ? approvalThanks
+                            : "Your approval has been recorded for this version."
                           : panel === "decline"
-                            ? "Your decision has been recorded."
+                            ? "Thank you for letting us know. The newsroom has received your decision."
                             : "Your message has been sent to the newsroom.",
                       )
                     }
@@ -696,7 +920,7 @@ export function StoryReview({
                       : panel === "changes"
                         ? "Send change request"
                         : panel === "decline"
-                          ? "Decline participation"
+                          ? "Prefer not to publish"
                           : "Send comment"}
                   </button>
                 </>
@@ -824,7 +1048,7 @@ export function StoryReview({
               ))}
             </section>
           )}
-          {can("DECLINE") && !review.published && (
+          {!celebration && can("DECLINE") && !review.published && (
             <footer className="sm-review-decline">
               <button disabled={busy} onClick={() => setPanel("decline")}>
                 Decline participation / please don’t publish this announcement

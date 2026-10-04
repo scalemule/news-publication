@@ -100,3 +100,10 @@ const cards = getArticleCards(article.metadata?.cards)
 
 Styles adhere to the publication theme (`--pub-paper`, `--pub-ink`, `--pub-accent`, `--pub-rule`, `--pub-soft`) and are included in `@scalemule/news-publication/tokens.css` or available standalone via `@scalemule/news-publication/verified-card.css`.
 
+
+
+### Private Celebrations reviews (0.0.27)
+
+`StoryReview` accepts an optional `nameplateUrl` from the publication identity. Celebrations reviews lead with the finished article, keep corrections and photos separate from its text, and progressively disclose optional questions (five first, then the remaining questions). One-click approval is limited to subject-plus-editor policies without required questions; automatic-publication policies still show their explicit confirmation.
+
+The review endpoint returns the decision for the exact invited revision. Editors can explicitly advance an existing link using Blog's `SHARE_REVISION` command; approval never carries over. This patch does not enable a publication's section or publish any content. HEIC conversion and live transport certification remain outside this patch.
