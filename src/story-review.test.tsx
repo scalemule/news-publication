@@ -112,7 +112,7 @@ describe("family review", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.submit(upload.closest("form")!);
     await screen.findByText(/replacement photo has been sent/);
-    const posts = fetcher.mock.calls.filter(([, o]) => o?.method === "POST" && (typeof o.body !== "string" || JSON.parse(o.body).action !== "SAVE_DRAFT"));
+    const posts = fetcher.mock.calls.filter(([url, o]) => !String(url).endsWith("/session") && o?.method === "POST" && (typeof o.body !== "string" || JSON.parse(o.body).action !== "SAVE_DRAFT"));
     expect(posts).toHaveLength(2);
     expect(posts[0][0]).toBe("/api/news/review/private-session/media");
     expect(JSON.parse((posts[0][1]!.body as FormData).get("metadata") as string).rights_confirmed).toBe(true);
@@ -169,7 +169,7 @@ describe("family review", () => {
     );
     await screen.findByRole("heading", { name: "Thank you." });
     const posts = fetcher.mock.calls.filter(
-      ([, options]) => options?.method === "POST",
+      ([url, options]) => !String(url).endsWith("/session") && options?.method === "POST",
     );
     expect(posts).toHaveLength(1);
     expect(JSON.parse(posts[0][1]!.body as string)).toEqual({
@@ -195,7 +195,7 @@ describe("family review", () => {
       screen.getByText(/configured this version to publish or schedule/),
     ).toBeTruthy();
     expect(
-      fetcher.mock.calls.filter(([, options]) => options?.method === "POST"),
+      fetcher.mock.calls.filter(([url, options]) => !String(url).endsWith("/session") && options?.method === "POST"),
     ).toHaveLength(0);
   });
   it("sends quick corrections as change requests without overwriting the draft", async () => {
@@ -238,7 +238,52 @@ describe("family review", () => {
       screen.getByLabelText("Caption (optional)").hasAttribute("required"),
     ).toBe(false);
     expect(
-      fetcher.mock.calls.filter(([, options]) => options?.method === "POST"),
+      fetcher.mock.calls.filter(([url, options]) => !String(url).endsWith("/session") && options?.method === "POST"),
     ).toHaveLength(0);
+  });
+});
+
+describe("forwarded family invitations", () => {
+  function familySetup() {
+    let identified = false;
+    const token = "a".repeat(64);
+    const fetcher = vi.fn(async (url: unknown, options?: RequestInit) => {
+      const path = String(url), body = typeof options?.body === "string" ? JSON.parse(options.body) : {};
+      if (path.endsWith("/session")) return { ok: true, json: async () => ({ data: { share_url: `/review/family?key=${token}`, can_share: true } }) };
+      if (path.endsWith("/verify") && body.code) identified = true;
+      if (path.endsWith("/join") || path.endsWith("/verify")) return { ok: true, json: async () => ({ success: true }) };
+      return { ok: true, json: async () => ({ data: { ...initial, session_id: identified ? "mother-session" : "family", identity_required: !identified, participant: identified, reviewer: identified ? "Mother" : "Family", permissions: initial.permissions.filter(p => !["APPROVE", "DECLINE"].includes(p)) } }) };
+    });
+    vi.stubGlobal("fetch",fetcher);
+    render(<StoryReview sessionId="family" publicationName="Test publication" />);
+    return fetcher;
+  }
+  it("upgrades old fragment invitations to a complete copyable address and preserves it after navigation", async () => {
+    window.history.replaceState(null,"",`/review/family#${"a".repeat(64)}`);
+    familySetup();
+    await screen.findByRole("heading", { name: document.title });
+    expect(window.location.hash).toBe("");
+    expect(new URL(window.location.href).searchParams.get("key")).toBe("a".repeat(64));
+    fireEvent.click(screen.getByText("Review options"));
+    expect(new URL(window.location.href).searchParams.get("key")).toBe("a".repeat(64));
+    fireEvent.click(screen.getByRole("button", { name: "Share private preview" }));
+    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toContain(`?key=${"a".repeat(64)}`);
+  });
+  it("lets forwarded readers open the story before asking who is contributing", async () => {
+    const fetcher=familySetup();
+    await screen.findByRole("heading", { name: document.title });
+    expect(screen.queryByLabelText("Your email")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Looks Good — Approve" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Suggest a Change" }));
+    fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "Mother" } });
+    fireEvent.change(screen.getByLabelText("Your email"), { target: { value: "mother@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    fireEvent.change(await screen.findByLabelText("Email verification code"), { target: { value: "12345678" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and continue" }));
+    await screen.findByRole("heading", { name: "Suggest a change" });
+    expect(screen.getByText("Mother", { selector: "strong" })).toBeTruthy();
+    const posts = fetcher.mock.calls.flatMap(([, o]) => typeof o?.body === "string" ? [JSON.parse(o.body)] : []);
+    expect(posts.some(p => p.email === "mother@example.test" && p.name === "Mother")).toBe(true);
+    expect(posts.some(p => p.action === "APPROVE")).toBe(false);
   });
 });

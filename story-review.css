@@ -620,3 +620,10 @@
   .sm-review-photo-picker button { flex: 1 1 180px; margin: 0; }
   .sm-review-save-state button { margin: 8px 0 0; }
 }
+
+/* Keep family sharing alongside the preview, separate from editorial copy. */
+.sm-review-sharing, .sm-review-identity-status { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px 0; border-bottom:1px solid var(--sm-rule, #d8d8d8); font:16px/1.5 system-ui,sans-serif; }
+.sm-review-sharing p { flex:1 1 240px; margin:0; }
+.sm-review-sharing button, .sm-review-identity-status button { min-height:48px; font:inherit; padding:10px 16px; cursor:pointer; }
+.sm-review-form input#review-share-url { width:100%; font-size:16px; min-width:0; }
+.sm-review-form label[for^="contributor-"] { display:block; margin-top:16px; }
