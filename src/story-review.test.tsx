@@ -49,7 +49,7 @@ const initial = {
   published: false,
   decision: null as string | null,
 };
-function setup(policy = initial.review_policy) {
+function setup(policy = initial.review_policy, shell = false) {
   let current = { ...initial, review_policy: policy };
   const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
     if (
@@ -65,6 +65,8 @@ function setup(policy = initial.review_policy) {
     <StoryReview
       sessionId="private-session"
       publicationName="Test publication"
+      publicationHeader={shell ? <header aria-label="Publication masthead">Real publication header</header> : undefined}
+      publicationFooter={shell ? <footer aria-label="Publication footer">Real publication footer</footer> : undefined}
     />,
   );
   return fetcher;
@@ -78,6 +80,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("family review", () => {
+  it("places the real publication shell around the private article without a duplicate masthead", async () => {
+    setup(initial.review_policy, true);
+    await screen.findByRole("heading", { name: document.title });
+    const main = screen.getByRole("main");
+    const header = screen.getByRole("banner", { name: "Publication masthead" });
+    const footer = screen.getByRole("contentinfo", { name: "Publication footer" });
+    expect(main.contains(header)).toBe(false);
+    expect(main.contains(footer)).toBe(false);
+    expect(main.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(window.document.querySelector(".sm-review-masthead")).toBeNull();
+    expect(screen.getByText("Private preview · Not published")).toBeTruthy();
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+  });
   it("shows a finished story before any optional form and reveals five questions first", async () => {
     setup();
     await screen.findByRole("heading", { name: document.title });
