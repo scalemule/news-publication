@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
+import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
 
 type Media = {
@@ -48,6 +50,7 @@ type Revision = {
   content_html: string;
 };
 type Review = {
+  response_drafts?: Record<string, Draft>;
   publication: { name: string };
   reviewer: string;
   revision: Revision;
@@ -96,23 +99,26 @@ export function StoryReview({
     [panel, setPanel] = useState("article"),
     [verification, setVerification] = useState(false),
     [code, setCode] = useState("");
-  const [message, setMessage] = useState(""),
-    [document, setDocument] = useState<Document | null>(null),
-    [answers, setAnswers] = useState<Record<string, string>>({}),
-    [file, setFile] = useState<File | null>(null),
-    [rights, setRights] = useState(false),
+  const [rights, setRights] = useState(false),
     [compare, setCompare] = useState(""),
     [compareTo, setCompareTo] = useState(""),
     [editingMedia, setEditingMedia] = useState(""),
     [commentTarget, setCommentTarget] = useState("STORY");
+  const pendingPhoto = usePendingPhoto(review ? `${sessionId}:${review.revision.id}` : undefined);
+  const file = pendingPhoto.photo?.file || null;
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (notice) { noticeRef.current?.scrollIntoView({ block: "center" }); noticeRef.current?.focus({ preventScroll: true }); } }, [notice]);
   const responseRef = useRef<HTMLElement>(null);
   const thanksRef = useRef<HTMLElement>(null);
   const [moreQuestions, setMoreQuestions] = useState(false);
-  const [correctionKind, setCorrectionKind] = useState("Correct a detail");
+
   const [replacementPhoto, setReplacementPhoto] = useState<Media | null>(null);
+  const photoToReplace: Media | null = pendingPhoto.photo?.replacement || replacementPhoto;
   function openMedia(photo: Media | null = null) {
-    setReplacementPhoto(photo);
-    setFile(null);
+    setReplacementPhoto(file ? pendingPhoto.photo?.replacement || null : photo);
+    if (file) { setPanel("media"); return; }
     setRights(false);
     setPanel("media");
   }
@@ -128,15 +134,32 @@ export function StoryReview({
       responseRef.current?.focus({ preventScroll: true });
     }
   }, [panel]);
-  const [mediaInfo, setMediaInfo] = useState({
-    caption: "",
-    who_is_pictured: "",
-    creator: "",
-    when_taken: "",
-    where_taken: "",
-    credit: "",
-    alt: "",
-  });
+  const emptyMediaInfo = { caption: "", who_is_pictured: "", creator: "", when_taken: "", where_taken: "", credit: "", alt: "" };
+  const drafts = useReviewDrafts(sessionId, review?.revision.id, review?.response_drafts, request);
+  const currentDraft = drafts.entries[panel];
+  const message: string = currentDraft?.data.message || "";
+  const answers: Record<string, string> = drafts.entries.questions?.data.answers || {};
+  const document: Document | null = drafts.entries.edits?.data.document || review?.revision.document || null;
+  const correctionKind: string = drafts.entries.changes?.data.correctionKind || "Correct a detail";
+  const mediaPanel = panel === "metadata" ? "metadata" : "media";
+  const mediaInfo: typeof emptyMediaInfo = { ...emptyMediaInfo, ...drafts.entries[mediaPanel]?.data.mediaInfo };
+  function setMessage(value: string) {
+    drafts.set(panel, value.trim() ? { ...currentDraft?.data, message: value, ...(panel === "changes" ? { correctionKind } : {}), ...(panel === "comment" ? { commentTarget: currentDraft?.data.commentTarget || commentTarget } : {}) } : {});
+  }
+  function setAnswers(value: Record<string, string>) {
+    drafts.set("questions", Object.values(value).some(a => a.trim()) ? { answers: value } : {});
+  }
+  function setDocument(value: Document) {
+    drafts.set("edits", JSON.stringify(value) === JSON.stringify(review?.revision.document) ? {} : { document: value });
+  }
+  function setCorrectionKind(value: string) {
+    drafts.set("changes", { ...drafts.entries.changes?.data, correctionKind: value });
+  }
+  function setMediaInfo(value: typeof emptyMediaInfo) {
+    drafts.set(mediaPanel, Object.values(value).some(v => v.trim()) ? { mediaInfo: value, editingMedia: drafts.entries.metadata?.data.editingMedia || editingMedia } : {});
+  }
+  const pending = Object.entries(drafts.entries).filter(([, entry]) => hasDraft(entry.data));
+  const draftLabel = (name: string) => ({ questions: "your answers", changes: "your correction", media: "your photograph details", metadata: "your caption changes", edits: "your wording changes", comment: "your comment", decline: "your response", approve: "your approval message" }[name] || "your response");
   async function request(path = "", body?: unknown): Promise<any> {
     const form = body instanceof FormData;
     const r = await fetch(base + path, {
@@ -151,10 +174,7 @@ export function StoryReview({
     });
     const result = await r.json();
     if (!r.ok || result.success === false)
-      throw new Error(
-        result.error?.message ||
-          "This private review is unavailable. Please contact the newsroom.",
-      );
+      throw Object.assign(new Error(result.error?.message || "This private review is unavailable. Please contact the newsroom."), { status: r.status });
     return result.data ?? result;
   }
   async function load() {
@@ -165,7 +185,7 @@ export function StoryReview({
     } else {
       setVerification(false);
       setReview(data);
-      setDocument(data.revision.document);
+
     }
   }
   useEffect(() => {
@@ -185,7 +205,7 @@ export function StoryReview({
           } else {
             setVerification(false);
             setReview(data);
-            setDocument(data.revision.document);
+
           }
         }
       } catch (e) {
@@ -198,16 +218,22 @@ export function StoryReview({
     };
   }, [sessionId]);
   async function send(action: Record<string, unknown>, success: string) {
-    if (!review) return;
+    if (!review || busy) return;
+    if (action.action === "APPROVE" && file) {
+      setNotice("Your photo is not uploaded yet. Upload it or remove the selection before approving."); setPanel("media"); return;
+    }
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      await request("", { revision_id: review.revision.id, ...action });
-      await load();
+      const actionPanel = ({ ANSWER_QUESTIONS: "questions", REQUEST_CHANGES: "changes", COMMENT: "comment", PROPOSE_EDITS: "edits", EDIT_MEDIA_METADATA: "metadata", APPROVE: "approve", DECLINE: "decline" } as Record<string, string>)[String(action.action)];
+      const receipt = actionPanel ? await drafts.receipt(actionPanel) : undefined;
+      const sent = await request("", { revision_id: review.revision.id, ...action, ...(receipt ? { draft: receipt } : {}) });
+      if (sent.cleared_draft) drafts.consumed(sent.cleared_draft);
+      try { await load(); } catch { success += " Refresh to see the latest preview."; }
       setNotice(success);
       setPanel("article");
-      setMessage("");
+
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not save your response.",
@@ -228,6 +254,11 @@ export function StoryReview({
     }
   }, [approved, finalEditor]);
   const approve = () => {
+    if (pending.length || file) {
+      setNotice("You have a response in progress. Send it or discard it, then return to approve the story.");
+      setPanel(file ? "media" : pending[0][0]);
+      return;
+    }
     if (
       celebration &&
       finalEditor &&
@@ -236,8 +267,19 @@ export function StoryReview({
       void send({ action: "APPROVE", message: null }, approvalThanks);
     else setPanel("approve");
   };
+  function choosePhoto(selected: File | null) {
+    if (!selected) return;
+    const photo = ["image/jpeg", "image/png", "image/webp"].includes(selected.type);
+    const video = ["video/mp4", "video/webm"].includes(selected.type);
+    if ((!photo && !video) || selected.size > (photo ? 12 : 25) * 1024 * 1024) {
+      setError("Please choose a JPEG, PNG or WebP photo up to 12 MB, or an MP4/WebM video up to 25 MB. For an HEIC photo, export or share it as JPEG first."); return;
+    }
+    setError(""); setRights(false);
+    void pendingPhoto.select(selected, photoToReplace);
+  }
   async function upload() {
-    if (!review || !file || !rights) return;
+    if (!review || !file || !rights || busy) return;
+    const replacementPhoto = pendingPhoto.photo?.replacement;
     setBusy(true);
     setError("");
     try {
@@ -270,8 +312,10 @@ export function StoryReview({
           uploadNotice = "Your photo was uploaded privately for newsroom review. The newsroom will select the photo for the next preview.";
         }
       }
-      await load();
-      setFile(null);
+      // The file is already received; never invite a duplicate upload if a later refresh fails.
+      await pendingPhoto.select(null);
+      try { await drafts.discard("media"); } catch { uploadNotice += " Your saved caption details still need to be cleared; you do not need to upload the photo again."; }
+      try { await load(); } catch { uploadNotice += " Refresh to see the received photo below."; }
       setRights(false);
       setNotice(uploadNotice);
       setReplacementPhoto(null);
@@ -321,7 +365,7 @@ export function StoryReview({
         </p>
       )}
       {notice && !(approved && finalEditor && notice === approvalThanks) && (
-        <p role="status" className="sm-review-notice">
+        <p ref={noticeRef} tabIndex={-1} role="status" className="sm-review-notice">
           {notice}
         </p>
       )}
@@ -587,6 +631,12 @@ export function StoryReview({
               )}
             </div>
           )}
+          {panel === "article" && (pending.length > 0 || file) && <aside className="sm-review-resume" aria-label="Unfinished responses">
+            <strong>You have a response in progress</strong>
+            <p>Send your response when you're ready, then return here to review and approve the story.</p>
+            {pending.map(([name]) => <button key={name} onClick={() => setPanel(name)}>Continue {draftLabel(name)}</button>)}
+            {file && !pending.some(([name]) => name === "media") && <button onClick={() => setPanel("media")}>Continue your photo upload</button>}
+          </aside>}
           {panel !== "article" && (
             <section
               ref={responseRef}
@@ -601,7 +651,7 @@ export function StoryReview({
                     : panel === "edits"
                       ? "Propose changes"
                       : panel === "media"
-                        ? replacementPhoto ? "Change photo" : "Contribute a photograph"
+                        ? photoToReplace ? "Change photo" : "Contribute a photograph"
                         : panel === "questions"
                           ? "Tell us a little more"
                           : panel === "history"
@@ -616,6 +666,18 @@ export function StoryReview({
                   Close
                 </button>
               </div>
+              {panel !== "history" && <div className="sm-review-save-state" role="status" aria-live="polite">
+                {currentDraft?.status === "conflict" ? <>
+                  <p>A response was saved in another tab or device. Your writing here is still available. Choose which version to keep.</p>
+                  <button disabled={busy} onClick={() => void drafts.resolve(panel, true).catch(e => setError(e.message))}>Keep what I wrote here</button>
+                  <button disabled={busy} onClick={() => void drafts.resolve(panel, false).catch(e => setError(e.message))}>Use the saved response</button>
+                </> : currentDraft?.status === "offline" ? <>
+                  <p>{currentDraft.local ? "Saved on this device. Waiting for a connection to save online." : "Not saved yet. Keep this page open and try again."}</p>
+                  <button disabled={busy} onClick={() => void drafts.flush(panel).catch(e => setError(e.message))}>Try saving again</button>
+                </> : <p>{currentDraft?.status === "saving" ? "Saving your writing…" : hasDraft(currentDraft?.data) ? "Saved — not sent yet. You can safely come back later." : "Your writing saves automatically. Use the Send button below when you're ready to share it with the newsroom."}</p>}
+                {hasDraft(currentDraft?.data) && <button className="sm-review-quiet" disabled={busy} onClick={() => { if (window.confirm("Discard this unsent response? Responses already sent will be kept.")) void drafts.discard(panel).catch(e => setError(e.message)); }}>Discard this unsent response</button>}
+              </div>}
+              <fieldset disabled={busy} className="sm-review-response-fields">
               {panel === "edits" && (
                 <>
                   <p>
@@ -744,7 +806,7 @@ export function StoryReview({
                       void send(
                         {
                           action: "EDIT_MEDIA_METADATA",
-                          contribution_id: editingMedia,
+                          contribution_id: drafts.entries.metadata?.data.editingMedia || editingMedia,
                           caption: mediaInfo.caption,
                           credit: mediaInfo.credit,
                           alt: mediaInfo.alt,
@@ -764,21 +826,32 @@ export function StoryReview({
                     void upload();
                   }}
                 >
-                  {replacementPhoto && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
+                  {photoToReplace && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
                   <p>
                     JPEG, PNG or WebP photos up to 12 MB; MP4 or WebM videos up
                     to 25 MB. Media remain private until selected and approved
                     by the newsroom.
                   </p>
-                  <label>
+                  <div className="sm-review-photo-picker">
+                  <p><strong>1. Choose a photo</strong></p>
+                  <button type="button" onClick={() => galleryRef.current?.click()}>Choose from my photos</button>
+                  <button type="button" onClick={() => cameraRef.current?.click()}>Take a photo</button>
+                  <input ref={cameraRef} aria-label="Take a photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onChange={e => choosePhoto(e.target.files?.[0] || null)} />
+                  <label className="sm-review-native-file">
                     Photograph or video
-                    <input
+                    <input ref={galleryRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
-                      required
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      onChange={(e) => choosePhoto(e.target.files?.[0] || null)}
                     />
                   </label>
+                  </div>
+                  {file && <div className="sm-review-selected-photo">
+                    {pendingPhoto.preview && <img src={pendingPhoto.preview} alt="Your selected photograph" />}
+                    <p><strong>{file.name}</strong></p>
+                    <p role="status">{pendingPhoto.saved ? "Photo kept on this device — not uploaded yet." : "Photo selected — not uploaded yet. Keep this page open."}</p>
+                    <button type="button" onClick={() => { void pendingPhoto.select(null); setRights(false); }}>Remove selected photo</button>
+                  </div>}
                   <p className="sm-review-help">
                     Choose a photograph and confirm permission below. All
                     descriptions are optional; we can help with the caption.
@@ -820,6 +893,7 @@ export function StoryReview({
                       </label>
                     ))}
                   </details>
+                  <p><strong>2. Confirm permission</strong></p>
                   <label className="sm-review-check">
                     <input
                       type="checkbox"
@@ -831,9 +905,11 @@ export function StoryReview({
                     this media to {review.publication.name} for editorial
                     publication.
                   </label>
-                  <button disabled={busy || !rights || !file}>
-                    Upload privately
-                  </button>
+                  <div className={`sm-review-send-bar${rights && file ? " is-ready" : ""}`}>
+                    <p>{busy ? "Uploading your photo. Please keep this page open…" : !file ? "Choose a photo above to continue." : !rights ? "Tick the permission box above, then upload your photo." : "Ready. Tap Upload privately to send this photo to the newsroom."}</p>
+                    {busy && <progress aria-label="Uploading photo" />}
+                    <button className="sm-review-primary" disabled={busy || !rights || !file}>{busy ? "Uploading…" : "Upload privately"}</button>
+                  </div>
                 </form>
               )}
               {["approve", "changes", "comment", "decline"].includes(panel) && (
@@ -860,8 +936,8 @@ export function StoryReview({
                     <label>
                       Comment on
                       <select
-                        value={commentTarget}
-                        onChange={(e) => setCommentTarget(e.target.value)}
+                        value={currentDraft?.data.commentTarget || commentTarget}
+                        onChange={(e) => { setCommentTarget(e.target.value); if (message) drafts.set("comment", { ...currentDraft?.data, commentTarget: e.target.value }); }}
                       >
                         <option value="STORY">Entire story</option>
                         {review.revision.document.content_markdown
@@ -954,9 +1030,9 @@ export function StoryReview({
                           ...(panel === "comment"
                             ? {
                                 target: {
-                                  kind: commentTarget.split(":")[0],
+                                  kind: (currentDraft?.data.commentTarget || commentTarget).split(":")[0],
                                   reference:
-                                    commentTarget.split(":")[1] || null,
+                                    (currentDraft?.data.commentTarget || commentTarget).split(":")[1] || null,
                                 },
                               }
                             : {}),
@@ -1031,6 +1107,7 @@ export function StoryReview({
                   </details>
                 </>
               )}
+              </fieldset>
             </section>
           )}
           {review.contributions.length > 0 && (
@@ -1070,12 +1147,7 @@ export function StoryReview({
                           <button
                             onClick={() => {
                               setEditingMedia(c.id);
-                              setMediaInfo({
-                                ...mediaInfo,
-                                caption: c.payload.caption || "",
-                                credit: c.payload.credit || "",
-                                alt: c.payload.caption || "",
-                              });
+                              if (!hasDraft(drafts.entries.metadata?.data)) drafts.set("metadata", { editingMedia: c.id, mediaInfo: { ...emptyMediaInfo, caption: c.payload.caption || "", credit: c.payload.credit || "", alt: c.payload.alt || "" } });
                               setPanel("metadata");
                             }}
                           >
