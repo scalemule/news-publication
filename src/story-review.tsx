@@ -248,7 +248,7 @@ export function StoryReview({
     }
     setPanel("share");
   }
-  async function send(action: Record<string, unknown>, success: string) {
+  async function send(action: Record<string, unknown>, success: string, consumeDraft = true) {
     if (!review || busy) return;
     if (action.action === "APPROVE" && file) {
       setNotice("Your photo is not uploaded yet. Upload it or remove the selection before approving."); setPanel("media"); return;
@@ -258,7 +258,7 @@ export function StoryReview({
     setNotice("");
     try {
       const actionPanel = ({ ANSWER_QUESTIONS: "questions", REQUEST_CHANGES: "changes", COMMENT: "comment", PROPOSE_EDITS: "edits", EDIT_MEDIA_METADATA: "metadata", APPROVE: "approve", DECLINE: "decline" } as Record<string, string>)[String(action.action)];
-      const receipt = actionPanel ? await drafts.receipt(actionPanel) : undefined;
+      const receipt = consumeDraft && actionPanel ? await drafts.receipt(actionPanel) : undefined;
       const sent = await request("", { revision_id: review.revision.id, ...action, ...(receipt ? { draft: receipt } : {}) });
       if (sent.cleared_draft) drafts.consumed(sent.cleared_draft);
       try { await load(); } catch { success += " Refresh to see the latest preview."; }
@@ -605,7 +605,7 @@ export function StoryReview({
             className={`sm-review-actions${celebration ? " sm-review-concierge-actions" : ""}${panel !== "article" ? " sm-review-actions-editing" : ""}`}
             aria-label="Review actions"
           >
-            {!can("APPROVE") && can("COMMENT") && (review.identity_required || review.participant) && <button disabled={busy} onClick={() => setPanel("feedback")}>Looks good to me</button>}
+            {!can("APPROVE") && can("COMMENT") && (review.identity_required || review.participant) && <button className="sm-review-primary" disabled={busy} onClick={() => setPanel("feedback")}>Looks Good — Send Feedback</button>}
             {can("APPROVE") && !review.published && (
               <button
                 className="sm-review-primary"
@@ -712,7 +712,7 @@ export function StoryReview({
           </section>}
           {panel === "feedback" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Family feedback">
             <h2>Looks good to you?</h2>{errorMessage}<p>We'll send your feedback as {review.reviewer}. The newsroom will request approval from the designated family reviewer separately. This will not publish the story.</p>
-            <button disabled={busy} onClick={() => void send({ action: "COMMENT", message: "This draft looks good to me.", target: { kind: "STORY" } }, "Thank you. Your feedback has been sent to the newsroom. The story is still private.")}>Send my feedback</button>
+            <button className="sm-review-primary" disabled={busy} onClick={() => void send({ action: "COMMENT", message: "This draft looks good to me.", target: { kind: "STORY" } }, "Thank you. Your feedback has been sent to the newsroom. The story is still private.", false)}>Send my feedback</button>
             <button disabled={busy} onClick={() => setPanel("article")}>Back to the story</button>
           </section>}
           {!["article", "identity", "share", "feedback"].includes(panel) && (

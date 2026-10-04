@@ -244,7 +244,7 @@ describe("family review", () => {
 });
 
 describe("forwarded family invitations", () => {
-  function familySetup() {
+  function familySetup(withSavedComment = false) {
     let identified = false;
     const token = "a".repeat(64);
     const fetcher = vi.fn(async (url: unknown, options?: RequestInit) => {
@@ -253,7 +253,7 @@ describe("forwarded family invitations", () => {
       if (path.endsWith("/verify") && body.code === "00000000") return { ok: false, json: async () => ({ error: { message: "Check the code in your email" } }) };
       if (path.endsWith("/verify") && body.code) identified = true;
       if (path.endsWith("/join") || path.endsWith("/verify")) return { ok: true, json: async () => ({ success: true }) };
-      return { ok: true, json: async () => ({ data: { ...initial, session_id: identified ? "mother-session" : "family", identity_required: !identified, participant: identified, reviewer: identified ? "Mother" : "Family", permissions: initial.permissions.filter(p => !["APPROVE", "DECLINE"].includes(p)) } }) };
+      return { ok: true, json: async () => ({ data: { ...initial, response_drafts: withSavedComment && identified ? { comment: { panel: "comment", version: 3, data: { message: "Please retain my unsent caption correction.", commentTarget: "STORY" } } } : {}, session_id: identified ? "mother-session" : "family", identity_required: !identified, participant: identified, reviewer: identified ? "Mother" : "Family", permissions: initial.permissions.filter(p => !["APPROVE", "DECLINE"].includes(p)) } }) };
     });
     vi.stubGlobal("fetch",fetcher);
     render(<StoryReview sessionId="family" publicationName="Test publication" />);
@@ -291,5 +291,25 @@ describe("forwarded family invitations", () => {
     const posts = fetcher.mock.calls.flatMap(([, o]) => typeof o?.body === "string" ? [JSON.parse(o.body)] : []);
     expect(posts.some(p => p.email === "mother@example.test" && p.name === "Mother")).toBe(true);
     expect(posts.some(p => p.action === "APPROVE")).toBe(false);
+  });
+  it("offers a prominent feedback action without consuming an unrelated saved comment or granting approval", async () => {
+    const fetcher = familySetup(true);
+    const primary = await screen.findByRole("button", { name: "Looks Good — Send Feedback" });
+    expect(primary.classList.contains("sm-review-primary")).toBe(true);
+    fireEvent.click(primary);
+    fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "Mother" } });
+    fireEvent.change(screen.getByLabelText("Your email"), { target: { value: "mother@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    fireEvent.change(await screen.findByLabelText("Email verification code"), { target: { value: "12345678" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send my feedback" }));
+    await screen.findByText(/Your feedback has been sent/);
+    const commands = fetcher.mock.calls.flatMap(([, o]) => typeof o?.body === "string" ? [JSON.parse(o.body)] : []);
+    const feedback = commands.find(c => c.action === "COMMENT");
+    expect(feedback).toMatchObject({ revision_id: "exact-revision", message: "This draft looks good to me." });
+    expect(feedback.draft).toBeUndefined();
+    expect(commands.some(c => c.action === "APPROVE")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Continue your comment" }));
+    expect((screen.getByLabelText("Message (optional)") as HTMLTextAreaElement).value).toBe("Please retain my unsent caption correction.");
   });
 });
