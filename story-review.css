@@ -1,6 +1,43 @@
-.sm-story-review {
+.sm-review-frame:not(.sm-review-publication-frame) {
   --pub-paper: #fff;
   --pub-ink: #171917;
+  --pub-muted: #545c55;
+  --pub-soft: #f5f6f3;
+}
+.sm-review-frame {
+  background: var(--pub-paper, #fff);
+  color: var(--pub-ink, #171917);
+}
+.sm-review-banner-wrap,
+.sm-review-brand-wrap {
+  box-sizing: border-box;
+  max-width: 1040px;
+  margin: auto;
+  padding-inline: 32px;
+}
+.sm-review-publication-frame .sm-review-banner-wrap {
+  width: min(var(--pub-width, 1240px), calc(100% - 2 * var(--pub-gutter, 32px)));
+  max-width: none;
+  padding-inline: 0;
+}
+.sm-review-publication-frame {
+  padding-bottom: 100px;
+}
+.sm-review-publication-frame .sm-story-review {
+  min-height: auto;
+  padding-bottom: 32px;
+}
+.sm-review-publication-frame .sm-review-concierge-actions {
+  max-width: none;
+}
+.sm-review-publication-frame .sm-review-private {
+  color: var(--pub-muted, #545c55);
+  border-color: var(--pub-rule, #d7dcd7);
+}
+.sm-review-publication-frame .sm-review-private strong {
+  color: var(--pub-ink, #171917);
+}
+.sm-story-review {
   color-scheme: light;
   max-width: 1040px;
   margin: 0 auto;
@@ -15,7 +52,7 @@
 .sm-review-private {
   padding: 14px 0;
   border-bottom: 1px solid #d7dcd7;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
   font:
     13px/1.5 var(--font-inter),
     Arial,
@@ -26,7 +63,7 @@
   flex-wrap: wrap;
 }
 .sm-review-private strong {
-  color: #171917;
+  color: var(--pub-ink, #171917);
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -59,13 +96,13 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
 }
 .sm-review-intro p {
   margin: 0;
 }
 .sm-review-intro a {
-  color: #171917;
+  color: var(--pub-ink, #171917);
   white-space: nowrap;
   text-underline-offset: 3px;
 }
@@ -83,7 +120,7 @@
 }
 .sm-review-dek {
   font-size: 21px;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
   line-height: 1.5;
   margin: 0 0 28px;
 }
@@ -121,7 +158,7 @@
   gap: 8px;
   flex-wrap: wrap;
   border-top: 1px solid #d7dcd7;
-  background: #fff;
+  background: var(--pub-paper, #fff);
   padding: 14px;
   z-index: 10;
 }
@@ -132,8 +169,8 @@
   padding: 10px 14px;
   border: 1px solid #a2aaa2;
   border-radius: 4px;
-  background: #fff;
-  color: #171917;
+  background: var(--pub-paper, #fff);
+  color: var(--pub-ink, #171917);
   cursor: pointer;
 }
 .sm-story-review button:disabled {
@@ -141,7 +178,7 @@
   cursor: default;
 }
 .sm-story-review button:hover:not(:disabled) {
-  background: #f5f6f3;
+  background: var(--pub-soft, #f5f6f3);
 }
 .sm-story-review :focus-visible {
   outline: 3px solid #2276b1;
@@ -234,6 +271,13 @@
   gap: 16px;
 }
 @media (max-width: 600px) {
+  .sm-review-banner-wrap,
+  .sm-review-brand-wrap {
+    padding-inline: 16px;
+  }
+  .sm-review-publication-frame {
+    padding-bottom: 148px;
+  }
   .sm-story-review {
     padding: 0 16px 32px;
   }
@@ -262,7 +306,7 @@
   .sm-review-private {
     position: static;
     color: #000;
-    background: #fff;
+    background: var(--pub-paper, #fff);
     border: 2px solid #000;
   }
   .sm-story-review {
@@ -303,7 +347,7 @@
 .sm-review-category span + span {
   border-left: 1px solid #d7dcd7;
   padding-left: 12px;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
 }
 .sm-review-photo-invitation {
   display: flex;
@@ -312,19 +356,19 @@
   gap: 20px;
   margin: 28px 0 32px;
   padding: 20px 22px;
-  background: #f5f6f3;
+  background: var(--pub-soft, #f5f6f3);
   border-left: 2px solid #d7dcd7;
   font:
     13px/1.6 var(--font-inter),
     Arial,
     sans-serif;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
 }
 .sm-review-photo-invitation p {
   margin: 3px 0 0;
 }
 .sm-review-photo-invitation strong {
-  color: #171917;
+  color: var(--pub-ink, #171917);
   font-weight: 600;
 }
 .sm-review-photo-invitation button {
@@ -434,10 +478,11 @@
 }
 .sm-review-help {
   font-size: 14px;
-  color: #545c55;
+  color: var(--pub-muted, #545c55);
 }
 .sm-review-thanks {
   border-top-color: #2c644b;
+  color: #215d3d;
   padding: 24px;
   background: #eef6f1;
 }

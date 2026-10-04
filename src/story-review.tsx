@@ -78,10 +78,15 @@ export function StoryReview({
   sessionId,
   publicationName,
   nameplateUrl,
+  publicationHeader,
+  publicationFooter,
 }: {
   sessionId: string;
   publicationName: string;
   nameplateUrl?: string;
+  /** The publication supplies its real shell; private content still loads only through the review capability. */
+  publicationHeader?: React.ReactNode;
+  publicationFooter?: React.ReactNode;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
   const [review, setReview] = useState<Review | null>(null),
@@ -260,9 +265,8 @@ export function StoryReview({
       (r) => r.id === (compareTo || review?.revision.id),
     );
   return (
-    <main
-      className={`sm-story-review${celebration ? " sm-review-celebration" : ""}`}
-    >
+    <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
+      <div className="sm-review-banner-wrap">
       <div className="sm-review-private">
         <strong>
           {review?.published
@@ -275,12 +279,14 @@ export function StoryReview({
             : `Prepared by ${publicationName} for ${celebration ? "family " : ""}review.`}
         </span>
       </div>
-      <header className="sm-review-masthead">
+      </div>
+      {publicationHeader ?? <div className="sm-review-brand-wrap"><header className="sm-review-masthead">
         {nameplateUrl && (
           <img src={nameplateUrl} alt="" width={80} height={80} />
         )}
         <span>{review?.publication.name || publicationName}</span>
-      </header>
+      </header></div>}
+      <main className={`sm-story-review${celebration ? " sm-review-celebration" : ""}`}>
       {error && (
         <p role="alert" className="sm-review-alert">
           {error}
@@ -1074,7 +1080,9 @@ export function StoryReview({
           )}
         </>
       )}
-    </main>
+      </main>
+      {publicationFooter}
+    </div>
   );
 }
 function PrivatePhoto({ base, media }: { base: string; media: Media }) {

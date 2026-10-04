@@ -107,3 +107,7 @@ Styles adhere to the publication theme (`--pub-paper`, `--pub-ink`, `--pub-accen
 `StoryReview` accepts an optional `nameplateUrl` from the publication identity. Celebrations reviews lead with the finished article, keep corrections and photos separate from its text, and progressively disclose optional questions (five first, then the remaining questions). One-click approval is limited to subject-plus-editor policies without required questions; automatic-publication policies still show their explicit confirmation.
 
 The review endpoint returns the decision for the exact invited revision. Editors can explicitly advance an existing link using Blog's `SHARE_REVISION` command; approval never carries over. This patch does not enable a publication's section or publish any content. HEIC conversion and live transport certification remain outside this patch.
+
+### Publication framing for private previews (0.0.28)
+
+Pass `publicationHeader` and `publicationFooter` React nodes to `StoryReview` to reuse a publication's real navigation, masthead, and footer. The private banner remains above the publication header and the review controls remain separate from the story. The standalone masthead remains the default. The host must suppress analytics on private review routes; public article indexing and sharing features are not mounted by these slots. This patch changes presentation only; review permissions and publication gates are unchanged.
