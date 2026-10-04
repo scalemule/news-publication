@@ -404,6 +404,10 @@
 .sm-review-form-heading {
   margin-bottom: 24px;
 }
+.sm-review-form-heading > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .sm-review-form textarea {
   resize: vertical;
   min-height: 88px;
@@ -508,6 +512,11 @@
   }
   .sm-review-welcome button {
     margin-bottom: 8px;
+  }
+  .sm-review-form input:not([type="checkbox"]),
+  .sm-review-form textarea,
+  .sm-review-form select {
+    font-size: 16px;
   }
 }
 @media print {
