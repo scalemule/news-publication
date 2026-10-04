@@ -52,7 +52,20 @@ const initial = {
 const photo = { kind: "image" as const, contribution_id: "original-photo", file_id: "private-file", caption: "A family photograph", credit: "", alt: "The couple smiling", position: "hero" };
 function setup(policy = initial.review_policy, shell = false, withPhoto = false, permissions = initial.permissions, failReplacementNote = false) {
   let current = { ...initial, review_policy: policy, permissions, revision: { ...initial.revision, document: { ...document, media: withPhoto ? [photo] : [] } } };
+  const drafts: Record<string, any> = {};
   const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
+    if (typeof options?.body === "string") {
+      const body = JSON.parse(options.body);
+      if (body.action === "SAVE_DRAFT") {
+        drafts[body.panel] = { panel: body.panel, version: (drafts[body.panel]?.version || 0) + 1, data: body.data };
+        return { ok: true, json: async () => ({ data: drafts[body.panel] }) };
+      }
+      if (body.draft) {
+        const d = body.draft;
+        drafts[d.panel] = { panel: d.panel, version: d.version + 1, data: {} };
+        return { ok: true, json: async () => ({ data: { cleared_draft: drafts[d.panel] } }) };
+      }
+    }
     if (String(_url).endsWith("/media/private-file")) return { ok: true, blob: async () => new Blob(["photo"], { type: "image/jpeg" }) };
     if (options?.body instanceof FormData) return { ok: true, json: async () => ({ data: { id: "replacement-photo" } }) };
     if (failReplacementNote && typeof options?.body === "string" && JSON.parse(options.body).action === "COMMENT") return { ok: false, json: async () => ({ error: { message: "Try again" } }) };
@@ -62,7 +75,7 @@ function setup(policy = initial.review_policy, shell = false, withPhoto = false,
       JSON.parse(options.body).action === "APPROVE"
     )
       current = { ...current, decision: "APPROVED" };
-    return { ok: true, json: async () => ({ success: true, data: current }) };
+    return { ok: true, json: async () => ({ success: true, data: { ...current, response_drafts: drafts } }) };
   });
   vi.stubGlobal("fetch", fetcher);
   render(
@@ -76,6 +89,8 @@ function setup(policy = initial.review_policy, shell = false, withPhoto = false,
   return fetcher;
 }
 beforeEach(() => {
+  const storage = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => storage.set(k, v), removeItem: (k: string) => storage.delete(k) });
   window.history.replaceState(null, "", "/");
   Element.prototype.scrollIntoView = vi.fn();
   URL.createObjectURL = vi.fn(() => "blob:private-photo");
@@ -97,7 +112,7 @@ describe("family review", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.submit(upload.closest("form")!);
     await screen.findByText(/replacement photo has been sent/);
-    const posts = fetcher.mock.calls.filter(([, o]) => o?.method === "POST");
+    const posts = fetcher.mock.calls.filter(([, o]) => o?.method === "POST" && (typeof o.body !== "string" || JSON.parse(o.body).action !== "SAVE_DRAFT"));
     expect(posts).toHaveLength(2);
     expect(posts[0][0]).toBe("/api/news/review/private-session/media");
     expect(JSON.parse((posts[0][1]!.body as FormData).get("metadata") as string).rights_confirmed).toBe(true);
@@ -197,16 +212,13 @@ describe("family review", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Send change request" }),
     );
-    await waitFor(() =>
-      expect(fetcher.mock.calls.some(([, o]) => o?.method === "POST")).toBe(
-        true,
-      ),
-    );
-    const post = fetcher.mock.calls.find(([, o]) => o?.method === "POST");
+    await screen.findByText("Your message has been sent to the newsroom.");
+    const post = fetcher.mock.calls.find(([, o]) => typeof o?.body === "string" && JSON.parse(o.body).action === "REQUEST_CHANGES");
     expect(JSON.parse(post![1]!.body as string)).toEqual({
       revision_id: "exact-revision",
       action: "REQUEST_CHANGES",
       message: "Correct a name: Please include the accent in София.",
+      draft: { panel: "changes", version: 1 },
     });
   });
   it("accepts a photo without requiring descriptions but always requires permission", async () => {

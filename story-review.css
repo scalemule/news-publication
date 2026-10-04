@@ -597,3 +597,25 @@
     scroll-behavior: auto;
   }
 }
+
+/* Response controls stay readable with a phone keyboard and at browser zoom. */
+.sm-review-response-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.sm-review-save-state, .sm-review-resume { background: var(--pub-soft, #f5f6f3); padding: 16px; margin: 18px auto; max-width: 760px; font: 16px/1.6 system-ui, sans-serif; }
+.sm-review-save-state p { margin: 0 0 8px; }
+.sm-story-review button, .sm-review-form summary { min-height: 48px; }
+.sm-review-photo-picker { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sm-review-photo-picker > p { width: 100%; margin-bottom: 0; }
+.sm-review-photo-picker .sm-review-native-file { width: 100%; }
+.sm-review-photo-picker input[hidden] { display: none; }
+.sm-review-selected-photo { padding: 16px; border: 1px solid var(--pub-rule, #d7dcd7); }
+.sm-review-selected-photo img { display: block; width: 100%; max-height: 320px; object-fit: contain; }
+.sm-review-send-bar { position: sticky; bottom: 0; background: var(--pub-paper, #fff); border-top: 1px solid var(--pub-rule, #d7dcd7); padding: 12px 0 max(12px, env(safe-area-inset-bottom)); }
+.sm-review-send-bar p { margin: 0 0 8px; }
+.sm-review-send-bar progress { display: block; width: 100%; }
+.sm-review-form input[type=file]::file-selector-button { min-height: 44px; font: inherit; }
+@media (max-width: 600px) {
+  .sm-review-form button { font-size: 16px; }
+  .sm-review-response-fields > form > button, .sm-review-send-bar button { width: 100%; margin: 8px 0 0; }
+  .sm-review-photo-picker button { flex: 1 1 180px; margin: 0; }
+  .sm-review-save-state button { margin: 8px 0 0; }
+}
