@@ -250,6 +250,7 @@ describe("forwarded family invitations", () => {
     const fetcher = vi.fn(async (url: unknown, options?: RequestInit) => {
       const path = String(url), body = typeof options?.body === "string" ? JSON.parse(options.body) : {};
       if (path.endsWith("/session")) return { ok: true, json: async () => ({ data: { share_url: `/review/family?key=${token}`, can_share: true } }) };
+      if (path.endsWith("/verify") && body.code === "00000000") return { ok: false, json: async () => ({ error: { message: "Check the code in your email" } }) };
       if (path.endsWith("/verify") && body.code) identified = true;
       if (path.endsWith("/join") || path.endsWith("/verify")) return { ok: true, json: async () => ({ success: true }) };
       return { ok: true, json: async () => ({ data: { ...initial, session_id: identified ? "mother-session" : "family", identity_required: !identified, participant: identified, reviewer: identified ? "Mother" : "Family", permissions: initial.permissions.filter(p => !["APPROVE", "DECLINE"].includes(p)) } }) };
@@ -278,6 +279,11 @@ describe("forwarded family invitations", () => {
     fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "Mother" } });
     fireEvent.change(screen.getByLabelText("Your email"), { target: { value: "mother@example.test" } });
     fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+    fireEvent.change(await screen.findByLabelText("Email verification code"), { target: { value: "00000000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and continue" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.closest('section[aria-label="Introduce yourself"]')).toBeTruthy();
+    expect(screen.getByLabelText("Email verification code")).toBeTruthy();
     fireEvent.change(await screen.findByLabelText("Email verification code"), { target: { value: "12345678" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify and continue" }));
     await screen.findByRole("heading", { name: "Suggest a change" });
