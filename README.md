@@ -111,3 +111,20 @@ The review endpoint returns the decision for the exact invited revision. Editors
 ### Publication framing for private previews (0.0.28)
 
 Pass `publicationHeader` and `publicationFooter` React nodes to `StoryReview` to reuse a publication's real navigation, masthead, and footer. The private banner remains above the publication header and the review controls remain separate from the story. The standalone masthead remains the default. The host must suppress analytics on private review routes; public article indexing and sharing features are not mounted by these slots. This patch changes presentation only; review permissions and publication gates are unchanged.
+
+### Private review sign-in and email options
+
+`StoryReview` accepts `readerAccountUrl` and a client `renderSignIn(returnTo)`
+function so the host publication can reuse its existing account and sign-in
+components. Hosts must implement the `/api/news/review/:session/account`
+server adapter to connect the authenticated, verified reader through Blog’s
+`join-account` endpoint. Never trust a browser-supplied email or verification flag.
+The private return path belongs in the host’s signed, HttpOnly OAuth flow cookie,
+not the provider’s authorization URL. Contributor access does not imply subject
+approval authority.
+
+Optional questions can be browsed and copied before identity verification.
+`feedbackEmail` enables mail-app links containing the story title, exact revision
+reference and optional answers, never the invitation credential. Configure a
+monitored mailbox; received email must be recorded by the newsroom. Online
+answers retain their existing autosave and explicit-send behavior.
