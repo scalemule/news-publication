@@ -630,3 +630,8 @@
 .sm-review-sharing button, .sm-review-identity-status button { min-height:48px; font:inherit; padding:10px 16px; cursor:pointer; }
 .sm-review-form input#review-share-url { width:100%; font-size:16px; min-width:0; }
 .sm-review-form label[for^="contributor-"] { display:block; margin-top:16px; }
+
+.sm-review-question-list { padding-left: 1.5rem; margin: 1.5rem 0; }
+.sm-review-question-list li { padding-left: .4rem; margin: 0 0 1.2rem; line-height: 1.6; }
+.sm-review-email-alternative { border-top: 1px solid var(--sm-review-line, #d7d7d7); padding-top: 1rem; margin-top: 1.5rem; line-height: 1.6; }
+.sm-review-email-alternative a { font-weight: 700; text-decoration: underline; text-underline-offset: .2em; }

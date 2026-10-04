@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
+import { reviewEmailLink, reviewEmailText } from "./story-review-email";
 
 type Media = {
   kind?: "image" | "video";
@@ -86,6 +87,9 @@ export function StoryReview({
   nameplateUrl,
   publicationHeader,
   publicationFooter,
+  readerAccountUrl,
+  renderSignIn,
+  feedbackEmail,
 }: {
   sessionId: string;
   publicationName: string;
@@ -93,6 +97,10 @@ export function StoryReview({
   /** The publication supplies its real shell; private content still loads only through the review capability. */
   publicationHeader?: React.ReactNode;
   publicationFooter?: React.ReactNode;
+  /** Reuse the publication's existing account and sign-in components. */
+  readerAccountUrl?: string;
+  renderSignIn?: (returnTo: string) => React.ReactNode;
+  feedbackEmail?: string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
   const [review, setReview] = useState<Review | null>(null),
@@ -105,8 +113,22 @@ export function StoryReview({
   const [shareUrl, setShareUrl] = useState(""), [canShare, setCanShare] = useState(false);
   const [contributorName, setContributorName] = useState(""), [contributorEmail, setContributorEmail] = useState("");
   const [identityStep, setIdentityStep] = useState("name"), [requestedPanel, setRequestedPanel] = useState("comment");
+  const [reader, setReader] = useState<{ full_name?: string; email: string; email_verified: boolean } | null>(null);
+  const [readerLoading, setReaderLoading] = useState(!!readerAccountUrl);
+  const [useEmailCode, setUseEmailCode] = useState(!renderSignIn);
+  const [returnPanel, setReturnPanel] = useState("");
+  const resumed = useRef(false);
+  const [copiedQuestions, setCopiedQuestions] = useState(false);
+  useEffect(() => {
+    if (!readerAccountUrl) return;
+    let active = true;
+    void fetch(readerAccountUrl, { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(15000) })
+      .then(async response => { if (response.ok) { const data = await response.json(); if (active) setReader(data.user || null); } })
+      .catch(() => {}).finally(() => { if (active) setReaderLoading(false); });
+    return () => { active = false; };
+  }, [readerAccountUrl]);
   function setPanel(next: string) {
-    if (review?.identity_required && !["article", "history", "identity", "share"].includes(next)) {
+    if (review?.identity_required && !["article", "history", "identity", "share", "question-list"].includes(next)) {
       setRequestedPanel(next); setPanelState("identity");
     } else setPanelState(next);
   }
@@ -202,10 +224,30 @@ export function StoryReview({
 
     }
   }
+  async function connectReader(target = requestedPanel) {
+    setBusy(true); setError("");
+    try {
+      await request("/account", {}); await load(); setPanelState(target); setReturnPanel("");
+      const url = new URL(window.location.href); url.searchParams.delete("respond");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    } catch (e) { setError((e as Error).message); setPanelState("identity"); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => {
+    if (!returnPanel || !review || !reader?.email_verified || resumed.current) return;
+    resumed.current = true;
+    void connectReader(returnPanel);
+  }, [returnPanel, review, reader]);
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
+        const returnUrl = new URL(window.location.href);
+        if (returnUrl.searchParams.get("signin") === "retry") setError("Sign-in wasn’t completed. Try again or use an email code.");
+        const respond = returnUrl.searchParams.get("respond") || "";
+        if (["feedback", "changes", "questions", "media", "comment", "edits"].includes(respond)) {
+          setRequestedPanel(respond); setReturnPanel(respond); setPanelState("identity");
+        }
         const token = new URL(window.location.href).searchParams.get("key") || (/^[a-f0-9]{64}$/.test(window.location.hash.slice(1)) ? window.location.hash.slice(1) : undefined);
         // Keep a complete copyable invitation in the address bar. A legacy
         // fragment invitation (or an existing cookie-only visit) upgrades here.
@@ -216,7 +258,9 @@ export function StoryReview({
         if (address) {
           const canonical = new URL(address, window.location.origin);
           if (canonical.origin === window.location.origin) {
-            window.history.replaceState(null, "", canonical.pathname + canonical.search);
+            const address = new URL(canonical);
+            if (respond) address.searchParams.set("respond", respond);
+            window.history.replaceState(null, "", address.pathname + address.search);
             if (active) { setShareUrl(canonical.href); setCanShare(exchange.can_share === true); }
           }
         }
@@ -368,6 +412,11 @@ export function StoryReview({
       (r) => r.id === (compareTo || review?.revision.id),
     );
   const errorMessage = error ? <p ref={errorRef} tabIndex={-1} role="alert" className="sm-review-alert">{error}</p> : null;
+  const emailLink = review ? reviewEmailLink(feedbackEmail, review.revision.document.title, reviewEmailText(review)) : undefined;
+  const questionText = review ? reviewEmailText(review, answers) : "";
+  const questionsEmail = review ? reviewEmailLink(feedbackEmail, review.revision.document.title, questionText) : undefined;
+  const signInReturn = shareUrl ? new URL(shareUrl).pathname + new URL(shareUrl).search + `&respond=${encodeURIComponent(requestedPanel)}` : "";
+  const emailAlternative = emailLink && <p className="sm-review-email-alternative">Prefer email? <a href={emailLink}>Email the newsroom</a>. Your email app will open; send your message there.</p>;
   return (
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
@@ -580,7 +629,7 @@ export function StoryReview({
                 <button
                   onClick={() => {
                     setMoreQuestions(false);
-                    setPanel("questions");
+                    setPanel(review.identity_required ? "question-list" : "questions");
                   }}
                 >
                   Tell Us More
@@ -599,6 +648,7 @@ export function StoryReview({
                   Leave a Comment
                 </button>
               )}
+              {emailAlternative}
             </section>
           )}
           <nav
@@ -644,7 +694,7 @@ export function StoryReview({
                   </button>
                 )}
                 {can("ANSWER_QUESTIONS") && review.questions.length > 0 && (
-                  <button disabled={busy} onClick={() => setPanel("questions")}>
+                  <button disabled={busy} onClick={() => setPanel(review.identity_required ? "question-list" : "questions")}>
                     Answer questions
                   </button>
                 )}
@@ -679,16 +729,34 @@ export function StoryReview({
           </aside>}
           {panel === "share" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Share private preview">
             <h2>Share with your family</h2>{errorMessage}
-            <p>Anyone with this link can read the private preview. To send feedback or photos, they will enter their own name and verify their email. No account is needed.</p>
+            <p>Anyone with this link can read the private preview. {renderSignIn ? "To contribute, they can continue with Google or use an email code." : "To send feedback or photos, they will enter their own name and verify their email. No account is needed."}</p>
             <label htmlFor="review-share-url">Private preview link</label>
             <input id="review-share-url" readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
             <button onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setNotice("Private link copied. Paste it into your message to family."); } catch { setNotice("Select the link above, then choose Copy on your device."); } }}>Copy private link</button>
             <button onClick={() => setPanel("article")}>Back to the story</button>
           </section>}
+          {panel === "question-list" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Optional story questions">
+            <div className="sm-review-form-heading"><h2>Tell us a little more</h2><button onClick={() => setPanel("article")}>Close</button></div>
+            <p>Completely optional. Read the questions first, then answer online or copy them into an email. Even one answer helps.</p>
+            <ol className="sm-review-question-list">{review.questions.filter((q, i) => moreQuestions || i < 5 || q.required).map(q => <li key={q.id}>{q.prompt}</li>)}</ol>
+            {!moreQuestions && review.questions.length > 5 && <button onClick={() => setMoreQuestions(true)}>See all questions</button>}
+            <button className="sm-review-primary" onClick={() => setPanel("questions")}>Answer online</button>
+            <p>Sign in to save your answers as you go. You can return whenever it suits you.</p>
+            <button onClick={async () => { try { await navigator.clipboard.writeText(questionText); setNotice("Questions copied. Paste them into an email and answer as many as you like."); } catch { setCopiedQuestions(true); } }}>Copy all questions</button>
+            {copiedQuestions && <label>Copy these questions<textarea readOnly rows={10} value={questionText} onFocus={e => e.currentTarget.select()} /></label>}
+            {questionsEmail && <p><a href={questionsEmail}>Answer by email</a> — opens your email app with the questions ready.</p>}
+          </section>}
           {panel === "identity" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Introduce yourself">
-            <h2>{identityStep === "code" ? "Check your email" : "Who is helping with the story?"}</h2>{errorMessage}
-            <p>Your name will accompany your feedback for the newsroom. Your email stays private. No password or account is needed.</p>
-            {identityStep === "name" ? <form onSubmit={async e => {
+            <h2>{identityStep === "code" ? "Check your email" : "Continue to help with the story"}</h2>{errorMessage}
+            <p>Your name accompanies your feedback. Your email stays private.</p>
+            {identityStep === "name" && renderSignIn && <>
+              {readerLoading ? <p role="status">Checking your sign-in…</p> : reader?.email_verified ? <>
+                <button className="sm-review-primary" disabled={busy} onClick={() => void connectReader()}>Continue as {reader.full_name || reader.email}</button>
+                <p>Your reader account is ready. No email code is needed.</p>
+              </> : renderSignIn(signInReturn)}
+              {!useEmailCode && <button className="sm-review-quiet" onClick={() => setUseEmailCode(true)}>Use an email code instead</button>}
+            </>}
+            {identityStep === "name" && useEmailCode && <form onSubmit={async e => {
               e.preventDefault(); setBusy(true); setError("");
               try { await request("/join", { name: contributorName, email: contributorEmail }); await request("/verify", {}); setIdentityStep("code"); setCode(""); }
               catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -696,8 +764,10 @@ export function StoryReview({
               <label htmlFor="contributor-name">Your name</label><input id="contributor-name" autoComplete="name" value={contributorName} maxLength={150} required onChange={e => setContributorName(e.target.value)} />
               <label htmlFor="contributor-email">Your email</label><input id="contributor-email" type="email" autoComplete="email" value={contributorEmail} maxLength={320} required onChange={e => setContributorEmail(e.target.value)} />
               <p>We'll email you a code to confirm it's you.</p>
+              <p>No password or account is needed for this option.</p>
               <button disabled={busy}>{busy ? "Sending your code…" : "Email me a code"}</button>
-            </form> : <form onSubmit={async e => {
+            </form>}
+            {identityStep === "code" && <form onSubmit={async e => {
               e.preventDefault(); setBusy(true); setError("");
               try { await request("/verify", { code }); await load(); setCode(""); setPanelState(requestedPanel); }
               catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -708,6 +778,7 @@ export function StoryReview({
               <button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await request("/verify", {}); setNotice("A new code was sent. Check your inbox and spam folder."); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>Send a new code</button>
               <button type="button" disabled={busy} onClick={() => setIdentityStep("name")}>Use a different email</button>
             </form>}
+            {emailAlternative}
             <button disabled={busy} onClick={() => setPanel("article")}>Just read the story</button>
           </section>}
           {panel === "feedback" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Family feedback">
@@ -715,7 +786,7 @@ export function StoryReview({
             <button className="sm-review-primary" disabled={busy} onClick={() => void send({ action: "COMMENT", message: "This draft looks good to me.", target: { kind: "STORY" } }, "Thank you. Your feedback has been sent to the newsroom. The story is still private.", false)}>Send my feedback</button>
             <button disabled={busy} onClick={() => setPanel("article")}>Back to the story</button>
           </section>}
-          {!["article", "identity", "share", "feedback"].includes(panel) && (
+          {!["article", "identity", "share", "feedback", "question-list"].includes(panel) && (
             <section
               ref={responseRef}
               tabIndex={-1}
@@ -860,6 +931,7 @@ export function StoryReview({
                       Answer More Questions
                     </button>
                   )}
+                  {questionsEmail && <p><a href={questionsEmail}>Email these answers instead</a>. Send them from your email app; your online draft stays saved.</p>}
                 </form>
               )}
               {panel === "metadata" && (

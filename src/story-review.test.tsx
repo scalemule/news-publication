@@ -244,19 +244,21 @@ describe("family review", () => {
 });
 
 describe("forwarded family invitations", () => {
-  function familySetup(withSavedComment = false) {
+  function familySetup(withSavedComment = false, google = false, account = false) {
     let identified = false;
     const token = "a".repeat(64);
     const fetcher = vi.fn(async (url: unknown, options?: RequestInit) => {
       const path = String(url), body = typeof options?.body === "string" ? JSON.parse(options.body) : {};
       if (path.endsWith("/session")) return { ok: true, json: async () => ({ data: { share_url: `/review/family?key=${token}`, can_share: true } }) };
+      if (path === "/api/news/me") return { ok: true, json: async () => ({ user: account ? { email: "mother@example.test", full_name: "Майка", email_verified: true } : null }) };
+      if (path.endsWith("/account")) { identified = true; return { ok: true, json: async () => ({ success: true }) }; }
       if (path.endsWith("/verify") && body.code === "00000000") return { ok: false, json: async () => ({ error: { message: "Check the code in your email" } }) };
       if (path.endsWith("/verify") && body.code) identified = true;
       if (path.endsWith("/join") || path.endsWith("/verify")) return { ok: true, json: async () => ({ success: true }) };
       return { ok: true, json: async () => ({ data: { ...initial, response_drafts: withSavedComment && identified ? { comment: { panel: "comment", version: 3, data: { message: "Please retain my unsent caption correction.", commentTarget: "STORY" } } } : {}, session_id: identified ? "mother-session" : "family", identity_required: !identified, participant: identified, reviewer: identified ? "Mother" : "Family", permissions: initial.permissions.filter(p => !["APPROVE", "DECLINE"].includes(p)) } }) };
     });
     vi.stubGlobal("fetch",fetcher);
-    render(<StoryReview sessionId="family" publicationName="Test publication" />);
+    render(<StoryReview sessionId="family" publicationName="Test publication" readerAccountUrl={google ? "/api/news/me" : undefined} renderSignIn={google ? next => <a href={`/sign-in?next=${encodeURIComponent(next)}`}>Continue with Google</a> : undefined} feedbackEmail={google ? "family@example.test" : undefined} />);
     return fetcher;
   }
   it("upgrades old fragment invitations to a complete copyable address and preserves it after navigation", async () => {
@@ -312,4 +314,45 @@ describe("forwarded family invitations", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue your comment" }));
     expect((screen.getByLabelText("Message (optional)") as HTMLTextAreaElement).value).toBe("Please retain my unsent caption correction.");
   });
+  it("shows optional questions and copying before sign-in, then offers Google first with a guest fallback", async () => {
+    const copied = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: copied } });
+    const fetcher = familySetup(false, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Tell Us More" }));
+    expect(screen.queryByLabelText("Your email")).toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "See all questions" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+    fireEvent.click(screen.getByRole("button", { name: "Copy all questions" }));
+    await waitFor(() => expect(copied).toHaveBeenCalled());
+    expect(copied.mock.calls[0][0]).toContain("Reference exact-revision");
+    expect(copied.mock.calls[0][0]).not.toContain("a".repeat(64));
+    expect(screen.getByRole("link", { name: "Answer by email" }).getAttribute("href")).toMatch(/^mailto:/);
+    fireEvent.click(screen.getByRole("button", { name: "Answer online" }));
+    const google = await screen.findByRole("link", { name: "Continue with Google" });
+    expect(decodeURIComponent(google.getAttribute("href")!)).toContain("&respond=questions");
+    expect(screen.queryByLabelText("Your email")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Use an email code instead" }));
+    expect(screen.getByLabelText("Your email")).toBeTruthy();
+    expect(fetcher.mock.calls.some(([url]) => String(url).endsWith("/join") || String(url).endsWith("/account"))).toBe(false);
+  });
+  it("connects an existing verified reader without another email code or a publish action", async () => {
+    const fetcher = familySetup(false, true, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Suggest a Change" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue as Майка" }));
+    await screen.findByRole("heading", { name: "Suggest a change" });
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/account"))).toHaveLength(1);
+    expect(fetcher.mock.calls.some(([url]) => String(url).endsWith("/verify"))).toBe(false);
+    expect(screen.queryByRole("button", { name: "Looks Good — Approve" })).toBeNull();
+  });
+  it("resumes the requested panel after Google returns and preserves the shareable key", async () => {
+    window.history.replaceState(null, "", `/review/family?key=${"a".repeat(64)}&respond=questions`);
+    const fetcher = familySetup(false, true, true);
+    await screen.findByRole("heading", { name: "Tell us a little more" });
+    expect(screen.getAllByRole("textbox")).toHaveLength(5);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/account"))).toHaveLength(1);
+    expect(new URL(window.location.href).searchParams.get("respond")).toBeNull();
+    expect(new URL(window.location.href).searchParams.get("key")).toBe("a".repeat(64));
+  });
+
 });
