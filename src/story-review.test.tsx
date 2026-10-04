@@ -49,9 +49,13 @@ const initial = {
   published: false,
   decision: null as string | null,
 };
-function setup(policy = initial.review_policy, shell = false) {
-  let current = { ...initial, review_policy: policy };
+const photo = { kind: "image" as const, contribution_id: "original-photo", file_id: "private-file", caption: "A family photograph", credit: "", alt: "The couple smiling", position: "hero" };
+function setup(policy = initial.review_policy, shell = false, withPhoto = false, permissions = initial.permissions, failReplacementNote = false) {
+  let current = { ...initial, review_policy: policy, permissions, revision: { ...initial.revision, document: { ...document, media: withPhoto ? [photo] : [] } } };
   const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
+    if (String(_url).endsWith("/media/private-file")) return { ok: true, blob: async () => new Blob(["photo"], { type: "image/jpeg" }) };
+    if (options?.body instanceof FormData) return { ok: true, json: async () => ({ data: { id: "replacement-photo" } }) };
+    if (failReplacementNote && typeof options?.body === "string" && JSON.parse(options.body).action === "COMMENT") return { ok: false, json: async () => ({ error: { message: "Try again" } }) };
     if (
       options?.method === "POST" &&
       typeof options.body === "string" &&
@@ -74,12 +78,49 @@ function setup(policy = initial.review_policy, shell = false) {
 beforeEach(() => {
   window.history.replaceState(null, "", "/");
   Element.prototype.scrollIntoView = vi.fn();
+  URL.createObjectURL = vi.fn(() => "blob:private-photo");
+  URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 describe("family review", () => {
+  it("requests a replacement for the exact photo without changing or approving the current revision", async () => {
+    const fetcher = setup(initial.review_policy, false, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Change photo" }));
+    expect(screen.getByRole("heading", { name: "Change photo" })).toBeTruthy();
+    expect(screen.getByText(/current photo stays in place/)).toBeTruthy();
+    const upload = screen.getByRole("button", { name: "Upload privately" });
+    fireEvent.change(screen.getByLabelText("Photograph or video"), { target: { files: [new File(["photo"], "replacement.jpg", { type: "image/jpeg" })] } });
+    expect(upload.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.submit(upload.closest("form")!);
+    await screen.findByText(/replacement photo has been sent/);
+    const posts = fetcher.mock.calls.filter(([, o]) => o?.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(posts[0][0]).toBe("/api/news/review/private-session/media");
+    expect(JSON.parse((posts[0][1]!.body as FormData).get("metadata") as string).rights_confirmed).toBe(true);
+    expect(JSON.parse(posts[1][1]!.body as string)).toMatchObject({ action: "COMMENT", revision_id: "exact-revision", target: { kind: "PHOTO", reference: "original-photo", replacement_contribution_id: "replacement-photo" } });
+    expect(screen.getByRole("img", { name: photo.alt })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Looks Good — Approve" }).hasAttribute("disabled")).toBe(false);
+  });
+  it("does not offer photo changes without upload permission", async () => {
+    setup(initial.review_policy, false, true, initial.permissions.filter(p => p !== "UPLOAD_MEDIA"));
+    await screen.findByRole("img", { name: photo.alt });
+    expect(screen.queryByRole("button", { name: "Change photo" })).toBeNull();
+  });
+  it("reports a saved photo if its replacement note fails and clears replacement intent for Add Photos", async () => {
+    setup(initial.review_policy, false, true, initial.permissions, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Change photo" }));
+    fireEvent.change(screen.getByLabelText("Photograph or video"), { target: { files: [new File(["photo"], "new.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.submit(screen.getByRole("button", { name: "Upload privately" }).closest("form")!);
+    await screen.findByText(/photo was uploaded privately, but we couldn't attach/);
+    fireEvent.click(screen.getByRole("button", { name: "Add Photos" }));
+    expect(screen.getByRole("heading", { name: "Contribute a photograph" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Upload privately" }).hasAttribute("disabled")).toBe(true);
+  });
   it("places the real publication shell around the private article without a duplicate masthead", async () => {
     setup(initial.review_policy, true);
     await screen.findByRole("heading", { name: document.title });

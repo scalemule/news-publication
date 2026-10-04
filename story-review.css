@@ -151,6 +151,24 @@
   color: #496076;
   margin-top: 8px;
 }
+.sm-review-photo-details {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+}
+.sm-review-photo-details > span {
+  flex: 1 1 200px;
+  margin: 0;
+  color: var(--pub-muted, #545c55);
+}
+.sm-story-review .sm-review-change-photo {
+  margin-left: auto;
+  min-height: 44px;
+  font-size: 13px;
+}
 .sm-review-actions {
   position: sticky;
   bottom: 0;
@@ -565,6 +583,7 @@
   }
 }
 @media print {
+  .sm-review-change-photo,
   .sm-review-concierge-actions,
   .sm-review-welcome,
   .sm-review-utilities,

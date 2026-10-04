@@ -109,6 +109,13 @@ export function StoryReview({
   const thanksRef = useRef<HTMLElement>(null);
   const [moreQuestions, setMoreQuestions] = useState(false);
   const [correctionKind, setCorrectionKind] = useState("Correct a detail");
+  const [replacementPhoto, setReplacementPhoto] = useState<Media | null>(null);
+  function openMedia(photo: Media | null = null) {
+    setReplacementPhoto(photo);
+    setFile(null);
+    setRights(false);
+    setPanel("media");
+  }
   useEffect(() => {
     if (panel !== "article") {
       responseRef.current?.scrollIntoView({
@@ -240,13 +247,34 @@ export function StoryReview({
         "metadata",
         JSON.stringify({ ...mediaInfo, rights_confirmed: true }),
       );
-      await request("/media", form);
+      const received = await request("/media", form);
+      let uploadNotice = "Media received privately. The newsroom will review it before publication.";
+      if (replacementPhoto) {
+        uploadNotice = "Your replacement photo has been sent to the newsroom. The current photo will stay in this preview until we prepare an updated draft.";
+        if (can("COMMENT")) {
+          try {
+            await request("", {
+              revision_id: review.revision.id,
+              action: "COMMENT",
+              message: "Please use my newly uploaded photograph in place of this photo.",
+              target: {
+                kind: "PHOTO",
+                reference: replacementPhoto.contribution_id,
+                replacement_contribution_id: received.id,
+              },
+            });
+          } catch {
+            uploadNotice = "Your photo was uploaded privately, but we couldn't attach the replacement note. Please use Suggest a Change to tell the newsroom which photograph it should replace.";
+          }
+        } else {
+          uploadNotice = "Your photo was uploaded privately for newsroom review. The newsroom will select the photo for the next preview.";
+        }
+      }
       await load();
       setFile(null);
       setRights(false);
-      setNotice(
-        "Media received privately. The newsroom will review it before publication.",
-      );
+      setNotice(uploadNotice);
+      setReplacementPhoto(null);
       setPanel("article");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
@@ -418,7 +446,9 @@ export function StoryReview({
             {review.revision.document.media
               .filter((m) => m.position === "hero")
               .map((m) => (
-                <PrivatePhoto key={m.file_id} media={m} base={base} />
+                <PrivatePhoto key={m.file_id} media={m} base={base}
+                  onChange={can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
+                  disabled={busy} />
               ))}
             {celebration &&
               !review.revision.document.media.some(
@@ -433,7 +463,7 @@ export function StoryReview({
                     <strong>A photograph makes it yours.</strong>
                     <p>Family photograph may be added before publication.</p>
                   </div>
-                  <button onClick={() => setPanel("media")}>
+                  <button onClick={() => openMedia()}>
                     + Add a photograph
                   </button>
                 </aside>
@@ -445,7 +475,9 @@ export function StoryReview({
             {review.revision.document.media
               .filter((m) => m.position !== "hero")
               .map((m) => (
-                <PrivatePhoto key={m.file_id} media={m} base={base} />
+                <PrivatePhoto key={m.file_id} media={m} base={base}
+                  onChange={m.kind !== "video" && can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
+                  disabled={busy} />
               ))}
           </article>
           {celebration && (
@@ -516,7 +548,7 @@ export function StoryReview({
               </button>
             )}
             {can("UPLOAD_MEDIA") && (
-              <button disabled={busy} onClick={() => setPanel("media")}>
+              <button disabled={busy} onClick={() => openMedia()}>
                 {celebration ? "Add Photos" : "Add photos"}
               </button>
             )}
@@ -569,7 +601,7 @@ export function StoryReview({
                     : panel === "edits"
                       ? "Propose changes"
                       : panel === "media"
-                        ? "Contribute a photograph"
+                        ? replacementPhoto ? "Change photo" : "Contribute a photograph"
                         : panel === "questions"
                           ? "Tell us a little more"
                           : panel === "history"
@@ -732,6 +764,7 @@ export function StoryReview({
                     void upload();
                   }}
                 >
+                  {replacementPhoto && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
                   <p>
                     JPEG, PNG or WebP photos up to 12 MB; MP4 or WebM videos up
                     to 25 MB. Media remain private until selected and approved
@@ -1085,7 +1118,9 @@ export function StoryReview({
     </div>
   );
 }
-function PrivatePhoto({ base, media }: { base: string; media: Media }) {
+function PrivatePhoto({ base, media, onChange, disabled }: {
+  base: string; media: Media; onChange?: () => void; disabled?: boolean;
+}) {
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState(false);
   useEffect(() => {
@@ -1129,9 +1164,12 @@ function PrivatePhoto({ base, media }: { base: string; media: Media }) {
       ) : (
         <p>Media unavailable.</p>
       )}
-      <figcaption>
+      <figcaption className="sm-review-photo-details">
+      {(media.caption || media.credit) && <span>
         {media.caption}
         {media.credit && ` Photo: ${media.credit}`}
+      </span>}
+      {onChange && <button className="sm-review-change-photo" type="button" disabled={disabled} onClick={onChange}>Change photo</button>}
       </figcaption>
     </figure>
   );
