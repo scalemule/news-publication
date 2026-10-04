@@ -60,7 +60,7 @@ export function useReviewDrafts(session: string, revision: string | undefined, i
   }
   const flushRef = useRef(flush); flushRef.current = flush;
   useEffect(() => {
-    if (!revision) return;
+    if (!revision) { entries.current = {}; redraw(); return; }
     const id = `${session}:${revision}`;
     active.current = id;
     const next: Record<string, Entry> = {};

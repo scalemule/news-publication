@@ -50,6 +50,9 @@ type Revision = {
   content_html: string;
 };
 type Review = {
+  session_id?: string;
+  identity_required?: boolean;
+  participant?: boolean;
   response_drafts?: Record<string, Draft>;
   publication: { name: string };
   reviewer: string;
@@ -96,18 +99,29 @@ export function StoryReview({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
-    [panel, setPanel] = useState("article"),
+    [panel, setPanelState] = useState("article"),
     [verification, setVerification] = useState(false),
     [code, setCode] = useState("");
+  const [shareUrl, setShareUrl] = useState(""), [canShare, setCanShare] = useState(false);
+  const [contributorName, setContributorName] = useState(""), [contributorEmail, setContributorEmail] = useState("");
+  const [identityStep, setIdentityStep] = useState("name"), [requestedPanel, setRequestedPanel] = useState("comment");
+  function setPanel(next: string) {
+    if (review?.identity_required && !["article", "history", "identity", "share"].includes(next)) {
+      setRequestedPanel(next); setPanelState("identity");
+    } else setPanelState(next);
+  }
+  const identity = review?.session_id || sessionId;
   const [rights, setRights] = useState(false),
     [compare, setCompare] = useState(""),
     [compareTo, setCompareTo] = useState(""),
     [editingMedia, setEditingMedia] = useState(""),
     [commentTarget, setCommentTarget] = useState("STORY");
-  const pendingPhoto = usePendingPhoto(review ? `${sessionId}:${review.revision.id}` : undefined);
+  const pendingPhoto = usePendingPhoto(review && !review.identity_required ? `${identity}:${review.revision.id}` : undefined);
   const file = pendingPhoto.photo?.file || null;
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (error) { errorRef.current?.scrollIntoView({ block: "center" }); errorRef.current?.focus({ preventScroll: true }); } }, [error]);
   const noticeRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (notice) { noticeRef.current?.scrollIntoView({ block: "center" }); noticeRef.current?.focus({ preventScroll: true }); } }, [notice]);
   const responseRef = useRef<HTMLElement>(null);
@@ -135,7 +149,7 @@ export function StoryReview({
     }
   }, [panel]);
   const emptyMediaInfo = { caption: "", who_is_pictured: "", creator: "", when_taken: "", where_taken: "", credit: "", alt: "" };
-  const drafts = useReviewDrafts(sessionId, review?.revision.id, review?.response_drafts, request);
+  const drafts = useReviewDrafts(identity, review?.identity_required ? undefined : review?.revision.id, review?.response_drafts, request);
   const currentDraft = drafts.entries[panel];
   const message: string = currentDraft?.data.message || "";
   const answers: Record<string, string> = drafts.entries.questions?.data.answers || {};
@@ -192,10 +206,19 @@ export function StoryReview({
     let active = true;
     void (async () => {
       try {
-        const token = window.location.hash.slice(1);
-        if (token) {
-          await request("/session", { token });
-          window.history.replaceState(null, "", window.location.pathname);
+        const token = new URL(window.location.href).searchParams.get("key") || (/^[a-f0-9]{64}$/.test(window.location.hash.slice(1)) ? window.location.hash.slice(1) : undefined);
+        // Keep a complete copyable invitation in the address bar. A legacy
+        // fragment invitation (or an existing cookie-only visit) upgrades here.
+        let exchange: { share_url?: string; can_share?: boolean } = {};
+        try { exchange = await request("/session", token ? { token } : {}); }
+        catch (e) { if (token) throw e; /* Older publication proxies can still open their existing cookie session. */ }
+        const address = exchange.share_url || (token ? `/review/${encodeURIComponent(sessionId)}?key=${encodeURIComponent(token)}` : undefined);
+        if (address) {
+          const canonical = new URL(address, window.location.origin);
+          if (canonical.origin === window.location.origin) {
+            window.history.replaceState(null, "", canonical.pathname + canonical.search);
+            if (active) { setShareUrl(canonical.href); setCanShare(exchange.can_share === true); }
+          }
         }
         const data = await request();
         if (active) {
@@ -217,6 +240,14 @@ export function StoryReview({
       active = false;
     };
   }, [sessionId]);
+  async function sharePrivateLink() {
+    if (!shareUrl) return;
+    if (navigator.share) {
+      try { await navigator.share({ title: "Private story preview", url: shareUrl }); return; }
+      catch (e) { if ((e as Error).name === "AbortError") return; }
+    }
+    setPanel("share");
+  }
   async function send(action: Record<string, unknown>, success: string) {
     if (!review || busy) return;
     if (action.action === "APPROVE" && file) {
@@ -360,7 +391,7 @@ export function StoryReview({
       </header></div>}
       <main className={`sm-story-review${celebration ? " sm-review-celebration" : ""}`}>
       {error && (
-        <p role="alert" className="sm-review-alert">
+        <p ref={errorRef} tabIndex={-1} role="alert" className="sm-review-alert">
           {error}
         </p>
       )}
@@ -431,11 +462,23 @@ export function StoryReview({
           </form>
         </section>
       )}
+      {!review && error && <p>Ask the person who invited you to use <strong>Share private preview</strong> or copy the complete address from their open preview. You do not need an account to read it.</p>}
       {!review && !error && !verification && (
         <p role="status">Opening your private preview…</p>
       )}
       {review && document && (
         <>
+          {canShare && <div className="sm-review-sharing">
+            <p>Private family preview. Share only with people you want to invite.</p>
+            <button onClick={() => void sharePrivateLink()}>Share private preview</button>
+          </div>}
+          {review.participant && <div className="sm-review-identity-status">
+            <span>Contributing as <strong>{review.reviewer}</strong></span>
+            <button disabled={busy || pending.length > 0 || !!file} onClick={async () => {
+              setBusy(true); try { await request("/leave", {}); setPanelState("article"); setIdentityStep("name"); await load(); }
+              catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+            }}>Not you?</button>
+          </div>}
           {celebration ? (
             <div className="sm-review-intro">
               {review.revision.number > 1 ? (
@@ -529,8 +572,7 @@ export function StoryReview({
               <h2>Help us make this just right</h2>
               <p>
                 We prepared this announcement as a starting point so you don't
-                have to write anything yourself. If everything looks right, you
-                can simply approve it.
+                have to write anything yourself. {can("APPROVE") ? "If everything looks right, you can simply approve it." : "Read it at your own pace, and let us know if anything needs a change."}
               </p>
               <p>
                 If you'd like, you can also correct a detail, add photographs,
@@ -566,6 +608,7 @@ export function StoryReview({
             className={`sm-review-actions${celebration ? " sm-review-concierge-actions" : ""}${panel !== "article" ? " sm-review-actions-editing" : ""}`}
             aria-label="Review actions"
           >
+            {!can("APPROVE") && can("COMMENT") && (review.identity_required || review.participant) && <button disabled={busy} onClick={() => setPanel("feedback")}>Looks good to me</button>}
             {can("APPROVE") && !review.published && (
               <button
                 className="sm-review-primary"
@@ -637,7 +680,45 @@ export function StoryReview({
             {pending.map(([name]) => <button key={name} onClick={() => setPanel(name)}>Continue {draftLabel(name)}</button>)}
             {file && !pending.some(([name]) => name === "media") && <button onClick={() => setPanel("media")}>Continue your photo upload</button>}
           </aside>}
-          {panel !== "article" && (
+          {panel === "share" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Share private preview">
+            <h2>Share with your family</h2>
+            <p>Anyone with this link can read the private preview. To send feedback or photos, they will enter their own name and verify their email. No account is needed.</p>
+            <label htmlFor="review-share-url">Private preview link</label>
+            <input id="review-share-url" readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
+            <button onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setNotice("Private link copied. Paste it into your message to family."); } catch { setNotice("Select the link above, then choose Copy on your device."); } }}>Copy private link</button>
+            <button onClick={() => setPanel("article")}>Back to the story</button>
+          </section>}
+          {panel === "identity" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Introduce yourself">
+            <h2>{identityStep === "code" ? "Check your email" : "Who is helping with the story?"}</h2>
+            <p>Your name will accompany your feedback for the newsroom. Your email stays private. No password or account is needed.</p>
+            {identityStep === "name" ? <form onSubmit={async e => {
+              e.preventDefault(); setBusy(true); setError("");
+              try { await request("/join", { name: contributorName, email: contributorEmail }); await request("/verify", {}); setIdentityStep("code"); setCode(""); }
+              catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+            }}>
+              <label htmlFor="contributor-name">Your name</label><input id="contributor-name" autoComplete="name" value={contributorName} maxLength={150} required onChange={e => setContributorName(e.target.value)} />
+              <label htmlFor="contributor-email">Your email</label><input id="contributor-email" type="email" autoComplete="email" value={contributorEmail} maxLength={320} required onChange={e => setContributorEmail(e.target.value)} />
+              <p>We'll email you a code to confirm it's you.</p>
+              <button disabled={busy}>{busy ? "Sending your code…" : "Email me a code"}</button>
+            </form> : <form onSubmit={async e => {
+              e.preventDefault(); setBusy(true); setError("");
+              try { await request("/verify", { code }); await load(); setCode(""); setPanelState(requestedPanel); }
+              catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+            }}>
+              <p>Enter the eight-digit code sent to <strong>{contributorEmail}</strong>. It expires in ten minutes.</p>
+              <label htmlFor="contributor-code">Email verification code</label><input id="contributor-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} value={code} required onChange={e => setCode(e.target.value.replace(/\s/g, ""))} />
+              <button disabled={busy}>{busy ? "Verifying…" : "Verify and continue"}</button>
+              <button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await request("/verify", {}); setNotice("A new code was sent. Check your inbox and spam folder."); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>Send a new code</button>
+              <button type="button" disabled={busy} onClick={() => setIdentityStep("name")}>Use a different email</button>
+            </form>}
+            <button disabled={busy} onClick={() => setPanel("article")}>Just read the story</button>
+          </section>}
+          {panel === "feedback" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Family feedback">
+            <h2>Looks good to you?</h2><p>We'll send your feedback as {review.reviewer}. The newsroom will request approval from the designated family reviewer separately. This will not publish the story.</p>
+            <button disabled={busy} onClick={() => void send({ action: "COMMENT", message: "This draft looks good to me.", target: { kind: "STORY" } }, "Thank you. Your feedback has been sent to the newsroom. The story is still private.")}>Send my feedback</button>
+            <button disabled={busy} onClick={() => setPanel("article")}>Back to the story</button>
+          </section>}
+          {!["article", "identity", "share", "feedback"].includes(panel) && (
             <section
               ref={responseRef}
               tabIndex={-1}
