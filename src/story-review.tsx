@@ -115,8 +115,9 @@ export function StoryReview({
   const [moreQuestions, setMoreQuestions] = useState(false);
 
   const [replacementPhoto, setReplacementPhoto] = useState<Media | null>(null);
+  const photoToReplace: Media | null = pendingPhoto.photo?.replacement || replacementPhoto;
   function openMedia(photo: Media | null = null) {
-    setReplacementPhoto(photo);
+    setReplacementPhoto(file ? pendingPhoto.photo?.replacement || null : photo);
     if (file) { setPanel("media"); return; }
     setRights(false);
     setPanel("media");
@@ -143,7 +144,7 @@ export function StoryReview({
   const mediaPanel = panel === "metadata" ? "metadata" : "media";
   const mediaInfo: typeof emptyMediaInfo = { ...emptyMediaInfo, ...drafts.entries[mediaPanel]?.data.mediaInfo };
   function setMessage(value: string) {
-    drafts.set(panel, value.trim() ? { ...currentDraft?.data, message: value, ...(panel === "changes" ? { correctionKind } : {}), ...(panel === "comment" ? { commentTarget } : {}) } : {});
+    drafts.set(panel, value.trim() ? { ...currentDraft?.data, message: value, ...(panel === "changes" ? { correctionKind } : {}), ...(panel === "comment" ? { commentTarget: currentDraft?.data.commentTarget || commentTarget } : {}) } : {});
   }
   function setAnswers(value: Record<string, string>) {
     drafts.set("questions", Object.values(value).some(a => a.trim()) ? { answers: value } : {});
@@ -155,7 +156,7 @@ export function StoryReview({
     drafts.set("changes", { ...drafts.entries.changes?.data, correctionKind: value });
   }
   function setMediaInfo(value: typeof emptyMediaInfo) {
-    drafts.set(mediaPanel, Object.values(value).some(v => v.trim()) ? { mediaInfo: value, editingMedia, replacementPhoto } : {});
+    drafts.set(mediaPanel, Object.values(value).some(v => v.trim()) ? { mediaInfo: value, editingMedia: drafts.entries.metadata?.data.editingMedia || editingMedia } : {});
   }
   const pending = Object.entries(drafts.entries).filter(([, entry]) => hasDraft(entry.data));
   const draftLabel = (name: string) => ({ questions: "your answers", changes: "your correction", media: "your photograph details", metadata: "your caption changes", edits: "your wording changes", comment: "your comment", decline: "your response", approve: "your approval message" }[name] || "your response");
@@ -274,7 +275,7 @@ export function StoryReview({
       setError("Please choose a JPEG, PNG or WebP photo up to 12 MB, or an MP4/WebM video up to 25 MB. For an HEIC photo, export or share it as JPEG first."); return;
     }
     setError(""); setRights(false);
-    void pendingPhoto.select(selected, replacementPhoto);
+    void pendingPhoto.select(selected, photoToReplace);
   }
   async function upload() {
     if (!review || !file || !rights || busy) return;
@@ -650,7 +651,7 @@ export function StoryReview({
                     : panel === "edits"
                       ? "Propose changes"
                       : panel === "media"
-                        ? replacementPhoto ? "Change photo" : "Contribute a photograph"
+                        ? photoToReplace ? "Change photo" : "Contribute a photograph"
                         : panel === "questions"
                           ? "Tell us a little more"
                           : panel === "history"
@@ -825,7 +826,7 @@ export function StoryReview({
                     void upload();
                   }}
                 >
-                  {replacementPhoto && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
+                  {photoToReplace && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
                   <p>
                     JPEG, PNG or WebP photos up to 12 MB; MP4 or WebM videos up
                     to 25 MB. Media remain private until selected and approved
