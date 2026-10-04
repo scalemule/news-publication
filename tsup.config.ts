@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "story-review": "src/story-review.tsx",
     "snapshot-file": "src/snapshot-file.ts",
     "marketplace-view": "src/marketplace-view.tsx",
     "marketplace-forms": "src/marketplace-forms.tsx",
