@@ -71,7 +71,26 @@ export function composeEdition(items: NewsItem[], selection: HomepageSelection =
     ...(pins.secondary_slugs ?? []).flatMap(slug => remaining.find(item => item.slug === slug) ?? []),
     ...remaining.filter(item => !requested.has(item.slug)),
   ];
-  const secondary = Array.from(new Map(ordered.map(item => [item.id, item])).values()).slice(0, 3);
+  const uniqueOrdered = Array.from(new Map(ordered.map(item => [item.id, item])).values());
+  const seenImages = new Set<string>();
+  if (lead?.cover_image_url?.trim()) {
+    seenImages.add(lead.cover_image_url.trim());
+  }
+  const secondary: NewsItem[] = [];
+  const deferredWithDuplicateImage: NewsItem[] = [];
+  for (const item of uniqueOrdered) {
+    if (secondary.length >= 3) break;
+    const img = item.cover_image_url?.trim();
+    if (img && seenImages.has(img)) {
+      deferredWithDuplicateImage.push(item);
+    } else {
+      secondary.push(item);
+      if (img) seenImages.add(img);
+    }
+  }
+  while (secondary.length < 3 && deferredWithDuplicateImage.length > 0) {
+    secondary.push(deferredWithDuplicateImage.shift()!);
+  }
   for (const item of secondary) remaining.splice(remaining.indexOf(item), 1);
   const eligible = remaining.filter(item => {
     const age = now - Date.parse(item.published_at);
