@@ -133,6 +133,23 @@ describe("front page", () => {
     expect(composeEdition(items, { lead_slug: "second", pinned_until: "2026-09-21T00:00:00.000Z" }, now).lead?.slug).toBe("lead");
   });
 
+  it("avoids duplicate images between lead and secondary stories", () => {
+    const photoA = "https://cdn.example.com/photo-a.jpg";
+    const photoB = "https://cdn.example.com/photo-b.jpg";
+    const photoC = "https://cdn.example.com/photo-c.jpg";
+    const stories = [
+      story({ id: "1", slug: "story-1", title: "Story 1", cover_image_url: photoA }),
+      story({ id: "2", slug: "story-2", title: "Story 2 (Duplicate Photo A)", cover_image_url: photoA }),
+      story({ id: "3", slug: "story-3", title: "Story 3 (Unique Photo B)", cover_image_url: photoB }),
+      story({ id: "4", slug: "story-4", title: "Story 4 (Unique Photo C)", cover_image_url: photoC }),
+      story({ id: "5", slug: "story-5", title: "Story 5", cover_image_url: null }),
+    ];
+    const edition = composeEdition(stories);
+    expect(edition.lead?.slug).toBe("story-1");
+    // Story 2 should be deferred because it shares photoA with lead
+    expect(edition.secondary.map(s => s.slug)).toEqual(["story-3", "story-4", "story-5"]);
+  });
+
   it("keeps a complete sentence and refuses a cut-off brief", () => {
     expect(briefSummary(story({ id: "1", slug: "a", title: "A", excerpt: "Город открыл парк. Дальше ещё." }))).toBe("Город открыл парк.");
     expect(briefSummary(story({ id: "1", slug: "a", title: "A", excerpt: "Incomplete sentence…" }))).toBe("");
