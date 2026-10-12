@@ -2,6 +2,8 @@
 import { useMemo } from "react";
 import {
   CommunityGuide,
+  CommunityCityGuide,
+  type CommunityCityAtlasConfig,
   CommunityFeatureDetail,
   CommunitySubmissionForm,
   createCommunityMapsBrowserClient,
@@ -16,6 +18,7 @@ export interface PublicationCommunityMapPageProps {
   correctionFor?: string;
   basePath: string;
   apiPath?: string;
+  atlas?: CommunityCityAtlasConfig;
 }
 /** The newspaper supplies its chrome and inherited type. The platform owns map behavior. */
 export function PublicationCommunityMapPage({
@@ -26,6 +29,7 @@ export function PublicationCommunityMapPage({
   correctionFor,
   basePath,
   apiPath,
+  atlas,
 }: PublicationCommunityMapPageProps) {
   const client = useMemo(
     () => createCommunityMapsBrowserClient(apiPath),
@@ -45,6 +49,8 @@ export function PublicationCommunityMapPage({
           collection={collection}
           initialAreaId={areaId}
           correctionFor={correctionFor}
+          guidelinesHref="/editorial-standards"
+          termsHref="/terms"
         />
       ) : mode === "feature" && feature ? (
         <CommunityFeatureDetail
@@ -52,6 +58,15 @@ export function PublicationCommunityMapPage({
           collection={collection}
           feature={feature}
           correctionHref={`${basePath}/submit?correction=${feature.id}&area=${feature.area_id}`}
+        />
+      ) : atlas ? (
+        <CommunityCityGuide
+          client={client}
+          collection={collection}
+          atlas={atlas}
+          featureHref={featureHref}
+          communityHref={(id) => `${basePath}?area=${id}`}
+          submitHref={`${basePath}/submit?area=${collection.areas.find((a) => a.slug === atlas.areaSlug)?.id || ""}`}
         />
       ) : (
         <CommunityGuide
