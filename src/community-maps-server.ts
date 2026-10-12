@@ -171,24 +171,51 @@ export function createPublicationCommunityMapsHandler(
               ...buildClientContextHeaders(clientContext),
               "x-api-key": scope.apiKey,
               ...callOptions.headers,
+              ...(request.headers.has("range")
+                ? { range: request.headers.get("range")! }
+                : {}),
             },
             cache: "no-store",
             redirect: "error",
             signal: AbortSignal.timeout(30000),
           },
         );
-        response = upstream.ok
-          ? new Response(upstream.body, {
-              headers: {
-                "content-type": "image/png",
-                "cache-control": "private, no-store",
-                "x-content-type-options": "nosniff",
-              },
-            })
-          : json(
-              { error: { message: "Photo unavailable" } },
-              upstream.status >= 500 ? 503 : upstream.status,
-            );
+        const contentType =
+          upstream.headers.get("content-type")?.split(";")[0] || "";
+        const allowed = [
+          "image/png",
+          "video/mp4",
+          "video/webm",
+          "audio/mpeg",
+          "audio/mp4",
+          "audio/ogg",
+          "audio/wav",
+        ].includes(contentType);
+        const mediaHeaders = new Headers({
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+        });
+        for (const key of [
+          "content-range",
+          "accept-ranges",
+          "content-length",
+        ]) {
+          const value = upstream.headers.get(key);
+          if (value) mediaHeaders.set(key, value);
+        }
+        if ((upstream.ok || upstream.status === 416) && allowed) {
+          mediaHeaders.set("content-type", contentType);
+          response = new Response(upstream.body, {
+            status: upstream.status,
+            headers: mediaHeaders,
+          });
+        } else {
+          await upstream.body?.cancel();
+          response = json(
+            { error: { message: "Media unavailable" } },
+            upstream.ok || upstream.status >= 500 ? 503 : upstream.status,
+          );
+        }
       } else {
         let result;
         if (read) {
@@ -232,15 +259,15 @@ export function createPublicationCommunityMapsHandler(
         } else if (upload) {
           const contentType = request.headers.get("content-type") || "";
           if (!contentType.startsWith("multipart/form-data;"))
-            throw new ProxyProblem(415, "Choose a photograph to upload.");
-          const bytes = await boundedBody(request, 9 * 1024 * 1024);
+            throw new ProxyProblem(415, "Choose a photo, video or audio file.");
+          const bytes = await boundedBody(request, 26 * 1024 * 1024);
           const form = await new Response(bytes as BodyInit, {
             headers: { "content-type": contentType },
           }).formData();
           const file = form.get("file");
           if (!(file instanceof Blob))
-            throw new ProxyProblem(400, "Photo is required.");
-          result = await sdk.communityMaps.uploadPhoto(
+            throw new ProxyProblem(400, "Media is required.");
+          result = await sdk.communityMaps.uploadMedia(
             slug,
             rest[1],
             file,
@@ -248,6 +275,7 @@ export function createPublicationCommunityMapsHandler(
               caption: String(form.get("caption") || ""),
               attribution: String(form.get("attribution") || ""),
               rights_confirmed: form.get("rights_confirmed") === "true",
+              consent_version: String(form.get("consent_version") || ""),
             },
             callOptions,
           );

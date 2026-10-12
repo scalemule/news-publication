@@ -103,6 +103,7 @@ describe("publication Community Maps boundary", () => {
       "photo.png",
     );
     body.append("rights_confirmed", "true");
+    body.append("consent_version", "current-policy");
     const uploaded = await handler(
       new Request("https://paper.example.test/api", {
         method: "POST",
@@ -118,8 +119,48 @@ describe("publication Community Maps boundary", () => {
       expect(new Headers(call.headers).get("x-client-ip")).toBe("192.0.2.1");
     }
     expect(calls[2].body).toBeInstanceOf(FormData);
+    expect((calls[2].body as FormData).get("consent_version")).toBe(
+      "current-policy",
+    );
     expect(new Headers(calls[2].headers).has("content-type")).toBe(false);
     expect(await uploaded.text()).not.toContain(secret);
+  });
+  it("preserves video byte ranges and refuses unexpected active media types", async () => {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal("fetch", async (_url: unknown, init: RequestInit) => {
+      calls.push(init);
+      return new Response(new Uint8Array([1, 2]), {
+        status: 206,
+        headers: {
+          "content-type": "video/mp4",
+          "content-range": "bytes 0-1/10",
+          "accept-ranges": "bytes",
+        },
+      });
+    });
+    const response = await handler(
+      new Request("https://paper.example.test/api", {
+        headers: { range: "bytes=0-1" },
+      }),
+      [...route, "media", "019a12ec-1234-7000-8000-123456789abc"],
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(response.headers.get("content-range")).toBe("bytes 0-1/10");
+    expect(new Headers(calls[0].headers).get("range")).toBe("bytes=0-1");
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response("<script>bad</script>", {
+          headers: { "content-type": "text/html" },
+        }),
+    );
+    const rejected = await handler(
+      new Request("https://paper.example.test/api"),
+      [...route, "media", "019a12ec-1234-7000-8000-123456789abc"],
+    );
+    expect(rejected.status).toBe(503);
+    expect(await rejected.text()).not.toContain("<script>");
   });
   it("caps request bodies before attempting an SDK submission", async () => {
     const fetch = vi.fn();
