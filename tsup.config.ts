@@ -3,6 +3,8 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "community-maps-server": "src/community-maps-server.ts",
+    "community-maps-view": "src/community-maps-view.tsx",
     "story-review": "src/story-review.tsx",
     "snapshot-file": "src/snapshot-file.ts",
     "marketplace-view": "src/marketplace-view.tsx",
@@ -23,5 +25,5 @@ export default defineConfig({
   sourcemap: false,
   clean: true,
   treeshake: true,
-  external: ["react"],
+  external: ["react", "@scalemule/react", "@scalemule/sdk"],
 });

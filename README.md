@@ -128,3 +128,28 @@ Optional questions can be browsed and copied before identity verification.
 reference and optional answers, never the invitation credential. Configure a
 monitored mailbox; received email must be recorded by the newsroom. Online
 answers retain their existing autosave and explicit-send behavior.
+
+## Community Maps
+
+The `community-maps-server` subpath exports `createPublicationCommunityMapsHandler`.
+Supply a resolver that verifies the publication host using your existing site lookup,
+then returns its server API key, gateway origin, canonical public origin, and trusted
+reader context. Forward only the public allowlisted catch-all route. The handler
+checks POST origins, bounds uploads, signs an HttpOnly reader cookie, and applies
+no-store responses. It never proxies editorial routes or accepts a caller-selected
+application ID. Use a Node server runtime; this module imports node:crypto.
+
+The `community-maps-view` subpath exports `PublicationCommunityMapPage` and
+`CommunityMapArticleEmbeds`. Supply the publication chrome and import the React map CSS.
+The optional React peer is required only when consuming these views. Use the map
+worker asset CLI from `@scalemule/react` before building the site.
+
+Article integration uses the existing Blog metadata extension:
+
+```json
+{"community_maps":[{"collection_slug":"halloween-2026","mode":"map"}]}
+```
+
+Other modes are `cards` and `features`; optional `area_id` / `feature_ids` select live
+records. No copied feature snapshot is embedded in a story, so withdrawal takes effect
+on the next read. Publishers should apply their caption policy to public media copy.
