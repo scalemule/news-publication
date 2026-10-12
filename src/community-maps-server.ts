@@ -108,9 +108,21 @@ export function createPublicationCommunityMapsHandler(
       const slug = path[1];
       const rest = path.slice(2);
       const method = request.method;
+      const discussion = rest.length === 1 && rest[0] === "comments";
+      const voting =
+        rest.length === 3 &&
+        rest[0] === "features" &&
+        UUID.test(rest[1]) &&
+        rest[2] === "vote";
+      const params = new URL(request.url).searchParams;
+      const featureId = params.get("feature_id") || undefined;
+      if (discussion && featureId && !UUID.test(featureId))
+        return json({ error: { message: "Invalid place" } }, 400);
       const read =
         method === "GET" &&
-        (rest.length === 0 ||
+        (discussion ||
+          voting ||
+          rest.length === 0 ||
           (rest[0] === "features" &&
             (rest.length === 1 || (rest.length === 2 && UUID.test(rest[1])))) ||
           (rest[0] === "media" && rest.length === 2 && UUID.test(rest[1])));
@@ -128,7 +140,8 @@ export function createPublicationCommunityMapsHandler(
         rest[0] === "features" &&
         UUID.test(rest[1]) &&
         ["reactions", "reports"].includes(rest[2]);
-      if (!read && !upload && !submission && !action)
+      const engagementWrite = method === "POST" && (discussion || voting);
+      if (!read && !upload && !submission && !action && !engagementWrite)
         return json({ error: { message: "Route not found" } }, 404);
       const scope = await options.resolve(request);
       if (
@@ -219,7 +232,25 @@ export function createPublicationCommunityMapsHandler(
       } else {
         let result;
         if (read) {
-          if (!rest.length)
+          if (discussion)
+            result = await sdk.communityMaps.listComments(
+              slug,
+              {
+                feature_id: featureId,
+                page: Math.min(
+                  10000,
+                  Math.max(1, Number(params.get("page")) || 1),
+                ),
+              },
+              callOptions,
+            );
+          else if (voting)
+            result = await sdk.communityMaps.getVote(
+              slug,
+              rest[1],
+              callOptions,
+            );
+          else if (!rest.length)
             result = await sdk.communityMaps.getCollection(slug, callOptions);
           else if (rest.length === 2)
             result = await sdk.communityMaps.getFeature(
@@ -295,7 +326,21 @@ export function createPublicationCommunityMapsHandler(
           }
           if (!body || typeof body !== "object" || Array.isArray(body))
             throw new ProxyProblem(400, "Invalid submission.");
-          if (submission)
+          if (discussion)
+            result = await sdk.communityMaps.createComment(
+              slug,
+              body,
+              featureId,
+              callOptions,
+            );
+          else if (voting)
+            result = await sdk.communityMaps.vote(
+              slug,
+              rest[1],
+              body.value,
+              callOptions,
+            );
+          else if (submission)
             result = await sdk.communityMaps.createSubmission(
               slug,
               body,

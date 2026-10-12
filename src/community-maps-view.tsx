@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 import {
   CommunityGuide,
+  CommunityDiscussion,
   CommunityCityGuide,
   type CommunityCityAtlasConfig,
   CommunityFeatureDetail,
@@ -35,6 +36,8 @@ export function PublicationCommunityMapPage({
     () => createCommunityMapsBrowserClient(apiPath),
     [apiPath],
   );
+  const signInHref = (f: CommunityMapFeature) =>
+    `/account?next=${encodeURIComponent(`${basePath}/places/${f.id}`)}`;
   const featureHref = (f: CommunityMapFeature) => `${basePath}/places/${f.id}`;
   return (
     <div className="smcm">
@@ -57,6 +60,7 @@ export function PublicationCommunityMapPage({
           client={client}
           collection={collection}
           feature={feature}
+          signInHref={signInHref(feature)}
           correctionHref={`${basePath}/submit?correction=${feature.id}&area=${feature.area_id}`}
         />
       ) : atlas ? (
@@ -65,6 +69,7 @@ export function PublicationCommunityMapPage({
           collection={collection}
           atlas={atlas}
           featureHref={featureHref}
+          signInHref={signInHref}
           communityHref={(id) => `${basePath}?area=${id}`}
           submitHref={`${basePath}/submit?area=${collection.areas.find((a) => a.slug === atlas.areaSlug)?.id || ""}`}
         />
@@ -73,10 +78,19 @@ export function PublicationCommunityMapPage({
           client={client}
           collection={collection}
           featureHref={featureHref}
+          signInHref={signInHref}
           communityHref={(a) => `${basePath}/map?area=${a.id}`}
           submitHref={`${basePath}/submit${areaId ? `?area=${areaId}` : ""}`}
           initialAreaId={areaId}
           showMap={mode === "map"}
+        />
+      )}
+      {(mode === "guide" || mode === "map") && (
+        <CommunityDiscussion
+          client={client}
+          collection={collection}
+          guidelinesHref="/editorial-standards"
+          termsHref="/terms"
         />
       )}
     </div>
@@ -182,6 +196,9 @@ function ArticleMap({
             <CommunityFeatureCard
               key={f.id}
               feature={f}
+              client={client}
+              collection={data.collection}
+              signInHref={`/account?next=${encodeURIComponent(`${path}/places/${f.id}`)}`}
               href={`${path}/places/${f.id}`}
               photoUrl={
                 f.media[0]

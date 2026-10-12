@@ -153,3 +153,26 @@ Article integration uses the existing Blog metadata extension:
 Other modes are `cards` and `features`; optional `area_id` / `feature_ids` select live
 records. No copied feature snapshot is embedded in a story, so withdrawal takes effect
 on the next read. Publishers should apply their caption policy to public media copy.
+
+### Votes and moderated conversations
+
+Set `config.voting_enabled` and `config.comments_enabled` on the canonical collection
+in the Community Maps editor to enable these controls. Both default to off for
+existing collections. Views share one place record, score, and discussion.
+
+The server resolver should include the signed-in reader's `accessToken` from its
+HttpOnly session cookie. Keep the publication API key on the server. Voting
+requires a signed-in reader; guests can read totals and submit comments for review.
+Each reader can upvote (`1`), downvote (`-1`), or clear (`0`) their place vote.
+
+The public proxy allows `features/:id/vote` and `comments?feature_id=:id` under
+`collections/:slug`. Without `feature_id`, comments belong to the guide. It strips
+editorial query flags and uses the same signed anonymous identity and origin
+checks as submissions. Comments and replies require the current publication
+permission and always enter review, including comments from signed-in readers.
+Only approved comments whose ancestors remain approved are public.
+
+Moderate through **Newsroom → Community Maps → Comments**. Approval requires
+explicit guideline review and the current revision. Existing pumpkin reactions
+remain configurable alongside voting. The UI links to `/account?next=...`; the
+publication must validate that return path and preserve it through sign-in.

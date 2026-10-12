@@ -201,3 +201,82 @@ describe("publication Community Maps boundary", () => {
     ]);
   });
 });
+
+describe("publication engagement proxy", () => {
+  const feature = "019f3fe1-107b-7000-8000-111111111111";
+  it("forwards reader session votes and excludes caller-supplied application scope", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        data: {
+          value: -1,
+          score: -1,
+          up_count: 0,
+          down_count: 1,
+          can_vote: true,
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const handle = createPublicationCommunityMapsHandler({
+      resolve: async () => ({
+        ...(await options.resolve()),
+        accessToken: "reader-session",
+      }),
+    });
+    const r = await handle(
+      new Request("https://paper.example.test/api?application_id=other", {
+        method: "POST",
+        headers: {
+          origin: "https://paper.example.test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ value: -1, application_id: "other" }),
+      }),
+      [...route, "features", feature, "vote"],
+    );
+    expect(r.status).toBe(200);
+    expect(
+      new Headers(fetch.mock.calls[0][1].headers).get("authorization"),
+    ).toBe("Bearer reader-session");
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ value: -1 });
+    expect(String(fetch.mock.calls[0][0])).not.toContain("application_id");
+    expect(r.headers.get("cache-control")).toContain("no-store");
+  });
+  it("bounds comment pagination, strips editorial query flags, and rejects invalid feature scope", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ data: { items: [], next_page: null } }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const r = await handler(
+      new Request(
+        `https://paper.example.test/api?feature_id=${feature}&page=2&include_unapproved=true&status=pending`,
+      ),
+      [...route, "comments"],
+    );
+    expect(r.status).toBe(200);
+    const url = new URL(String(fetch.mock.calls[0][0]));
+    expect(url.searchParams.get("feature_id")).toBe(feature);
+    expect(url.searchParams.get("page")).toBe("2");
+    expect(url.searchParams.has("include_unapproved")).toBe(false);
+    expect(url.searchParams.has("status")).toBe(false);
+    expect(
+      (
+        await handler(
+          new Request("https://paper.example.test/api?feature_id=invalid"),
+          [...route, "comments"],
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await handler(
+          new Request("https://paper.example.test/api", {
+            method: "POST",
+            headers: { origin: "https://attacker.test" },
+          }),
+          [...route, "comments"],
+        )
+      ).status,
+    ).toBe(403);
+  });
+});
