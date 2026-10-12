@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.35",
+  "version": "0.0.36",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -86,7 +86,17 @@
       "import": "./dist/story-review.js",
       "require": "./dist/story-review.cjs"
     },
-    "./story-review.css": "./story-review.css"
+    "./story-review.css": "./story-review.css",
+    "./community-maps-server": {
+      "types": "./dist/community-maps-server.d.ts",
+      "import": "./dist/community-maps-server.js",
+      "require": "./dist/community-maps-server.cjs"
+    },
+    "./community-maps-view": {
+      "types": "./dist/community-maps-view.d.ts",
+      "import": "./dist/community-maps-view.js",
+      "require": "./dist/community-maps-view.cjs"
+    }
   },
   "files": [
     "dist",
@@ -99,10 +109,14 @@
     "story-review.css"
   ],
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "@scalemule/react": ">=0.0.13 <0.1.0"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "@scalemule/react": {
       "optional": true
     }
   },
@@ -124,7 +138,8 @@
     "react-dom": "^19.3.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@scalemule/react": "^0.0.13"
   },
   "keywords": [
     "scalemule",
@@ -146,6 +161,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@scalemule/compliance": "^0.0.5"
+    "@scalemule/compliance": "^0.0.5",
+    "@scalemule/sdk": "^0.0.71"
   }
 }
