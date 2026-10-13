@@ -58,21 +58,38 @@ describe("server measurement consent", () => {
     expect(measurementConsent(new Headers(), false, now)).toBe(false);
     expect(
       measurementConsent(
-        headers({ essential: true, performance: "true" }),
-        false,
-        now,
-      ),
-    ).toBe(false);
-    expect(
-      measurementConsent(
-        headers({ essential: true, performance: true, advertising: false }),
+        headers({ essential: true, performance: true, advertising: true }),
         true,
         now,
       ),
     ).toBe(false);
     expect(
       measurementConsent(
-        headers({ essential: true, performance: true, advertising: true }),
+        headers({ essential: true, functional: false, performance: "true" }),
+        false,
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      measurementConsent(
+        headers({
+          essential: true,
+          functional: false,
+          performance: true,
+          advertising: false,
+        }),
+        true,
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      measurementConsent(
+        headers({
+          essential: true,
+          functional: false,
+          performance: true,
+          advertising: true,
+        }),
         true,
         now,
       ),
@@ -80,7 +97,7 @@ describe("server measurement consent", () => {
     expect(
       measurementConsent(
         headers(
-          { essential: true, performance: true },
+          { essential: true, functional: false, performance: true },
           {},
           "2024-01-01T00:00:00Z",
         ),
@@ -101,7 +118,12 @@ describe("server measurement consent", () => {
       expect(
         measurementConsent(
           headers(
-            { essential: true, performance: true, advertising: true },
+            {
+              essential: true,
+              functional: false,
+              performance: true,
+              advertising: true,
+            },
             { [name]: "1" },
           ),
           true,

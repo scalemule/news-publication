@@ -168,7 +168,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@scalemule/compliance": "^0.0.5",
+    "@scalemule/compliance": "0.0.7",
     "@scalemule/react": "0.0.21",
     "@scalemule/sdk": "0.0.75"
   }

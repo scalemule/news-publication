@@ -24,6 +24,8 @@ export function measurementConsent(
     return (
       record.version === 1 &&
       record.preferences?.essential === true &&
+      typeof record.preferences?.functional === "boolean" &&
+      typeof record.preferences?.advertising === "boolean" &&
       record.preferences?.performance === true &&
       (!sponsorship || record.preferences?.advertising === true) &&
       Number.isFinite(date) &&
