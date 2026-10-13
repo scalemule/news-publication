@@ -1,0 +1,78 @@
+.sm-sponsorship {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+  border-block: 1px solid var(--pub-rule, #d8dcd9);
+  color: var(--pub-ink, #171917);
+  font-family: var(--pub-sans, inherit);
+  overflow-wrap: anywhere;
+  max-width: 48rem;
+}
+.sm-sponsorship p {
+  margin: 0;
+}
+.sm-sponsorship .sm-sponsorship-label {
+  font: 600 0.72rem/1.5 var(--pub-sans, var(--font-sans, Arial, sans-serif));
+  letter-spacing: 0.04em;
+  color: var(--pub-muted, #455448);
+  margin-bottom: 0.4rem;
+}
+.sm-sponsorship .sm-sponsorship-name {
+  font-family: var(--pub-serif, inherit);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.sm-sponsorship .sm-sponsorship-description {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-top: 0.3rem;
+  max-width: 42ch;
+}
+.sm-sponsorship a {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-top: 0.5rem;
+  min-height: 24px;
+}
+.sm-sponsorship a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+.sm-sponsorship-logo {
+  width: auto;
+  height: auto;
+  max-width: 112px;
+  max-height: 64px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.sm-sponsorship-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+@media (max-width: 420px) {
+  .sm-sponsorship {
+    gap: 1rem;
+  }
+  .sm-sponsorship-logo {
+    max-width: 76px;
+    max-height: 52px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .sm-sponsorship {
+    border-color: var(--pub-rule, #777);
+  }
+  .sm-sponsorship .sm-sponsorship-label {
+    color: inherit;
+  }
+}
