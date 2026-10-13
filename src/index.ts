@@ -1,5 +1,10 @@
 export { BROADSHEET_THEME, LAYOUT_COOKIE, definePublication, featureEnabled, resolveLayout } from "./config";
 export { FEATURE_NAMES } from "./types";
+export { composeLocalBriefing, LOCAL_BRIEFING_POLICY_VERSION } from "./briefing";
+export type {
+  BriefingCandidate, BriefingPreferences, BriefingReason, BriefingSection,
+  BriefingSource, BriefingVerification, LocalBriefing, LocalBriefingItem, LocalBriefingOptions,
+} from "./briefing";
 export { walnutCreekTimes } from "./preset";
 export {
   NEWS_CACHE,

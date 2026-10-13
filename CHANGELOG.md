@@ -1,3 +1,8 @@
+## 0.0.46 - 2026-10-13
+
+- Add an opt-in local briefing composer over authorized publication records, with explicit preferences, civic priority, source attribution, freshness gates and correction-aware canonical revision selection.
+- Keep the existing edition path unchanged. Server projection, persistent preferences, event lifecycle APIs, publication UI and BaseNews hosting remain subsequent work; this is not a deployed personalization service.
+
 ## 0.0.45
 
 - Consume React 0.0.21 so ended community seasons retain contributor history without mounting capture, uploads or draft storage.
