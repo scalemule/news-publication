@@ -1,3 +1,12 @@
+## 0.0.48 - 2026-10-13
+
+- Broadsheet section layout: Break out single child sections and odd trailing sections across the full grid (`grid-column: 1 / -1`) with an asymmetric two-column spread (Lead story + supporting rail), eliminating huge empty right-side gaps on desktop.
+- Canonical editorial section resolution: Added `resolveSection` normalizing section aliases and using content/tag heuristics to categorize unassigned stories into civic, health, business, events, schools, and community desks rather than dropping them into unrendered local buckets.
+
+## 0.0.47 - 2026-10-13
+
+- Add community sponsorship contracts, previews and reporting.
+
 ## 0.0.46 - 2026-10-13
 
 - Add an opt-in local briefing composer over authorized publication records, with explicit preferences, civic priority, source attribution, freshness gates and correction-aware canonical revision selection.

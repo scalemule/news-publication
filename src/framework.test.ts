@@ -10,6 +10,7 @@ import {
   defaultRevalidateTargets,
   definePublication,
   edgeCacheControl,
+  editorialSections,
   featureEnabled,
   filterNews,
   llmsText,
@@ -19,6 +20,7 @@ import {
   resolveCoupon,
   orderedSections,
   resolveLayout,
+  resolveSection,
   revalidateDecision,
   sectionDefinition,
   sectionId,
@@ -173,6 +175,40 @@ describe("front page", () => {
     const names = ["Health", "Opinion", "Real Estate", "Local news", "Bridge club", "Civic life", "Aquatics"];
     expect(orderedSections(names.map(name => ({ name }))).map(section => section.name))
       .toEqual(["Civic life", "Real Estate", "Health", "Opinion", "Aquatics", "Bridge club"]);
+  });
+
+  it("resolves canonical sections and normalizes aliases", () => {
+    expect(resolveSection(story({ id: "1", slug: "a", title: "Council votes", section: "Government" }))).toBe("Civic life");
+    expect(resolveSection(story({ id: "2", slug: "b", title: "Bakery opens", section: "Business" }))).toBe("Local businesses");
+    expect(resolveSection(story({ id: "3", slug: "c", title: "Art display", section: "Arts & Culture" }))).toBe("Community");
+    expect(resolveSection(story({ id: "4", slug: "d", title: "Pumpkin weigh-off", section: "Things to do" }))).toBe("Events");
+  });
+
+  it("infers canonical sections from tags and content heuristics when unassigned", () => {
+    // Health from veterinary keywords
+    expect(resolveSection(story({ id: "1", slug: "vet", title: "Joybound mobile veterinary wellness clinic expands", section: null }))).toBe("Health");
+    // Civic life from ballot and council keywords
+    expect(resolveSection(story({ id: "2", slug: "civ", title: "City council debates transit measure on November ballot", section: null }))).toBe("Civic life");
+    // Real Estate from housing keywords
+    expect(resolveSection(story({ id: "3", slug: "re", title: "Walnut Creek expands below-market rate homeownership program", section: null }))).toBe("Real Estate");
+    // Events from festival/fair keywords
+    expect(resolveSection(story({ id: "4", slug: "ev", title: "Downtown autumn harvest festival and concert planned", section: null }))).toBe("Events");
+    // Local businesses from storefront/retail keywords
+    expect(resolveSection(story({ id: "5", slug: "biz", title: "New downtown boutique storefront opens on Main Street", section: null }))).toBe("Local businesses");
+    // Unassigned general story resolves to Community
+    expect(resolveSection(story({ id: "6", slug: "gen", title: "Residents gather to celebrate historic neighborhood heritage", section: null }))).toBe("Community");
+  });
+
+  it("populates balanced editorial sections without dropping unassigned stories to Local news", () => {
+    const mixed = [
+      story({ id: "1", slug: "council", title: "Council votes on transit budget", section: null }),
+      story({ id: "2", slug: "pet", title: "Subsidized animal clinic offers vaccines", section: null }),
+      story({ id: "3", slug: "fair", title: "Community volunteer fair set for Saturday", section: null }),
+      story({ id: "4", slug: "neigh", title: "Residents preserve historic neighborhood open space", section: null }),
+    ];
+    const sections = editorialSections(mixed);
+    expect(sections.map(s => s.name)).toEqual(["Civic life", "Health", "Events", "Community"]);
+    expect(sections.every(s => s.name !== "Local news")).toBe(true);
   });
 
   it("finds covered towns in Cyrillic and English copy", () => {

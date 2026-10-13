@@ -33,6 +33,7 @@ export {
   nearbyUpdates,
   normalizedText,
   orderedSections,
+  resolveSection,
   sectionDefinition,
   sectionId,
   sectionPath,

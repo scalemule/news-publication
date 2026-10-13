@@ -23,6 +23,61 @@ export const EDITORIAL_SECTION_ORDER = [
   "Opinion",
 ] as const;
 
+/** Canonical alias mappings to keep section URLs and labels unified across publications. */
+const SECTION_ALIASES: Record<string, string> = {
+  "Business": "Local businesses",
+  "Government": "Civic life",
+  "Arts & Culture": "Community",
+  "Food & drink": "Food & places",
+  "Things to do": "Events",
+  "Sports": "Community",
+  "Education": "Schools",
+  "Public Safety": "Civic life",
+  "Transit": "Civic life",
+  "Environment": "Civic life",
+  "Recreation": "Community",
+};
+
+/**
+ * Resolves a story's canonical editorial section.
+ * Preserves explicitly assigned sections (normalizing known aliases).
+ * If unassigned, intelligently infers section desk from tags, categories, or keywords
+ * so stories are never lost to unrendered buckets.
+ */
+export function resolveSection(item: NewsItem): string {
+  const explicit = item.section?.trim();
+  if (explicit && explicit !== "Local news") {
+    return SECTION_ALIASES[explicit] ?? explicit;
+  }
+
+  const descriptors = [
+    ...(item.tags ?? []).map(t => t.name.toLowerCase()),
+    ...(item.categories ?? []).map(c => c.name.toLowerCase()),
+  ];
+
+  for (const desc of descriptors) {
+    if (/\b(health|wellness|medical|hospital|clinic|doctor|pharmacy|veterinar|pet care|animal welfare|vaccin)\b/i.test(desc)) return "Health";
+    if (/\b(real estate|housing|home|homes|mortgage|tenant|tenants|apartment|apartments|property|bmr)\b/i.test(desc)) return "Real Estate";
+    if (/\b(civic|government|council|election|ballot|measure|transit|traffic|police|fire|firefighter|wildfire|safety|policy|supervisor)\b/i.test(desc)) return "Civic life";
+    if (/\b(business|retail|commerce|commercial|downtown|store|shop|merchants?|chamber of commerce)\b/i.test(desc)) return "Local businesses";
+    if (/\b(event|events|festival|festivals|fair|fairs|concert|concerts|music|workshop|workshops|things to do|exhibition|performance)\b/i.test(desc)) return "Events";
+    if (/\b(school|schools|education|student|students|teacher|teachers|campus|college|university)\b/i.test(desc)) return "Schools";
+    if (/\b(food|dining|restaurant|restaurants|wine|winery|brewery|bakery|cafe|coffee|cuisine|chef)\b/i.test(desc)) return "Food & places";
+    if (/\b(community|volunteer|volunteers|library|libraries|neighborhood|nonprofit|charity|youth|senior|seniors)\b/i.test(desc)) return "Community";
+  }
+
+  const text = `${item.title} ${item.excerpt ?? ""}`;
+  if (/\b(health|hospitals?|clinics?|medical|doctors?|pharmac(?:y|ies)|wellness|veterinar(?:y|ian)|pet care|animal welfare|vaccinat(?:ion|ions)|patients?)\b/iu.test(text)) return "Health";
+  if (/\b(real estate|homeownership|mortgage|housing|tenants?|apartments?|below-market rate|home sales?|condos?)\b/iu.test(text)) return "Real Estate";
+  if (/\b(city council|planning commission|board of supervisors|ballot|measure [a-z0-9]|election|transit|traffic|police|firefighter|wildfire|evacuation|pedestrian safety|city manager|public works)\b/iu.test(text)) return "Civic life";
+  if (/\b(storefront|retail|downtown business|chamber of commerce|opens? doors?|boutique|merchants?|shoppers?|commercial space)\b/iu.test(text)) return "Local businesses";
+  if (/\b(festival|parade|fair|concert|workshop|exhibition|showcase|celebration|weigh-off|halloween|trunk-or-treat)\b/iu.test(text)) return "Events";
+  if (/\b(schools?|students?|teachers?|campuses?|classrooms?|high school|elementary|school district)\b/iu.test(text)) return "Schools";
+  if (/\b(restaurants?|cafes?|baker(?:y|ies)|winer(?:y|ies)|brewer(?:y|ies)|dining|chefs?|menus?)\b/iu.test(text)) return "Food & places";
+
+  return "Community";
+}
+
 /** Sorts sections into the canonical order, dropping the implicit "Local news" bucket. */
 export function orderedSections<T extends { name: string }>(sections: T[], order: readonly string[] = EDITORIAL_SECTION_ORDER): T[] {
   return sections.filter(section => section.name !== "Local news").slice().sort((left, right) => {
@@ -49,8 +104,8 @@ export function sectionDefinition(name: string): EditorialSection {
 export function editorialSections(items: NewsItem[]): EditorialSection[] {
   const groups = new Map<string, NewsItem[]>();
   for (const item of items) {
-    const name = item.section?.trim() || "Local news";
-    groups.set(name, [...(groups.get(name) ?? []), item]);
+    const name = resolveSection(item);
+    groups.set(name, [...(groups.get(name) ?? []), { ...item, section: name }]);
   }
   return Array.from(groups, ([name, articles]) => ({ ...sectionDefinition(name), items: articles }));
 }
