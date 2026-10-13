@@ -1,3 +1,8 @@
+## 0.0.45
+
+- Consume React 0.0.21 so ended community seasons retain contributor history without mounting capture, uploads or draft storage.
+- Exercise the actual closed-season submission page and require collection-specific history URLs. Seasonal schedules remain publication configuration; no backend lifecycle changes are included.
+
 ## 0.0.43
 
 - Consume React 0.0.20 so publication guides share the illustrated city/community renderer, source attribution and optional visitor access notes.

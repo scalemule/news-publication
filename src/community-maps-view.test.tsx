@@ -39,3 +39,20 @@ describe("submission page performance boundary", () => {
     expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
   });
 });
+
+describe("past-season contributor access", () => {
+  it("retains the Halloween contributor history without requesting the Christmas collection or loading capture", async () => {
+    const old = { ...collection, slug: "halloween-2026", config: { ...collection.config, ends_at: "2020-11-02T08:00:00Z" } };
+    const fetcher = vi.fn(async (url: string) => {
+      if (url !== "/api/community-maps/collections/halloween-2026/submissions") throw new Error(`Unexpected request: ${url}`);
+      return { ok: true, json: async () => ({ data: { reader_key: crypto.randomUUID(), items: [], next_cursor: null } }) };
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const { container } = render(<PublicationCommunityMapPage collection={old} mode="submit" basePath="/halloween" atlas={atlas} />);
+    await screen.findByText("No contributions from this browser or account in this guide.");
+    expect(screen.getByRole("heading", { name: "My submissions" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Take photo" })).toBeNull();
+    expect(container.querySelector('canvas, input[type="file"], form')).toBeNull();
+    expect(fetcher.mock.calls.every(([url]) => url === "/api/community-maps/collections/halloween-2026/submissions")).toBe(true);
+  });
+});
