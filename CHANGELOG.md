@@ -1,3 +1,8 @@
+## 0.0.43
+
+- Consume React 0.0.20 so publication guides share the illustrated city/community renderer, source attribution and optional visitor access notes.
+- Keep mobile submissions separate from map rendering and geography requests. Publisher-supplied geographic snapshots remain required.
+
 ## 0.0.42
 
 - Use React 0.0.19 for compact photo-first submission forms, safer interrupted capture recovery and mobile guide refinements.
