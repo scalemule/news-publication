@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import {
   CommunityGuide,
   CommunityDiscussion,
@@ -7,6 +7,7 @@ import {
   type CommunityCityAtlasConfig,
   CommunityFeatureDetail,
   CommunitySubmissionForm,
+  CommunityStreetCapture,
   createCommunityMapsBrowserClient,
   type CommunityMapCollection,
   type CommunityMapFeature,
@@ -40,21 +41,47 @@ export function PublicationCommunityMapPage({
     `/account?next=${encodeURIComponent(`${basePath}/places/${f.id}`)}`;
   const featureHref = (f: CommunityMapFeature) => `${basePath}/places/${f.id}`;
   return (
-    <div className="smcm">
+    <div
+      className="smcm"
+      style={
+        {
+          "--smcm-paper": "var(--pub-paper, Canvas)",
+          "--smcm-ink": "var(--pub-ink, CanvasText)",
+          "--smcm-border": "var(--pub-rule, currentColor)",
+        } as CSSProperties
+      }
+    >
       {mode !== "guide" && (
         <p>
           <a href={basePath}>← {collection.config.title}</a>
         </p>
       )}
       {mode === "submit" ? (
-        <CommunitySubmissionForm
-          client={client}
-          collection={collection}
-          initialAreaId={areaId}
-          correctionFor={correctionFor}
-          guidelinesHref="/editorial-standards"
-          termsHref="/terms"
-        />
+        correctionFor ? (
+          <CommunitySubmissionForm
+            client={client}
+            collection={collection}
+            initialAreaId={
+              areaId ||
+              collection.areas.find((a) => a.slug === atlas?.areaSlug)?.id
+            }
+            correctionFor={correctionFor}
+            guidelinesHref="/editorial-standards"
+            termsHref="/terms"
+          />
+        ) : (
+          <CommunityStreetCapture
+            client={client}
+            collection={collection}
+            initialAreaId={
+              areaId ||
+              collection.areas.find((a) => a.slug === atlas?.areaSlug)?.id
+            }
+            featureHref={(id) => `${basePath}/places/${id}`}
+            guidelinesHref="/editorial-standards"
+            termsHref="/terms"
+          />
+        )
       ) : mode === "feature" && feature ? (
         <CommunityFeatureDetail
           client={client}
@@ -84,6 +111,17 @@ export function PublicationCommunityMapPage({
           initialAreaId={areaId}
           showMap={mode === "map"}
         />
+      )}
+      {(mode === "guide" || mode === "map") && (
+        <p className="smcm-contribute-links">
+          <a
+            className="smcm-button"
+            href={`${basePath}/submit${areaId ? `?area=${areaId}` : ""}`}
+          >
+            Take photos and share a street
+          </a>{" "}
+          <a href={`${basePath}/submit#my-submissions`}>My submissions</a>
+        </p>
       )}
       {(mode === "guide" || mode === "map") && (
         <CommunityDiscussion
