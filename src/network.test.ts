@@ -14,7 +14,9 @@ describe("publication network", () => {
   it("defines the parent institutional network entity", () => {
     expect(NETWORK_PARENT.name).toBe("Bay Area News Network");
     expect(NETWORK_PARENT.url).toBe("https://bayareanewsnetwork.com");
-    expect(NETWORK_PARENT.tagline).toBe("Local stories. Stronger communities.");
+    expect(NETWORK_PARENT.brandSlogan).toBe("Bringing communities closer.");
+    expect(NETWORK_PARENT.publicationSlogan).toBe("Local stories. Stronger communities.");
+    expect(NETWORK_PARENT.principles.length).toBe(6);
   });
 
   it("includes all 11 publications in the Bay Area network", () => {

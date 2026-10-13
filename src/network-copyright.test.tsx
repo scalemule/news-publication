@@ -25,6 +25,7 @@ describe("NetworkCopyrightNotice", () => {
     expect(json).toContain("Danville Times");
     expect(json).toContain("is a member publication of the");
     expect(json).toContain(NETWORK_PARENT.name);
+    expect(json).toContain(NETWORK_PARENT.brandSlogan);
   });
 
   it("supports custom classNames and disabling rights reserved", () => {

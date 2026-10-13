@@ -39,7 +39,7 @@ export function NetworkCopyrightNotice({
           >
             {NETWORK_PARENT.name}
           </a>
-          .
+          {" "}— {NETWORK_PARENT.brandSlogan}
         </p>
       )}
       <p className="sm-network-legal">

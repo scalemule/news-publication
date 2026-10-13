@@ -1,10 +1,126 @@
 import { decorateNetworkUrl } from "./cookies";
 
+export interface EditorialPrinciple {
+  id: string;
+  number: number;
+  title: string;
+  summary: string;
+  guidelines: readonly string[];
+}
+
+/**
+ * Six core principles that guide Bay Area News Network journalism,
+ * product development, and community initiatives.
+ */
+export const EDITORIAL_PRINCIPLES: readonly EditorialPrinciple[] = [
+  {
+    id: "independent-trustworthy-journalism",
+    number: 1,
+    title: "Independent, Trustworthy Local Journalism",
+    summary:
+      "Our first responsibility is to provide accurate, useful, and independent local information.",
+    guidelines: [
+      "Verify information before publication.",
+      "Attribute reporting to credible sources.",
+      "Clearly distinguish original reporting from aggregation.",
+      "Correct mistakes promptly and transparently.",
+      "Maintain editorial independence from advertisers, sponsors, political organizations, and public officials.",
+      "Avoid sensationalism, manufactured outrage, and misleading headlines.",
+      "Provide appropriate context rather than simply repeating announcements.",
+    ],
+  },
+  {
+    id: "people-communities-first",
+    number: 2,
+    title: "People and Communities First",
+    summary:
+      "Local journalism should be about more than institutions, government meetings, and press releases. We tell stories about the people who make communities interesting.",
+    guidelines: [
+      "Spotlight local residents doing extraordinary things.",
+      "Highlight teachers, students, and educational achievements.",
+      "Feature volunteers and nonprofit organizations.",
+      "Cover neighborhood initiatives and community milestones.",
+      "Recognize local artists, musicians, and creators.",
+      "Support small businesses and entrepreneurs.",
+      "Preserve local history and living traditions.",
+    ],
+  },
+  {
+    id: "connection-belonging",
+    number: 3,
+    title: "Connection and Belonging",
+    summary:
+      "Our publications help residents feel connected to their communities and cultivate a stronger sense of local belonging.",
+    guidelines: [
+      "Help residents discover what is happening around them.",
+      "Spotlight who is contributing to their neighborhoods.",
+      "Highlight which organizations are making a difference.",
+      "Show where residents can participate and engage.",
+      "Celebrate what makes each community distinctive.",
+      "Build useful community experiences rather than attention-maximizing feeds.",
+    ],
+  },
+  {
+    id: "constructive-participation",
+    number: 4,
+    title: "Constructive Community Participation",
+    summary:
+      "Readers have structured, respectful, and purposeful opportunities to contribute to their communities through our platform.",
+    guidelines: [
+      "Submit story ideas and news tips directly to the newsroom.",
+      "Share verified community photographs and visual stories.",
+      "Recommend local events and gatherings.",
+      "Contribute to seasonal community guides and neighborhood maps.",
+      "Recognize community volunteers and local achievers.",
+      "Suggest neighborhood improvements and share local knowledge.",
+      "Participate in carefully moderated civic discussions.",
+    ],
+  },
+  {
+    id: "accountability-constructive-journalism",
+    number: 5,
+    title: "Accountability and Constructive Journalism",
+    summary:
+      "Communities benefit from understanding both their successes and their challenges. We report thoroughly, fairly, and responsibly without manufacturing conflict.",
+    guidelines: [
+      "Explain how local decisions affect residents.",
+      "Investigate matters of public interest.",
+      "Hold institutions and elected leaders accountable.",
+      "Provide useful context and historical depth.",
+      "Explore credible solutions where appropriate.",
+      "Give relevant stakeholders opportunities to respond.",
+      "Help readers understand how to participate in civic life.",
+    ],
+  },
+  {
+    id: "sustainable-respectful-media",
+    number: 6,
+    title: "Sustainable, Respectful Local Media",
+    summary:
+      "We are developing a sustainable model for high-quality local journalism that respects readers and prioritizes trust over short-term traffic.",
+    guidelines: [
+      "Avoid intrusive advertising and clickbait distractions.",
+      "Avoid deceptive engagement tactics or endless outrage feeds.",
+      "Clearly identify sponsored content and commercial relationships.",
+      "Maintain a meaningful separation between advertising and editorial decisions.",
+      "Build long-term relationships with local businesses and community organizations.",
+      "Prioritize reader trust over short-term page views.",
+      "Design fast, accessible, readable websites.",
+      "Avoid low-quality syndication and tracking-heavy ad networks.",
+    ],
+  },
+] as const;
+
 export interface NetworkParent {
   name: string;
   url: string;
+  brandSlogan: string;
   tagline: string;
+  mission: string;
+  extendedMission: string;
+  publicationSlogan: string;
   description: string;
+  principles: readonly EditorialPrinciple[];
 }
 
 /**
@@ -13,8 +129,16 @@ export interface NetworkParent {
 export const NETWORK_PARENT: NetworkParent = {
   name: "Bay Area News Network",
   url: "https://bayareanewsnetwork.com",
-  tagline: "Local stories. Stronger communities.",
-  description: "The institutional network of independent local publications covering the San Francisco Bay Area.",
+  brandSlogan: "Bringing communities closer.",
+  tagline: "Bringing communities closer.",
+  mission:
+    "To strengthen local communities through independent journalism, meaningful connections, and opportunities for residents to participate in the places they call home.",
+  extendedMission:
+    "We believe communities thrive when people are informed, connected, and engaged. Our publications bring neighbors closer by sharing the stories that matter, celebrating local life, holding institutions accountable, and giving residents a voice in their community’s future. Through independent local journalism and community participation, we aim to help people better understand, appreciate, and shape the places they call home.",
+  publicationSlogan: "Local stories. Stronger communities.",
+  description:
+    "An institutional network of independent local publications that use journalism, technology, and community participation to strengthen the places they serve.",
+  principles: EDITORIAL_PRINCIPLES,
 } as const;
 
 export interface PublicationNetworkItem {
@@ -23,6 +147,8 @@ export interface PublicationNetworkItem {
   url: string;
   area: string;
   description: string;
+  slogan?: string;
+  aboutIntro?: string;
   listed?: boolean;
 }
 
@@ -36,77 +162,121 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Bay Area Chronicle",
     url: "https://bayareachronicle.com",
     area: "San Francisco Bay Area",
-    description: "Regional reporting and in-depth investigations covering the nine-county San Francisco Bay Area.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Regional investigative reporting and in-depth policy analysis covering housing, transit, environmental resilience, and civic institutions across the nine-county Bay Area.",
+    aboutIntro:
+      "Bay Area Chronicle is an independent regional publication providing in-depth reporting and investigative journalism across the nine-county San Francisco Bay Area. While our sister publications focus on the immediate pulse of individual towns and valleys, Bay Area Chronicle investigates the broader challenges and systemic choices that span our region—from regional transit integration and housing affordability to climate resilience and major civic governance. We believe regional awareness complements local loyalty, equipping Bay Area residents with the deep context required to solve shared problems.",
   },
   {
     slug: "concordchronicle",
     name: "Concord Chronicle",
     url: "https://concordchronicle.com",
-    area: "Concord",
-    description: "A new place for Concord’s local stories, independent businesses and community voices.",
+    area: "Concord & Clayton",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent reporting on municipal governance, school districts, small business, and neighborhood culture in Concord and Clayton.",
+    aboutIntro:
+      "Concord Chronicle is an independent local publication dedicated to chronicling community life and civic affairs across Concord and Clayton. We report closely on city council deliberations, the Mt. Diablo Unified School District, the transformation of the former naval weapons station, and the vibrant small businesses that anchor Todos Santos Plaza and neighborhood shopping districts. By illuminating both local challenges and community milestones, we aim to provide reliable reporting that deepens resident participation and fosters a stronger civic community.",
   },
   {
     slug: "walnutcreektimes",
     name: "Walnut Creek Times",
     url: "https://walnutcreektimes.com",
     area: "Walnut Creek · Rossmoor · Saranap · Pleasant Hill",
-    description: "A new place for Walnut Creek’s local stories, independent businesses and community voices.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent local journalism covering civic decisions, downtown commerce, neighborhood life, and community achievements across Walnut Creek, Rossmoor, Saranap, and Pleasant Hill.",
+    aboutIntro:
+      "Walnut Creek Times is an independent local publication dedicated to helping residents stay informed, connected, and engaged with the community they call home. We cover the people, places, decisions, and events that shape life across Walnut Creek, Rossmoor, Saranap, and Pleasant Hill. From downtown revitalization and neighborhood planning to open space stewardship, community celebrations, and the achievements of everyday residents, our goal is to provide trustworthy journalism that helps strengthen the connections between people and the places they live.",
   },
   {
     slug: "lamorindapost",
     name: "Lamorinda Post",
     url: "https://lamorindapost.com",
     area: "Orinda · Lafayette · Moraga",
-    description: "A new home for the neighbors, businesses and community stories of Lamorinda.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Community-rooted journalism for the three hillside towns of Lamorinda, covering local schools, civic leadership, wildfire preparedness, and neighborhood traditions.",
+    aboutIntro:
+      "Lamorinda Post is an independent local publication dedicated to the neighbors, families, and civic institutions of Orinda, Lafayette, and Moraga. Connected across rolling ridgelines and oak-studded canyons, our communities share exceptional schools, active civic traditions, and vital concerns including wildfire resilience, open space preservation, and sensible town planning. We provide thoughtful, verified reporting on the decisions and people shaping our three towns, helping neighbors stay informed and actively engaged in their community’s future.",
   },
   {
     slug: "alamoweekly",
     name: "Alamo Weekly",
     url: "https://alamoweekly.com",
-    area: "Alamo",
-    description: "A new place for Alamo’s local stories, independent businesses and community voices.",
+    area: "Alamo & Round Hill",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Hyperlocal news focused on the unincorporated enclave of Alamo, Round Hill, local schools, neighborhood preservation, and community organizations.",
+    aboutIntro:
+      "Alamo Weekly is an independent local publication committed to serving the unincorporated community of Alamo and the surrounding Round Hill neighborhoods. Nestled between Mount Diablo and the Las Trampas ridge, Alamo cherishes its semi-rural character, scenic trails, and close-knit neighborhood traditions. We follow county land-use planning, local school achievements, historic preservation, and community volunteer efforts, ensuring Alamo residents have a dedicated voice and a dependable source of local information.",
   },
   {
     slug: "danvilletimes",
     name: "Danville Times",
     url: "https://danvilletimes.com",
-    area: "Danville",
-    description: "A new place for Danville’s local stories, independent businesses and community voices.",
+    area: "Danville & Blackhawk",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Civic reporting, community events, local enterprise, youth sports, and cultural heritage for the Town of Danville and Blackhawk.",
+    aboutIntro:
+      "Danville Times is an independent local publication dedicated to reporting on the people, businesses, civic decisions, and community traditions of Danville and Blackhawk. From town council meetings and historic downtown preservation along Hartz Avenue to the bustling Iron Horse Trail, youth athletics, and Blackhawk community life, we chronicle the stories that matter to local families. Our mission is to deliver fair, accurate reporting that celebrates community achievement, holds local institutions accountable, and reinforces the bonds that unite our neighborhoods.",
   },
   {
     slug: "sanramontimes",
     name: "San Ramon Times",
     url: "https://sanramontimes.com",
-    area: "San Ramon",
-    description: "A new place for San Ramon’s local stories, independent businesses and community voices.",
+    area: "San Ramon & Dougherty Valley",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Daily reporting on municipal policy, City Center Bishop Ranch, San Ramon Valley schools, and the neighborhoods of Dougherty Valley.",
+    aboutIntro:
+      "San Ramon Times is an independent local publication focused on the rapidly evolving civic, commercial, and residential landscape of San Ramon. We cover the municipal governance that guides our growing city, innovations at Bishop Ranch and City Center, educational excellence in the San Ramon Valley Unified School District, and community life throughout Dougherty Valley. Through clear and constructive journalism, we help residents understand how local decisions affect their daily lives and provide opportunities to participate meaningfully in city affairs.",
   },
   {
     slug: "diablovalleynews",
     name: "Diablo Valley News",
     url: "https://diablovalleynews.com",
     area: "Concord · Walnut Creek · Pleasant Hill · Alamo · Danville · San Ramon",
-    description: "Local stories about the people, businesses and community life of the Diablo Valley.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Regional perspectives on economic trends, transportation, environmental stewardship, and community life surrounding Mount Diablo.",
+    aboutIntro:
+      "Diablo Valley News is an independent local publication offering cross-community reporting for the towns and cities nestled in the shadow of Mount Diablo. From the I-680 and Route 24 commute corridors to regional parklands, Diablo Valley College initiatives, and valley-wide economic trends, we illuminate the connections between our neighboring communities. By bringing together reporting from across the valley, we help residents understand how shared regional developments influence their individual neighborhoods.",
   },
   {
     slug: "trivalleyweekly",
     name: "Tri-Valley Weekly",
     url: "https://trivalleyweekly.com",
-    area: "Alamo · Danville · San Ramon · Dublin · Pleasanton · Livermore",
-    description: "Local stories about the businesses, people and community life of the Tri-Valley.",
+    area: "Dublin · Pleasanton · Livermore",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Comprehensive reporting across the innovation and wine corridor of Dublin, Pleasanton, and Livermore, connecting civic developments, local research, and regional culture.",
+    aboutIntro:
+      "Tri-Valley Weekly is an independent local publication dedicated to connecting the dynamic communities of Dublin, Pleasanton, and Livermore. Spanning one of Northern California's premier corridors for technological research, historic downtown heritage, and historic viticulture, the Tri-Valley balances rapid civic growth with cherished local traditions. We report across city lines on transportation, regional commerce, school governance, environmental stewardship, and community culture, giving residents the comprehensive context needed to navigate and shape their shared valley.",
   },
   {
     slug: "eastbaypost",
     name: "East Bay Post",
     url: "https://eastbaypost.com",
     area: "The East Bay",
-    description: "A new publication connecting the people and neighborhoods of the East Bay.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Connecting the diverse neighborhoods, public policy, shoreline communities, and independent businesses across the East Bay.",
+    aboutIntro:
+      "East Bay Post is an independent regional publication devoted to exploring the diverse neighborhoods, public policies, and cultural vitality of the East Bay. From waterfront revitalization and transit infrastructure to local arts, community advocacy, and neighborhood commerce across Alameda and Contra Costa counties, we investigate the forces shaping our interconnected urban and suburban communities. We provide rigorous, constructive reporting that bridges community divides and empowers residents to advocate for resilient, inclusive neighborhoods.",
   },
   {
     slug: "napagate",
     name: "Napa Gate",
     url: "https://napagate.com",
     area: "Napa Valley",
-    description: "A new local publication for the people, places and everyday life of Napa Valley.",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Bespoke local reporting for the people, agriculture, culinary culture, riverfront, and civic institutions of the Napa Valley.",
+    aboutIntro:
+      "Napa Gate is an independent local publication devoted to the distinctive communities, agricultural heritage, and civic life of the Napa Valley. From municipal decisions in the City of Napa to vineyard stewardship, hospitality labor, wildfire defense, and cultural events throughout Yountville, St. Helena, and Calistoga, we tell the stories of the people who live and work here year-round. We deliver nuanced, independent journalism that respects the valley’s unique identity while examining the economic and environmental choices that will define its future.",
     listed: false,
   },
 ] as const;

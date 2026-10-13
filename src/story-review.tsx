@@ -4,23 +4,37 @@ import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
 import { reviewEmailLink, reviewEmailText } from "./story-review-email";
+import {
+  parseDocumentBlocks,
+  formatArtworkCaption,
+  type ContentBlock,
+  type StructuredMedia,
+} from "./article-blocks";
 
-type Media = {
+export type Media = {
   kind?: "image" | "video";
   contribution_id: string;
   file_id: string;
   caption: string;
   credit: string;
   alt: string;
-  position: string;
+  position: "hero" | "inline" | "gallery" | "attachment" | string;
+  artist_name?: string;
+  artwork_title?: string;
+  artwork_date?: string;
+  medium?: string;
+  photographer?: string;
+  source?: string;
+  rights_status?: string;
 };
-type Document = {
+export type Document = {
   title: string;
   subtitle: string;
   content_markdown: string;
   section: string;
   community: string;
   media: Media[];
+  blocks?: ContentBlock[];
 };
 type Editorial = {
   content_kind?: string;
@@ -158,18 +172,29 @@ export function StoryReview({
     setRights(false);
     setPanel("media");
   }
+  function openCorrection(photo: Media) {
+    const title = photo.artwork_title || photo.caption || "Photograph";
+    setPanel("changes");
+    drafts.set("changes", {
+      ...drafts.entries.changes?.data,
+      correctionKind: "Correct a detail",
+      message:
+        drafts.entries.changes?.data.message ||
+        `Correction regarding “${title}”: `,
+    });
+  }
   useEffect(() => {
     if (panel !== "article") {
-      responseRef.current?.scrollIntoView({
-        block: "start",
-        behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)")
-          .matches
-          ? "auto"
-          : "smooth",
-      });
-      responseRef.current?.focus({ preventScroll: true });
+      responseRef.current?.focus();
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape" && !busy) {
+          setPanel("article");
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  }, [panel]);
+  }, [panel, busy]);
   const emptyMediaInfo = { caption: "", who_is_pictured: "", creator: "", when_taken: "", where_taken: "", credit: "", alt: "" };
   const drafts = useReviewDrafts(identity, review?.identity_required ? undefined : review?.revision.id, review?.response_drafts, request);
   const currentDraft = drafts.entries[panel];
@@ -521,8 +546,33 @@ export function StoryReview({
           {review.participant && <div className="sm-review-identity-status">
             <span>Contributing as <strong>{review.reviewer}</strong></span>
             <button disabled={busy || pending.length > 0 || !!file} onClick={async () => {
-              setBusy(true); try { await request("/leave", {}); setPanelState("article"); setIdentityStep("name"); await load(); }
-              catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+              setBusy(true);
+              setError("");
+              try {
+                const prevReviewer = review.reviewer;
+                await request("/leave", {});
+                setReader(null);
+                setPanelState("article");
+                setIdentityStep("name");
+                await load();
+                if (readerAccountUrl) {
+                  void fetch(readerAccountUrl, { credentials: "same-origin", cache: "no-store" })
+                    .then(async (res) => {
+                      if (res.ok) {
+                        const d = await res.json();
+                        setReader(d.user || null);
+                      } else {
+                        setReader(null);
+                      }
+                    })
+                    .catch(() => setReader(null));
+                }
+                setNotice(`You are no longer contributing as ${prevReviewer}. You can review the draft or sign in with another account.`);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
             }}>Not you?</button>
           </div>}
           {celebration ? (
@@ -579,9 +629,14 @@ export function StoryReview({
             {review.revision.document.media
               .filter((m) => m.position === "hero")
               .map((m) => (
-                <PrivatePhoto key={m.file_id} media={m} base={base}
+                <PrivatePhoto
+                  key={m.file_id}
+                  media={m}
+                  base={base}
                   onChange={can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
-                  disabled={busy} />
+                  onSuggestCorrection={can("REQUEST_CHANGES") ? () => openCorrection(m) : undefined}
+                  disabled={busy}
+                />
               ))}
             {celebration &&
               !review.revision.document.media.some(
@@ -601,16 +656,116 @@ export function StoryReview({
                   </button>
                 </aside>
               )}
-            <div
-              className="sm-review-prose"
-              dangerouslySetInnerHTML={{ __html: review.revision.content_html }}
-            />
+            {(() => {
+              const blocks = parseDocumentBlocks({
+                content_markdown: review.revision.document.content_markdown,
+                media: review.revision.document.media,
+                blocks: review.revision.document.blocks,
+              });
+              const mediaMap = new Map<string, Media>();
+              for (const m of review.revision.document.media) {
+                mediaMap.set(m.file_id, m);
+                if (m.contribution_id) mediaMap.set(m.contribution_id, m);
+              }
+
+              return (
+                <div className="sm-review-prose">
+                  {blocks.length === 0 && review.revision.content_html ? (
+                    <div dangerouslySetInnerHTML={{ __html: review.revision.content_html }} />
+                  ) : (
+                    blocks.map((block, idx) => {
+                      switch (block.type) {
+                        case "paragraph":
+                          return (
+                            <p
+                              key={idx}
+                              dangerouslySetInnerHTML={{ __html: block.html }}
+                            />
+                          );
+                        case "heading": {
+                          if (block.level === 1)
+                            return <h1 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                          if (block.level === 2)
+                            return <h2 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                          if (block.level === 3)
+                            return <h3 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                          if (block.level === 4)
+                            return <h4 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                          if (block.level === 5)
+                            return <h5 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                          return <h6 key={idx} dangerouslySetInnerHTML={{ __html: block.html }} />;
+                        }
+                        case "quote":
+                          return (
+                            <blockquote key={idx}>
+                              <p dangerouslySetInnerHTML={{ __html: block.html }} />
+                              {block.attribution && <cite>{block.attribution}</cite>}
+                            </blockquote>
+                          );
+                        case "list":
+                          return block.ordered ? (
+                            <ol key={idx}>
+                              {block.items.map((it, i) => (
+                                <li key={i} dangerouslySetInnerHTML={{ __html: it }} />
+                              ))}
+                            </ol>
+                          ) : (
+                            <ul key={idx}>
+                              {block.items.map((it, i) => (
+                                <li key={i} dangerouslySetInnerHTML={{ __html: it }} />
+                              ))}
+                            </ul>
+                          );
+                        case "divider":
+                          return <hr key={idx} />;
+                        case "inline_media": {
+                          const m = mediaMap.get(block.media_id);
+                          if (!m) return null;
+                          return (
+                            <PrivatePhoto
+                              key={m.file_id}
+                              media={m}
+                              base={base}
+                              onChange={
+                                m.kind !== "video" && can("UPLOAD_MEDIA")
+                                  ? () => openMedia(m)
+                                  : undefined
+                              }
+                              onSuggestCorrection={
+                                can("REQUEST_CHANGES")
+                                  ? () => openCorrection(m)
+                                  : undefined
+                              }
+                              disabled={busy}
+                              isInline
+                            />
+                          );
+                        }
+                        default:
+                          return null;
+                      }
+                    })
+                  )}
+                </div>
+              );
+            })()}
             {review.revision.document.media
-              .filter((m) => m.position !== "hero")
+              .filter((m) => m.position === "gallery")
               .map((m) => (
-                <PrivatePhoto key={m.file_id} media={m} base={base}
-                  onChange={m.kind !== "video" && can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
-                  disabled={busy} />
+                <PrivatePhoto
+                  key={m.file_id}
+                  media={m}
+                  base={base}
+                  onChange={
+                    m.kind !== "video" && can("UPLOAD_MEDIA")
+                      ? () => openMedia(m)
+                      : undefined
+                  }
+                  onSuggestCorrection={
+                    can("REQUEST_CHANGES") ? () => openCorrection(m) : undefined
+                  }
+                  disabled={busy}
+                />
               ))}
           </article>
           {celebration && (
@@ -727,28 +882,69 @@ export function StoryReview({
             {pending.map(([name]) => <button key={name} onClick={() => setPanel(name)}>Continue {draftLabel(name)}</button>)}
             {file && !pending.some(([name]) => name === "media") && <button onClick={() => setPanel("media")}>Continue your photo upload</button>}
           </aside>}
-          {panel === "share" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Share private preview">
-            <h2>Share with your family</h2>{errorMessage}
-            <p>Anyone with this link can read the private preview. {renderSignIn ? "To contribute, they can continue with Google or use an email code." : "To send feedback or photos, they will enter their own name and verify their email. No account is needed."}</p>
-            <label htmlFor="review-share-url">Private preview link</label>
-            <input id="review-share-url" readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
-            <button onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setNotice("Private link copied. Paste it into your message to family."); } catch { setNotice("Select the link above, then choose Copy on your device."); } }}>Copy private link</button>
-            <button onClick={() => setPanel("article")}>Back to the story</button>
-          </section>}
-          {panel === "question-list" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Optional story questions">
-            <div className="sm-review-form-heading"><h2>Tell us a little more</h2><button onClick={() => setPanel("article")}>Close</button></div>
-            <p>Completely optional. Read the questions first, then answer online or copy them into an email. Even one answer helps.</p>
-            <ol className="sm-review-question-list">{review.questions.filter((q, i) => moreQuestions || i < 5 || q.required).map(q => <li key={q.id}>{q.prompt}</li>)}</ol>
-            {!moreQuestions && review.questions.length > 5 && <button onClick={() => setMoreQuestions(true)}>See all questions</button>}
-            <button className="sm-review-primary" onClick={() => setPanel("questions")}>Answer online</button>
-            <p>Sign in to save your answers as you go. You can return whenever it suits you.</p>
-            <button onClick={async () => { try { await navigator.clipboard.writeText(questionText); setNotice("Questions copied. Paste them into an email and answer as many as you like."); } catch { setCopiedQuestions(true); } }}>Copy all questions</button>
-            {copiedQuestions && <label>Copy these questions<textarea readOnly rows={10} value={questionText} onFocus={e => e.currentTarget.select()} /></label>}
-            {questionsEmail && <p><a href={questionsEmail}>Answer by email</a> — opens your email app with the questions ready.</p>}
-          </section>}
-          {panel === "identity" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Introduce yourself">
-            <h2>{identityStep === "code" ? "Check your email" : "Continue to help with the story"}</h2>{errorMessage}
-            <p>Your name accompanies your feedback. Your email stays private.</p>
+          {panel !== "article" && (
+            <div
+              className="sm-review-modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !busy) setPanel("article");
+              }}
+            >
+              <div className="sm-review-modal-container">
+                {panel === "share" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Share private preview">
+                  <div className="sm-review-form-heading">
+                    <h2>Share with your family</h2>
+                    <button disabled={busy} type="button" onClick={() => setPanel("article")} aria-label="Close">
+                      Close
+                    </button>
+                  </div>
+                  {errorMessage}
+                  <p>Anyone with this link can read the private preview. {renderSignIn ? "To contribute, they can continue with Google or use an email code." : "To send feedback or photos, they will enter their own name and verify their email. No account is needed."}</p>
+                  <label htmlFor="review-share-url">Private preview link</label>
+                  <input id="review-share-url" readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
+                  <button onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setNotice("Private link copied. Paste it into your message to family."); } catch { setNotice("Select the link above, then choose Copy on your device."); } }}>Copy private link</button>
+                  <button onClick={() => setPanel("article")}>Back to the story</button>
+                </section>}
+                {panel === "question-list" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Optional story questions">
+                  <div className="sm-review-form-heading"><h2>Tell us a little more</h2><button onClick={() => setPanel("article")}>Close</button></div>
+                  <p>Completely optional. Read the questions first, then answer online or copy them into an email. Even one answer helps.</p>
+                  <ol className="sm-review-question-list">{review.questions.filter((q, i) => moreQuestions || i < 5 || q.required).map(q => <li key={q.id}>{q.prompt}</li>)}</ol>
+                  {!moreQuestions && review.questions.length > 5 && <button onClick={() => setMoreQuestions(true)}>See all questions</button>}
+                  <button className="sm-review-primary" onClick={() => setPanel("questions")}>Answer online</button>
+                  <p>Sign in to save your answers as you go. You can return whenever it suits you.</p>
+                  <button onClick={async () => { try { await navigator.clipboard.writeText(questionText); setNotice("Questions copied. Paste them into an email and answer as many as you like."); } catch { setCopiedQuestions(true); } }}>Copy all questions</button>
+                  {copiedQuestions && <label>Copy these questions<textarea readOnly rows={10} value={questionText} onFocus={e => e.currentTarget.select()} /></label>}
+                  {questionsEmail && <p><a href={questionsEmail}>Answer by email</a> — opens your email app with the questions ready.</p>}
+                </section>}
+                {panel === "identity" && <section ref={responseRef} tabIndex={-1} className="sm-review-form" aria-label="Introduce yourself">
+                  <div className="sm-review-form-heading">
+                    <h2>
+                      {identityStep === "code"
+                        ? "Check your email"
+                        : requestedPanel === "media"
+                          ? photoToReplace ? "Change photo" : "Contribute a photograph"
+                          : requestedPanel === "changes"
+                            ? "Suggest a change"
+                            : requestedPanel === "edits"
+                              ? "Propose changes"
+                              : requestedPanel === "comment"
+                                ? "Leave a comment"
+                                : "Continue to help with the story"}
+                    </h2>
+                    <button disabled={busy} type="button" onClick={() => setPanel("article")} aria-label="Close">
+                      Close
+                    </button>
+                  </div>
+                  {errorMessage}
+                  {photoToReplace && (
+                    <div className="sm-review-target-preview" style={{ padding: "10px 14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", margin: "10px 0 16px" }}>
+                      <div style={{ fontSize: "13px", color: "#334155" }}>
+                        <strong>Replacing:</strong> {photoToReplace.artwork_title ? `“${photoToReplace.artwork_title}”` : photoToReplace.caption || "Header photograph"}
+                      </div>
+                    </div>
+                  )}
+                  <p>Your name accompanies your feedback. Your email stays private.</p>
             {identityStep === "name" && renderSignIn && <>
               {readerLoading ? <p role="status">Checking your sign-in…</p> : reader?.email_verified ? <>
                 <button className="sm-review-primary" disabled={busy} onClick={() => void connectReader()}>Continue as {reader.full_name || reader.email}</button>
@@ -977,6 +1173,13 @@ export function StoryReview({
                     void upload();
                   }}
                 >
+                  {photoToReplace && (
+                    <div className="sm-review-target-preview">
+                      <div className="sm-review-target-preview-title">
+                        <strong>Replacing:</strong> {photoToReplace.artwork_title ? `“${photoToReplace.artwork_title}”` : photoToReplace.caption || "Header photograph"}
+                      </div>
+                    </div>
+                  )}
                   {photoToReplace && <p>Choose the photograph you'd like us to use instead. We'll review it and prepare an updated preview; the current photo stays in place until then.</p>}
                   <p>
                     JPEG, PNG or WebP photos up to 12 MB; MP4 or WebM videos up
@@ -1261,6 +1464,9 @@ export function StoryReview({
               </fieldset>
             </section>
           )}
+              </div>
+            </div>
+          )}
           {review.contributions.length > 0 && (
             <section className="sm-review-contributions">
               <h2>Your contributions and newsroom messages</h2>
@@ -1341,8 +1547,20 @@ export function StoryReview({
     </div>
   );
 }
-function PrivatePhoto({ base, media, onChange, disabled }: {
-  base: string; media: Media; onChange?: () => void; disabled?: boolean;
+function PrivatePhoto({
+  base,
+  media,
+  onChange,
+  onSuggestCorrection,
+  disabled,
+  isInline,
+}: {
+  base: string;
+  media: Media;
+  onChange?: () => void;
+  onSuggestCorrection?: () => void;
+  disabled?: boolean;
+  isInline?: boolean;
 }) {
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState(false);
@@ -1370,8 +1588,14 @@ function PrivatePhoto({ base, media, onChange, disabled }: {
       if (object) URL.revokeObjectURL(object);
     };
   }, [base, media.file_id]);
+
+  const captionInfo = formatArtworkCaption(media as any);
+
   return (
-    <figure>
+    <figure
+      className={`sm-review-photo-figure ${isInline ? "sm-review-inline-figure" : "sm-review-hero-figure"}`}
+      data-media-id={media.file_id}
+    >
       {url ? (
         video ? (
           <video
@@ -1379,20 +1603,63 @@ function PrivatePhoto({ base, media, onChange, disabled }: {
             controls
             playsInline
             preload="metadata"
-            aria-label={media.alt}
+            aria-label={media.alt || captionInfo.title || "Story video"}
           />
         ) : (
-          <img src={url} alt={media.alt} referrerPolicy="no-referrer" />
+          <img
+            src={url}
+            alt={media.alt || captionInfo.title || "Story photograph"}
+            referrerPolicy="no-referrer"
+          />
         )
       ) : (
         <p>Media unavailable.</p>
       )}
       <figcaption className="sm-review-photo-details">
-      {(media.caption || media.credit) && <span>
-        {media.caption}
-        {media.credit && ` Photo: ${media.credit}`}
-      </span>}
-      {onChange && <button className="sm-review-change-photo" type="button" disabled={disabled} onClick={onChange}>Change photo</button>}
+        <div className="sm-review-caption-text">
+          {captionInfo.title && (
+            <div className="sm-review-artwork-title">
+              <strong>“{captionInfo.title}”</strong>
+            </div>
+          )}
+          {captionInfo.artist && (
+            <div className="sm-review-artist-name">{captionInfo.artist}</div>
+          )}
+          {captionInfo.mediumAndDate && (
+            <div className="sm-review-artwork-medium">{captionInfo.mediumAndDate}</div>
+          )}
+          {captionInfo.captionText && (
+            <div className="sm-review-photo-caption">{captionInfo.captionText}</div>
+          )}
+          {captionInfo.credit && (
+            <div className="sm-review-photo-credit">{captionInfo.credit}</div>
+          )}
+          {captionInfo.source && (
+            <div className="sm-review-photo-source">{captionInfo.source}</div>
+          )}
+        </div>
+        <div className="sm-review-photo-controls">
+          {onChange && (
+            <button
+              className="sm-review-change-photo"
+              type="button"
+              disabled={disabled}
+              onClick={onChange}
+            >
+              Change photo
+            </button>
+          )}
+          {onSuggestCorrection && (
+            <button
+              className="sm-review-suggest-correction"
+              type="button"
+              disabled={disabled}
+              onClick={onSuggestCorrection}
+            >
+              Suggest correction
+            </button>
+          )}
+        </div>
       </figcaption>
     </figure>
   );
