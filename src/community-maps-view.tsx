@@ -42,7 +42,7 @@ export function PublicationCommunityMapPage({
   const featureHref = (f: CommunityMapFeature) => `${basePath}/places/${f.id}`;
   return (
     <div
-      className="smcm"
+      className={`smcm${atlas ? " smcm-illustrated-publication" : ""}`}
       style={
         {
           "--smcm-paper": "var(--pub-paper, Canvas)",
@@ -56,6 +56,7 @@ export function PublicationCommunityMapPage({
           <a href={basePath}>← {collection.config.title}</a>
         </p>
       )}
+      {/* Keep capture exclusive: mounting a guide here starts map data, WebGL and workers. */}
       {mode === "submit" ? (
         correctionFor ? (
           <CommunitySubmissionForm
@@ -114,12 +115,7 @@ export function PublicationCommunityMapPage({
       )}
       {(mode === "guide" || mode === "map") && (
         <p className="smcm-contribute-links">
-          <a
-            className="smcm-button"
-            href={`${basePath}/submit${areaId ? `?area=${areaId}` : ""}`}
-          >
-            Take photos and share a street
-          </a>{" "}
+          Already shared a place?{" "}
           <a href={`${basePath}/submit#my-submissions`}>My submissions</a>
         </p>
       )}
