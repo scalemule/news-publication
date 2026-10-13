@@ -280,3 +280,57 @@ describe("publication engagement proxy", () => {
     ).toBe(403);
   });
 });
+
+describe("private contributor routes", () => {
+  it("forwards only the signed reader context on history and update routes", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        data: { items: [], next_cursor: null, reader_key: "opaque" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const response = await handler(
+      new Request(
+        "https://paper.example.test/api?application_id=other&actor_hash=forged",
+      ),
+      [...route, "submissions"],
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(String(fetch.mock.calls[0][0])).not.toContain("actor_hash");
+    expect(String(fetch.mock.calls[0][0])).not.toContain("application_id");
+    const id = "019a12ec-1234-7000-8000-123456789abc";
+    const forbidden = await handler(
+      new Request("https://paper.example.test/api", {
+        method: "POST",
+        headers: {
+          origin: "https://attacker.test",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      }),
+      [...route, "submissions", id],
+    );
+    expect(forbidden.status).toBe(403);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("does not proxy another private route or an invalid media identifier", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    for (const path of [
+      [...route, "submissions", "bad", "media", "bad"],
+      [
+        ...route,
+        "submissions",
+        "019a12ec-1234-7000-8000-123456789abc",
+        "notes",
+      ],
+    ]) {
+      expect(
+        (await handler(new Request("https://paper.example.test/api"), path))
+          .status,
+      ).toBe(404);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

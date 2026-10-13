@@ -118,9 +118,23 @@ export function createPublicationCommunityMapsHandler(
       const featureId = params.get("feature_id") || undefined;
       if (discussion && featureId && !UUID.test(featureId))
         return json({ error: { message: "Invalid place" } }, 400);
+      const ownList = rest.length === 1 && rest[0] === "submissions";
+      const ownUpdate =
+        method === "POST" &&
+        rest.length === 2 &&
+        rest[0] === "submissions" &&
+        UUID.test(rest[1]);
+      const ownMedia =
+        rest.length === 4 &&
+        rest[0] === "submissions" &&
+        UUID.test(rest[1]) &&
+        rest[2] === "media" &&
+        UUID.test(rest[3]);
       const read =
         method === "GET" &&
-        (discussion ||
+        (ownList ||
+          ownMedia ||
+          discussion ||
           voting ||
           rest.length === 0 ||
           (rest[0] === "features" &&
@@ -141,7 +155,14 @@ export function createPublicationCommunityMapsHandler(
         UUID.test(rest[1]) &&
         ["reactions", "reports"].includes(rest[2]);
       const engagementWrite = method === "POST" && (discussion || voting);
-      if (!read && !upload && !submission && !action && !engagementWrite)
+      if (
+        !read &&
+        !upload &&
+        !submission &&
+        !ownUpdate &&
+        !action &&
+        !engagementWrite
+      )
         return json({ error: { message: "Route not found" } }, 404);
       const scope = await options.resolve(request);
       if (
@@ -176,9 +197,9 @@ export function createPublicationCommunityMapsHandler(
           : {},
       };
       let response: Response;
-      if (read && rest[0] === "media") {
+      if (read && (rest[0] === "media" || ownMedia)) {
         const upstream = await fetch(
-          `${gateway.origin}${ROOT}/collections/${slug}/media/${rest[1]}`,
+          `${gateway.origin}${ROOT}/collections/${slug}/${ownMedia ? `submissions/${rest[1]}/media/${rest[3]}` : `media/${rest[1]}`}`,
           {
             headers: {
               ...buildClientContextHeaders(clientContext),
@@ -232,7 +253,16 @@ export function createPublicationCommunityMapsHandler(
       } else {
         let result;
         if (read) {
-          if (discussion)
+          if (ownList) {
+            const after = params.get("after") || undefined;
+            if (after && !UUID.test(after))
+              throw new ProxyProblem(400, "Invalid submission cursor.");
+            result = await sdk.communityMaps.listOwnSubmissions(
+              slug,
+              after,
+              callOptions,
+            );
+          } else if (discussion)
             result = await sdk.communityMaps.listComments(
               slug,
               {
@@ -307,6 +337,9 @@ export function createPublicationCommunityMapsHandler(
               attribution: String(form.get("attribution") || ""),
               rights_confirmed: form.get("rights_confirmed") === "true",
               consent_version: String(form.get("consent_version") || ""),
+              ...(form.has("idempotency_key")
+                ? { idempotency_key: String(form.get("idempotency_key")) }
+                : {}),
             },
             callOptions,
           );
@@ -338,6 +371,13 @@ export function createPublicationCommunityMapsHandler(
               slug,
               rest[1],
               body.value,
+              callOptions,
+            );
+          else if (ownUpdate)
+            result = await sdk.communityMaps.updateOwnSubmission(
+              slug,
+              rest[1],
+              body,
               callOptions,
             );
           else if (submission)
