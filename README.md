@@ -237,3 +237,11 @@ Moderate through **Newsroom → Community Maps → Comments**. Approval requires
 explicit guideline review and the current revision. Existing pumpkin reactions
 remain configurable alongside voting. The UI links to `/account?next=...`; the
 publication must validate that return path and preserve it through sign-in.
+
+### Community partnerships
+
+`SPONSORSHIP_OFFERINGS` defines preliminary USD rates and exact web/email deliverables. `Placement`, `SponsorParty`, `Campaign` and `SponsorshipReport` describe the publication-owned Blog API. `SponsorAcknowledgment` from `@scalemule/news-publication/sponsorship-view` and `sponsorship.css` use publication tokens, explicit labels and safe HTTPS links. They do not insert article ads, load advertising scripts, or measure preview renders.
+
+Inventory is unavailable until a verified operational placement is active. `placementAvailable` enforces verification freshness and keeps paid briefings disabled. Campaign approval, authorization, allocation capacity and manual commercial references remain server responsibilities. Report HTML distinguishes observed counts from unavailable data and can be printed or rendered to PDF. No invoice or payment is initiated by this SDK.
+
+The consent banner now offers a choice in every geography where optional measurement requires one. `measurementConsent` is the server gate for current, explicitly allowed categories and GPC/DNT. Positive permission is local: unsigned URL parameters and a binary network hub cannot grant all categories. Rendering sponsorship recognition does not require tracking consent; measuring it requires both performance and advertising permission.

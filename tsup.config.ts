@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "sponsorship-view": "src/sponsorship-view.tsx",
     "community-maps-server": "src/community-maps-server.ts",
     "community-maps-view": "src/community-maps-view.tsx",
     "story-review": "src/story-review.tsx",

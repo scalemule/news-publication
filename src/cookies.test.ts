@@ -116,11 +116,11 @@ describe("Cross-Domain Network Consent Bridge", () => {
     clearCookieConsent();
   });
 
-  it("decorateNetworkUrl appends sm_consent=1 when consent is accepted", () => {
+  it("accepted consent stays local to its publication", () => {
     acceptAllCookies();
     const target = "https://concordchronicle.com/";
     const decorated = decorateNetworkUrl(target);
-    expect(decorated).toBe("https://concordchronicle.com/?sm_consent=1");
+    expect(decorated).toBe("https://concordchronicle.com/");
   });
 
   it("decorateNetworkUrl appends sm_consent=0 when optional cookies are rejected", () => {
@@ -153,7 +153,7 @@ describe("Cross-Domain Network Consent Bridge", () => {
     };
 
     const status = await queryNetworkConsentHub(DEFAULT_CONSENT_HUB_URL, 100);
-    expect(status).toBe("accepted");
+    expect(status).toBe(null);
 
     store.delete(NETWORK_CONSENT_STORAGE_KEY);
     const emptyStatus = await queryNetworkConsentHub(DEFAULT_CONSENT_HUB_URL, 100);

@@ -6,6 +6,7 @@ import {
   clearCookieConsent,
   hasConsented,
   isCategoryAllowed,
+  isGpcActive,
   isGeoConsentRequired,
   checkUrlConsentBridge,
   decorateNetworkUrl,
@@ -55,10 +56,9 @@ let delegationInstalled = false;
 /**
  * Installs a global delegated click listener on `document` that automatically decorates
  * any outgoing link to any publication in the ScaleMule news network with the reader's
- * current consent status (?sm_consent=1 or ?sm_consent=0).
+ * refusal of optional categories (?sm_consent=0).
  *
- * This guarantees seamless cross-domain consent transfer without requiring repeated
- * consent prompts across the 11 publications in modern browsers with partitioned storage.
+ * Acceptance remains local because a binary URL cannot preserve category choices.
  */
 export function setupNetworkConsentDelegation(): void {
   if (typeof window === "undefined" || delegationInstalled) return;
@@ -109,6 +109,7 @@ export {
   clearCookieConsent,
   hasConsented,
   isCategoryAllowed,
+  isGpcActive,
   isGeoConsentRequired,
   checkUrlConsentBridge,
   decorateNetworkUrl,
@@ -153,13 +154,6 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
         type: "HTTP Cookie",
       },
       {
-        name: "napsite_session_v1",
-        provider: "First-Party",
-        purpose: "Maintains session continuity, security tokens, and server routing.",
-        duration: "30 minutes (idle)",
-        type: "Session Storage",
-      },
-      {
         name: "napsite_preview",
         provider: "First-Party",
         purpose: "Verifies preview access permissions when viewing unpublished newsroom editions.",
@@ -173,9 +167,17 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
     title: "Performance & Analytics Cookies",
     shortDescription: "Help us measure reader engagement, story completion, and site reliability.",
     fullDescription:
-      "These cookies collect anonymous information about how visitors navigate our news publication. They allow us to count article reads, understand scroll depth and reading completion, and identify broken links or slow-loading assets so we can keep our community reporting responsive and fast. All metrics are aggregated and never contain personal information.",
+      "With your permission, first-party identifiers support page-visit and reading measurements. Aggregate reports help us improve the publication. Measurements are incomplete when readers decline consent and are not a count of unique people.",
     required: false,
     cookies: [
+      {
+        name: "napsite_session_v1",
+        provider: "First-Party",
+        purpose: "Groups consented reading measurements within a session.",
+        duration: "30 minutes (idle)",
+        type: "Session Storage",
+      },
+
       {
         name: "napsite_visitor_v1",
         provider: "First-Party",
@@ -226,25 +228,10 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
   {
     id: "advertising",
     title: "Advertising & Local Sponsorship Cookies",
-    shortDescription: "Support local business sponsors by capping repetition and measuring notices.",
+    shortDescription: "Measure clearly labeled community sponsorship views and link clicks.",
     fullDescription:
-      "Our journalism is supported by local business sponsors and community partners. These cookies ensure you do not see the same sponsor banner repeatedly (frequency capping) and help local merchants measure whether their announcement reached their community. They never track your activity across unrelated third-party websites or build external advertising profiles.",
+      "With your permission, we measure visible sponsor acknowledgments and link clicks. Repetition limits use temporary page-session memory. We do not use third-party advertising trackers or build behavioral advertising profiles.",
     required: false,
-    cookies: [
-      {
-        name: "napsite_sponsor_cap",
-        provider: "First-Party",
-        purpose: "Prevents repetitive display of identical local business announcements.",
-        duration: "7 days",
-        type: "Local Storage",
-      },
-      {
-        name: "local_sponsor_ref",
-        provider: "First-Party",
-        purpose: "Attributes community inquiries directly to the sponsoring local merchant.",
-        duration: "30 days",
-        type: "Local Storage",
-      },
-    ],
+    cookies: [],
   },
 ];

@@ -7,11 +7,7 @@ import {
   hasConsented,
   recordConsentToCompliance,
   COOKIE_CONSENT_EVENT,
-  isGeoConsentRequired,
-  checkUrlConsentBridge,
-  queryNetworkConsentHub,
-  setNetworkConsentHub,
-  setupNetworkConsentDelegation,
+  isGpcActive,
   DEFAULT_CONSENT_HUB_URL,
 } from "./cookies";
 
@@ -37,7 +33,7 @@ export interface CookieConsentBannerProps {
 }
 
 export function CookieConsentBanner({
-  title = "Help Us Improve Our Website with Cookies",
+  title = "Your privacy choices",
   text,
   settingsUrl = "/cookies",
   className = "",
@@ -52,93 +48,53 @@ export function CookieConsentBanner({
 
   useEffect(() => {
     setMounted(true);
-    setupNetworkConsentDelegation();
-
-    // 1. Process any cross-domain network consent signal in the URL (?sm_consent=1|0)
-    if (checkUrlConsentBridge()) {
-      setVisible(false);
-      return;
+    // Analytics requires an explicit choice everywhere. Geography must not hide
+    // the only way to make that choice. An unsigned URL or a binary network hub
+    // response cannot grant category-level permission on this publication.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("sm_consent")) {
+      if (url.searchParams.get("sm_consent") === "0" && !hasConsented())
+        rejectOptionalCookies({ hubUrl: consentHubUrl });
+      url.searchParams.delete("sm_consent");
+      window.history.replaceState(window.history.state, "", url);
     }
-
-    // 2. Only display if user hasn't already made a recorded choice locally
-    if (hasConsented()) {
-      setVisible(false);
-      return;
-    }
-
-    // 3. Geo-Location requirement:
-    // If visitor is in California/US, prior consent is not legally required (CCPA opt-out model)
-    if (!forceShow && !isGeoConsentRequired(countryCode)) {
-      setVisible(false);
-      // Silently sync with the network hub in the background without prompting the reader
-      void queryNetworkConsentHub(consentHubUrl, 1200).then((networkStatus) => {
-        if (networkStatus === "accepted") {
-          acceptAllCookies();
-        } else if (networkStatus === "rejected") {
-          rejectOptionalCookies();
-        }
-      });
-      return;
-    }
-
-    // 4. Visitors in EU/EEA/UK (where prior opt-in is legally required):
-    // First query the cross-domain network hub via hidden iframe to check if user already consented on another network paper
-    let cancelled = false;
-    void queryNetworkConsentHub(consentHubUrl, 1000).then((networkStatus) => {
-      if (cancelled) return;
-      if (networkStatus === "accepted") {
-        acceptAllCookies();
-        setVisible(false);
-      } else if (networkStatus === "rejected") {
-        rejectOptionalCookies();
-        setVisible(false);
-      } else {
-        // No network consent found, and visitor is in GDPR jurisdiction -> show banner
-        setVisible(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    setVisible(!hasConsented() && !isGpcActive());
   }, [countryCode, forceShow, consentHubUrl]);
 
   useEffect(() => {
     const onConsentChange = () => {
-      if (hasConsented()) {
-        setVisible(false);
-      }
+      setVisible(!hasConsented() && !isGpcActive());
     };
     window.addEventListener(COOKIE_CONSENT_EVENT, onConsentChange);
-    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, onConsentChange);
+    return () =>
+      window.removeEventListener(COOKIE_CONSENT_EVENT, onConsentChange);
   }, []);
 
   if (!mounted || !visible) return null;
 
   const handleAccept = () => {
-    const record = acceptAllCookies();
+    const record = acceptAllCookies({ hubUrl: consentHubUrl });
     setVisible(false);
     void recordConsentToCompliance(record, {
       endpoint: complianceEndpoint,
       publicationSlug,
     });
-    setNetworkConsentHub("accepted", consentHubUrl);
   };
 
   const handleReject = () => {
-    const record = rejectOptionalCookies();
+    const record = rejectOptionalCookies({ hubUrl: consentHubUrl });
     setVisible(false);
     void recordConsentToCompliance(record, {
       endpoint: complianceEndpoint,
       publicationSlug,
     });
-    setNetworkConsentHub("rejected", consentHubUrl);
   };
 
   const defaultText = (
     <>
-      We use cookies and device data to analyze performance, support local sponsors,
-      and remember your reading preferences across our news network. View{" "}
+      With your permission, we measure reading activity and sponsor
+      acknowledgments. You can read the publication with optional cookies turned
+      off. View{" "}
       <a href={settingsUrl} className="sm-cookie-banner-link">
         Cookie Settings
       </a>{" "}
