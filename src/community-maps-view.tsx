@@ -56,6 +56,7 @@ export function PublicationCommunityMapPage({
           <a href={basePath}>← {collection.config.title}</a>
         </p>
       )}
+      {/* Keep capture exclusive: mounting a guide here starts map data, WebGL and workers. */}
       {mode === "submit" ? (
         correctionFor ? (
           <CommunitySubmissionForm
