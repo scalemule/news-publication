@@ -45,7 +45,7 @@ export function definePublication(input: PublicationInput): NewsPublication {
     nearbyTowns: input.nearbyTowns ?? [],
     sections: input.sections ?? [],
     description: input.description,
-    tagline: input.tagline ?? "Local stories. Close to home.",
+    tagline: input.tagline ?? "Local stories. Stronger communities.",
     briefTitle: input.briefTitle ?? `${input.regionLabel} in Brief`,
     parent: input.parent === true,
     layout,

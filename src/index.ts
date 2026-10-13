@@ -184,8 +184,9 @@ export {
   findPublicationByHost,
   getNetworkPublicationUrl,
   NETWORK_PARENT,
+  EDITORIAL_PRINCIPLES,
 } from "./network";
-export type { PublicationNetworkItem, NetworkParent } from "./network";
+export type { PublicationNetworkItem, NetworkParent, EditorialPrinciple } from "./network";
 export { LocalNetworkBar } from "./network-bar";
 export type { LocalNetworkBarProps } from "./network-bar";
 export { NetworkCopyrightNotice } from "./network-copyright";
@@ -212,5 +213,17 @@ export type {
   VerifiedCardImage,
 } from "./types";
 
-
 export * from "./community-maps";
+
+export {
+  parseDocumentBlocks,
+  renderArticleBlocksToHtml,
+  formatArtworkCaption,
+  sanitizeInlineMarkdown,
+} from "./article-blocks";
+export type {
+  ContentBlock,
+  StructuredMedia,
+  StructuredDocument,
+} from "./article-blocks";
+
