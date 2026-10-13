@@ -73,6 +73,67 @@ The React front page still lives in the Walnut Creek Times repository. This pack
 
 Patch only (`0.0.x` or `0.1.x`) until a stable release is explicitly approved. Publishing is manual: `npm publish` from this directory.
 
+## Local briefing foundation
+
+`composeLocalBriefing(candidates, options)` is an opt-in, pure selector for an existing
+publication brief. It consumes `BriefingCandidate` projections from an authorized
+server adapter and returns a bounded list using existing `NewsItem` text. It does
+not fetch or generate news, verify claims, store preferences, or change the current
+`composeEdition` path. A server adapter and publication pilot are still required;
+there is no new live BaseNews endpoint in this package.
+
+This is an article-backed presentation helper, not the canonical BaseNews schema.
+BaseNews events, issues and opportunities must also work without an article.
+Its eligibility rules apply only to this optional brief. They must never become
+new publishing gates for articles, questionnaires, jokes, jobs, classifieds,
+celebrations or other existing publication features. Their current owner services
+and workflows continue independently, including when intelligence processing is
+unavailable. Underlying capture, trust and agent APIs take priority over UI rollout.
+
+Supply the recipient `sm_application_id`, `publication_id`, resolved
+`coverage_area_ids`, and optional explicit community/topic/entity/issue preferences.
+`personalized: false` ignores all preferences. `limit` is a maximum from 1–12
+(default 6); zero useful records yields an empty briefing. Render summaries as
+text, with original reporting links, verification labels and source attribution.
+`why_it_matters` is optional editorial text; reason codes explain selection and
+are not factual claims about an item's consequences.
+
+The server must derive scope from authentication, authorize destination grants,
+resolve geographic relationships, enforce evidence/summary redistribution rights,
+and send public, approved projections. Reuse existing Content Intelligence
+classification, coverage profiles, editorial decisions and current evaluation
+receipts in that adapter; this presentation selector does not replace its generic
+relevance engine or editorial ledger. This helper is **not an authorization or
+input-validation boundary**. Do not pass client-supplied trust/approval fields,
+private artifacts, or raw community submissions. Unverified and community-submitted
+information retains those labels even after editorial approval.
+
+Each candidate references an existing canonical development, occurrence or reporting
+record via a namespaced `canonical_key`, with its revision. Do not use a whole issue
+ID as the key: separate developments must survive. Include withdrawal/supersession
+revisions when combining cached inventories; the newest revision wins before
+eligibility and ranking. Supply one selected edition per canonical revision;
+conflicting copies of that revision are omitted for reconciliation, not selected
+by input order. A feed lacking tombstones cannot prove that cached records
+are still current. The caller must invalidate caches on corrections and grant
+revocation. Treat personalized HTTP responses as `private, no-store`.
+
+Policy 1 uses a civic priority tier, followed by geography × 4, practical value × 3,
+explicit follows × 3, topics × 2, reporting recency and editorial discovery value.
+All seven components and reason codes are returned. Recency describes reporting,
+not event time or urgency. Civic importance comes from editors, not section names.
+Keep a visible link to all important coverage whenever `remaining_important_count`
+is positive. Eligibility still applies to civic items: stale or unauthorized facts
+cannot bypass trust gates.
+
+`relevant_until` is required. Confirmed labels also require a public evidence link,
+`last_verified_at` and a future `review_due_at`. Expired review/relevance deadlines
+exclude records; missing freshness information stays `unknown`. No date is inferred
+from `updated_at`, no confidence score promotes verification, and no fallback story
+fills a quota. The entire approved excerpt must end with sentence punctuation and
+fit within 280 Unicode code points; otherwise it is omitted for editorial repair.
+Later qualifications and corrections are never cut off to make a shorter summary.
+
 
 ### Reporting credit and sources
 
