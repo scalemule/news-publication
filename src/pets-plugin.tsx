@@ -253,19 +253,31 @@ export async function PetSubmitPage({
     );
   else
     try {
-      const [collection, own, initial] = await Promise.all([
+      const [collection, own, initial, preferences] = await Promise.all([
         petCollectionRequest<Collection>(scope),
         petCollectionRequest<{ items: OwnPetResource[] }>(scope, "/pets/mine"),
         edit && PET_UUID.test(edit)
           ? petCollectionRequest<OwnPetResource>(scope, "/pets/mine/" + edit)
           : undefined,
+        edit
+          ? petCollectionRequest<
+              PetPreferenceRecord & { communities?: PetCommunity[] }
+            >(scope, "/pets/preferences")
+          : undefined,
       ]);
+      const currentHome = preferences?.communities?.find(
+        (a) => a.id === initial?.area_id,
+      );
+      const editCommunities =
+        currentHome && !collection.areas.some((a) => a.id === currentHome.id)
+          ? [...collection.areas, currentHome]
+          : collection.areas;
       form =
         edit && !initial ? (
           <p>This contribution is unavailable. Open it from My pets.</p>
         ) : (
           <PetSubmissionForm
-            communities={collection.areas}
+            communities={editCommunities}
             policy={collection.submission_policy}
             profiles={own.items.filter((p) => p.kind === "profile")}
             initial={initial}

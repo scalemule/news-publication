@@ -53,7 +53,7 @@ async function call<T>(
       typeof body.error === "string"
         ? body.error
         : body.error?.message ||
-          "We couldn’t save this contribution. Please try again.",
+            "We couldn’t save this contribution. Please try again.",
     );
   return body.data ?? body;
 }
@@ -346,7 +346,11 @@ export function PetSubmissionForm({
                       source: content.source,
                       event: content.event,
                     });
-                    setCommunity(p.area_id);
+                    setCommunity(
+                      communities.some((c) => c.id === p.area_id)
+                        ? p.area_id
+                        : defaultCommunity || "",
+                    );
                   }
                 }}
               >
