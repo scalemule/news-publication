@@ -1147,7 +1147,8 @@
 }
 .paw-cover-photo > div {
   height: 100%;
-  background: url("./images/paw-jasper-mobile.webp") center 57% / cover
+  background: url("https://cdn-public.scalemule.com/01a1382e-6aff-7091-a757-12433a04eed1/anonymous/photos/01a13b52-a168-7131-90f6-a216dbe8dc3b/w800_h0_scaledown_q85_webp.webp")
+    center 57% / cover
     no-repeat;
 }
 .paw-cover-photo::after {
