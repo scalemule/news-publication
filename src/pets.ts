@@ -157,7 +157,7 @@ export function resolvePetCommunity(
   preference?: string | null,
   publicationDefault?: string | null,
 ): PetCommunity | undefined {
-  if (selected === "") return undefined;
+  if (selected === "" || (selected === undefined && preference === "all")) return undefined;
   for (const candidate of [selected, preference, publicationDefault]) {
     const found = areas.find(
       (area) => area.id === candidate || area.slug === candidate,

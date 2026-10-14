@@ -32,6 +32,123 @@ export function PawMark({ size = 36 }: { size?: number }) {
     </svg>
   );
 }
+/** Original vector artwork; never presented as a photograph or a community pet. */
+export function PawNeighborhoodIllustration() {
+  return (
+    <svg
+      className="paw-neighborhood-art"
+      viewBox="0 0 520 460"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M42 233C42 111 124 29 257 29c134 0 220 102 220 218v153H42V233Z"
+        fill="var(--paw-art-sky)"
+      />
+      <circle cx="366" cy="112" r="44" fill="var(--paw-sun)" />
+      <path
+        d="M42 262c93-99 132-19 203-52 91-43 145-27 232 52v138H42V262Z"
+        fill="var(--paw-art-hill)"
+      />
+      <path
+        d="M42 331c89-59 161-27 216-3 81 36 145-47 219-21v93H42v-69Z"
+        fill="var(--paw-art-ground)"
+      />
+      <path
+        d="M310 239c34-18 68-21 103-14M311 249c34-18 68-21 103-14"
+        stroke="var(--paw-art-line)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity=".45"
+      />
+      <path
+        d="M90 190v75m29-85v75m-44-46h61m-57 31c14-15 32-15 51-7"
+        stroke="var(--paw-art-line)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity=".45"
+      />
+      <path
+        d="M167 341c-29-24-33-67-5-88 16-12 44-6 59 17l27 47c15 26 36 38 58 44H167v-20Z"
+        fill="var(--paw-terracotta)"
+      />
+      <path
+        d="M173 340c-17-9-39-15-54-31-14-16-13-27-11-38"
+        stroke="var(--paw-terracotta)"
+        strokeWidth="17"
+        strokeLinecap="round"
+      />
+      <path
+        d="M229 283c26-17 39-43 31-67-8-25-35-34-57-18-23 17-13 49 1 68"
+        fill="var(--paw-terracotta)"
+      />
+      <path
+        d="M251 224l34 5c14 2 13 23 0 28l-36 13"
+        fill="var(--paw-terracotta)"
+      />
+      <path
+        d="M206 203c-15 1-31 13-29 33 1 11 6 18 15 17 13-1 21-18 25-37"
+        fill="var(--paw-art-line)"
+      />
+      <path
+        d="M231 285l-10 67c-1 7 9 11 28 11M264 280l2 70c0 10 10 13 25 13"
+        stroke="var(--paw-terracotta)"
+        strokeWidth="19"
+        strokeLinecap="round"
+      />
+      <path
+        d="M215 273l38-7"
+        stroke="var(--paw-art-line)"
+        strokeWidth="9"
+        strokeLinecap="round"
+      />
+      <circle cx="248" cy="223" r="3.5" fill="var(--paw-art-line)" />
+      <path d="M283 229h9c1 8-3 13-9 13" fill="var(--paw-art-line)" />
+      <path
+        d="M292 348c-9-46 1-79 33-79 33 0 47 37 48 77l-1 17h-80v-15Z"
+        fill="var(--paw-art-cat)"
+      />
+      <path d="M303 277l-6-43 26 20 23-22 2 48" fill="var(--paw-art-cat)" />
+      <path
+        d="M365 351c27-4 45-15 41-39-2-11-15-16-24-10"
+        stroke="var(--paw-art-cat)"
+        strokeWidth="12"
+        strokeLinecap="round"
+      />
+      <path
+        d="M316 277h3m17-2h3m-13 10 3 2-3 3m-21-5-15-3m16 9-17 2m54-10 16-5m-14 13 15 1"
+        stroke="var(--paw-art-line)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M145 378h245"
+        stroke="var(--paw-art-line)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity=".3"
+      />
+      <circle cx="99" cy="365" r="16" fill="var(--paw-sun)" />
+      <path
+        d="M93 351c16 8 18 18 12 28"
+        stroke="var(--paw-art-line)"
+        strokeWidth="2"
+      />
+      <path
+        d="M426 352v-43m0 22c-14-1-20-10-20-20 15 2 21 11 20 20m0-9c0-15 6-25 20-28 2 13-6 24-20 28"
+        stroke="var(--paw-art-line)"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="m406 153 8-6 8 6m-234-33 8-6 8 6"
+        stroke="var(--paw-art-line)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 type ResourceProps = {
   resource: PetResource;
   community: string;
@@ -399,10 +516,11 @@ export function PetsSection({
       ) : (
         <section className="paw-welcome">
           <div>
+            <p className="paw-eyebrow">Life is better together</p>
             <h1>
-              Every pet has a story.
+              Every pet.
               <br />
-              Let’s meet yours.
+              <em>A local story.</em>
             </h1>
             <p>
               A place for familiar faces, happy reunions and the everyday joy of
@@ -417,13 +535,9 @@ export function PetsSection({
               Free to enter. Thoughtfully selected by local editors.
             </small>
           </div>
-          <div className="paw-emblem">
-            <PawMark size={180} />
-            <span>
-              Good neighbors.
-              <br />
-              Great companions.
-            </span>
+          <div className="paw-illustration">
+            <PawNeighborhoodIllustration />
+            <p>Good neighbors. Great companions.</p>
           </div>
         </section>
       )}

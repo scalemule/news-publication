@@ -1,5 +1,6 @@
 /** Server rendering adapters. Publications keep their host routing, identity and credentials. */
 import React from "react";
+import { PetCommunityMemory } from "@scalemule/news-publication/pets-interactions";
 import {
   petRequest,
   petAcknowledgments,
@@ -27,7 +28,9 @@ export async function PublicationPetsSection({
   region,
   canonicalOrigin,
   defaultCommunity,
+  rememberedCommunity,
   walksUrl,
+  native = false,
   cleanCaption = (v) => v,
 }: {
   scope: PetScope;
@@ -35,7 +38,9 @@ export async function PublicationPetsSection({
   region: string;
   canonicalOrigin: string;
   defaultCommunity?: string;
+  rememberedCommunity?: string;
   walksUrl?: string;
+  native?: boolean;
   cleanCaption?: (caption: string) => string;
 }) {
   const root = `/v1/knowledge/community-maps/collections/${scope.collectionSlug}`;
@@ -48,10 +53,26 @@ export async function PublicationPetsSection({
       collection.areas.find(
         (area) => area.name.toLocaleLowerCase() === region.toLocaleLowerCase(),
       )?.id;
+    let remembered = rememberedCommunity,
+      signedIn = false;
+    if (native && scope.accessToken) {
+      try {
+        const saved = await petRequest<{
+          revision: number;
+          preferences: { home_area_id: string | null };
+        }>(scope, root + "/pets/preferences");
+        remembered =
+          saved.preferences.home_area_id ||
+          (saved.revision > 0 ? "all" : undefined);
+        signedIn = true;
+      } catch {
+        /* Local browsing remains available during a session or preference outage. */
+      }
+    }
     const chosen = resolvePetCommunity(
       collection.areas,
       query.community,
-      undefined,
+      remembered,
       home,
     );
     const filter = new URLSearchParams();
@@ -95,22 +116,37 @@ export async function PublicationPetsSection({
 
     const local = chosen ? "?community=" + encodeURIComponent(chosen.slug) : "";
     return (
-      <PetsSection
-        basePath="/pets"
-        regionLabel={region}
-        resourceBasePath={canonicalOrigin + "/pets"}
-        communities={collection.areas}
-        community={chosen}
-        acknowledgments={await petAcknowledgments(scope, chosen?.slug)}
-        resources={feeds.flatMap((feed) => feed.items).map(clean)}
-        spotlight={spotlights.items[0] && clean(spotlights.items[0])}
-        mediaUrl={mediaUrl}
-        contributeUrl={canonicalOrigin + "/submit" + local}
-        placesUrl={canonicalOrigin + "/places" + local}
-        walksUrl={walksUrl}
-        browseBasePath={canonicalOrigin + "/browse"}
-        eventsUrl={canonicalOrigin + "/events"}
-      />
+      <>
+        {native && (
+          <PetCommunityMemory
+            signedIn={signedIn}
+            selected={
+              query.community === undefined ? undefined : chosen?.id || null
+            }
+          />
+        )}
+        <PetsSection
+          basePath="/pets"
+          regionLabel={region}
+          resourceBasePath={native ? "/pets" : canonicalOrigin + "/pets"}
+          accountUrl={native ? "/pets/account" : undefined}
+          communities={collection.areas}
+          community={chosen}
+          acknowledgments={await petAcknowledgments(scope, chosen?.slug)}
+          resources={feeds.flatMap((feed) => feed.items).map(clean)}
+          spotlight={spotlights.items[0] && clean(spotlights.items[0])}
+          mediaUrl={mediaUrl}
+          contributeUrl={
+            (native ? "/pets/submit" : canonicalOrigin + "/submit") + local
+          }
+          placesUrl={canonicalOrigin + "/places" + local}
+          walksUrl={walksUrl}
+          browseBasePath={native ? "/pets/browse" : canonicalOrigin + "/browse"}
+          eventsUrl={
+            native ? "/pets/browse/event" : canonicalOrigin + "/events"
+          }
+        />
+      </>
     );
   } catch {
     return (
@@ -128,12 +164,14 @@ export async function PublicationPetReferences({
   scope,
   metadata,
   canonicalOrigin,
+  native = false,
   communities,
   cleanCaption = (v) => v,
 }: {
   scope: PetScope;
   metadata: unknown;
   canonicalOrigin: string;
+  native?: boolean;
   communities?: PetCommunity[];
   cleanCaption?: (value: string) => string;
 }) {
@@ -159,7 +197,7 @@ export async function PublicationPetReferences({
           community:
             communities?.find((c) => c.id === resource.area_id)?.name ||
             "Our community",
-          href: `${canonicalOrigin}/pets/${resource.id}`,
+          href: `${native ? "" : canonicalOrigin}/pets/${resource.id}`,
           mediaUrl: (id: string, photo: string) =>
             `/api/pets/${id}/media/${photo}`,
         };
@@ -185,10 +223,12 @@ export async function PublicationPetReferences({
 export async function PublicationPetEvents({
   scope,
   canonicalOrigin,
+  native = false,
   cleanCaption = (value) => value,
 }: {
   scope: PetScope;
   canonicalOrigin: string;
+  native?: boolean;
   cleanCaption?: (value: string) => string;
 }) {
   try {
@@ -219,12 +259,12 @@ export async function PublicationPetEvents({
                 })),
               }}
               community="Our community"
-              href={`${canonicalOrigin}/pets/${resource.id}`}
+              href={`${native ? "" : canonicalOrigin}/pets/${resource.id}`}
               mediaUrl={(id, media) => `/api/pets/${id}/media/${media}`}
             />
           ))}
         </div>
-        <a href={canonicalOrigin + "/events"}>
+        <a href={native ? "/pets/browse/event" : canonicalOrigin + "/events"}>
           Browse the pet community calendar
         </a>
       </section>

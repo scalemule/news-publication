@@ -273,3 +273,29 @@ Private recovery contact and broad community alert delivery are not implemented
 by these components. Notification controls default to disabled. The canonical
 application, collections, publication views and legitimate source content must
 be provisioned separately before launch.
+
+### Native pet plugin and shared sign-in
+
+`pets-plugin` exports `PetAccountPage`, `PetSubmitPage`, `PetStoryPage` and
+`PetBrowsePage`, with `publicationPetPaths` or `standalonePetPaths`. These are
+server components: give them the publication’s `PetScope` resolved on the server
+and its current reader token. Mount publication pages at `/pets/account`,
+`/pets/submit`, `/pets/:id` and `/pets/browse/:kind`. `native` on the publication
+section, references and calendar keeps resource links inside the publication.
+
+Configure `createPawAuthHandler` with the host’s existing `sessionCookie`,
+`callbackPath` and `accountPath`. An existing callback should dispatch to this
+handler only when `openPawFlow(pawCookie(request, PAW_FLOW_COOKIE), state, key)`
+validates. Otherwise preserve the publication’s normal authentication flow.
+`GET resume?next=...` makes a top-level `prompt=none` attempt; protected pages
+should call it only when the session is absent/invalid, `signin` is absent and
+`PAW_SIGNED_OUT_COOKIE` is absent. Failed continuity returns `signin=required`
+or `signin=retry`, preventing redirect loops. Explicit `POST start` opens the
+normal sign-in. Honor and clear the sign-out marker in existing host login/logout
+flows. All cookies remain host-only; do not embed the sign-in in an iframe.
+
+The collection must explicitly set `shared_identity_provider` to its configured
+OIDC provider. Auth resolves the verified provider subject; Knowledge authorizes
+each accepted view and keeps ownership collection-scoped. Never correlate local
+users by email or forward one application’s reader token/API key to another.
+Provision and verify each RP before enabling sign-in or contribution flags.

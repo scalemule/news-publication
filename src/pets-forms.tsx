@@ -102,6 +102,7 @@ export function PetSubmissionForm({
   initial,
   defaultCommunity,
   apiPath = "/api/pets",
+  accountUrl = "/account",
   onSaved,
 }: {
   communities: PetCommunity[];
@@ -110,6 +111,7 @@ export function PetSubmissionForm({
   initial?: OwnPetResource;
   defaultCommunity?: string;
   apiPath?: string;
+  accountUrl?: string;
   onSaved?: (id: string) => void;
 }) {
   const [deviceReady, setDeviceReady] = useState(false);
@@ -250,7 +252,7 @@ export function PetSubmissionForm({
             ? "Your profile is saved privately. Only you can see it."
             : "Your contribution is saved for editorial review. It will appear publicly only after approval."}
         </p>
-        <a href="/account">View your pets and submissions</a>
+        <a href={accountUrl}>View your pets and submissions</a>
       </section>
     );
   return (
@@ -795,9 +797,11 @@ export function PetSubmissionForm({
 export function PetOwnerActions({
   resource,
   apiPath = "/api/pets",
+  submitUrl = "/submit",
 }: {
   resource: OwnPetResource;
   apiPath?: string;
+  submitUrl?: string;
 }) {
   const [error, setError] = useState(""),
     [confirm, setConfirm] = useState(false),
@@ -819,7 +823,7 @@ export function PetOwnerActions({
   }
   return (
     <div className="paw-form-actions">
-      <a href={`/submit?edit=${resource.id}`}>Edit details or privacy</a>
+      <a href={`${submitUrl}?edit=${resource.id}`}>Edit details or privacy</a>
       {["lost", "found"].includes(resource.kind) && !resource.reunited_at && (
         <button disabled={busy} onClick={() => void act("reunited")}>
           Mark reunited
