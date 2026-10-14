@@ -137,78 +137,89 @@ export function PetPreferencesForm({
           ))}
         </select>
       </label>
-      <fieldset>
-        <legend>Communities you follow</legend>
-        {communities.map((c) => (
-          <label className="paw-consent" key={c.id}>
+      <details className="paw-preference-details">
+        <summary>
+          Communities you follow{" "}
+          <span>
+            {value.followed_area_ids.length
+              ? `${value.followed_area_ids.length} selected`
+              : "Choose communities"}
+          </span>
+        </summary>
+        <fieldset className="paw-community-choices">
+          <legend className="paw-sr-only">Communities you follow</legend>
+          {communities.map((c) => (
+            <label className="paw-consent" key={c.id}>
+              <input
+                type="checkbox"
+                checked={value.followed_area_ids.includes(c.id)}
+                onChange={(e) =>
+                  setValue({
+                    ...value,
+                    followed_area_ids: e.target.checked
+                      ? [...value.followed_area_ids, c.id]
+                      : value.followed_area_ids.filter((id) => id !== c.id),
+                  })
+                }
+              />
+              {c.name}
+            </label>
+          ))}
+        </fieldset>
+      </details>
+      {notificationsReady ? (
+        <fieldset>
+          <legend>Optional community updates</legend>
+          {PET_NOTIFICATION_CATEGORIES.map(([key, label]) => (
+            <label key={key} className="paw-consent">
+              <input
+                type="checkbox"
+                checked={value.categories.includes(key)}
+                onChange={(e) =>
+                  setValue({
+                    ...value,
+                    categories: e.target.checked
+                      ? [...value.categories, key]
+                      : value.categories.filter((c) => c !== key),
+                  })
+                }
+              />
+              {label}
+            </label>
+          ))}
+          <label className="paw-consent">
             <input
               type="checkbox"
-              checked={value.followed_area_ids.includes(c.id)}
+              checked={value.email_enabled}
+              onChange={(e) =>
+                setValue({ ...value, email_enabled: e.target.checked })
+              }
+            />
+            Email me selected updates
+          </label>
+          <label>
+            Frequency
+            <select
+              value={value.frequency || "weekly"}
               onChange={(e) =>
                 setValue({
                   ...value,
-                  followed_area_ids: e.target.checked
-                    ? [...value.followed_area_ids, c.id]
-                    : value.followed_area_ids.filter((id) => id !== c.id),
+                  frequency: e.target.value as "weekly" | "daily" | "immediate",
                 })
               }
-            />
-            {c.name}
+            >
+              <option value="weekly">Weekly digest</option>
+              <option value="daily">Daily digest</option>
+              <option value="immediate">As updates are approved</option>
+            </select>
           </label>
-        ))}
-      </fieldset>
-      <fieldset disabled={!notificationsReady}>
-        <legend>Optional community updates</legend>
-        {!notificationsReady && (
-          <p>
-            Community alerts are not active yet. No emails or alerts will be
-            sent from these settings.
-          </p>
-        )}
-        {PET_NOTIFICATION_CATEGORIES.map(([key, label]) => (
-          <label key={key} className="paw-consent">
-            <input
-              type="checkbox"
-              checked={value.categories.includes(key)}
-              onChange={(e) =>
-                setValue({
-                  ...value,
-                  categories: e.target.checked
-                    ? [...value.categories, key]
-                    : value.categories.filter((c) => c !== key),
-                })
-              }
-            />
-            {label}
-          </label>
-        ))}
-        <label className="paw-consent">
-          <input
-            type="checkbox"
-            checked={value.email_enabled}
-            onChange={(e) =>
-              setValue({ ...value, email_enabled: e.target.checked })
-            }
-          />
-          Email me selected updates
-        </label>
-        <label>
-          Frequency
-          <select
-            value={value.frequency || "weekly"}
-            onChange={(e) =>
-              setValue({
-                ...value,
-                frequency: e.target.value as "weekly" | "daily" | "immediate",
-              })
-            }
-          >
-            <option value="weekly">Weekly digest</option>
-            <option value="daily">Daily digest</option>
-            <option value="immediate">As updates are approved</option>
-          </select>
-        </label>
-      </fieldset>
+        </fieldset>
+      ) : (
+        <p className="paw-safety">
+          Community alerts are not active yet. No community emails or alerts
+          will be sent from these settings.
+        </p>
+      )}
       <p className="paw-safety">
         Account and submission messages are separate from optional community
         updates. Sponsors never receive your profile or preferences.
@@ -366,7 +377,9 @@ export function PetResourceActions({
           <p>
             <a
               href={
-                accountUrl + "?next=" + encodeURIComponent(`/pets/${resource.id}`)
+                accountUrl +
+                "?next=" +
+                encodeURIComponent(`/pets/${resource.id}`)
               }
             >
               Sign in to send a private report.
