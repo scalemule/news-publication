@@ -519,3 +519,37 @@
   }
 }
 
+/*
+ * Broadsheet In-Article Figures & Captions
+ * Ensures proper vertical breathing room (36px), clear boundaries, crisp sans captions, and responsive scaling.
+ */
+.publication figure,
+.publication .article-figure,
+.publication [class*="prose"] figure {
+  margin: 36px 0;
+  display: block;
+  clear: both;
+}
+
+.publication figure img,
+.publication .article-figure img,
+.publication [class*="prose"] figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.publication figcaption,
+.publication .article-figure figcaption,
+.publication [class*="prose"] figcaption {
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-family: var(--pub-sans, var(--font-inter), Arial, Helvetica, sans-serif);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--pub-muted, #545c55);
+  text-wrap: pretty;
+}
+
