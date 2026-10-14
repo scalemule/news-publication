@@ -1,4 +1,5 @@
 import React from "react";
+import { PawBayIllustration, PawInvitationArt } from "./pets-art";
 import {
   adoptionAvailability,
   PET_SAFETY,
@@ -63,123 +64,11 @@ export function PawMark({ size = 40 }: { size?: number }) {
     </svg>
   );
 }
-/** Original vector artwork; never presented as a photograph or a community pet. */
+/** Original vector artwork, not a photograph or a submitted community pet. */
 export function PawNeighborhoodIllustration() {
-  return (
-    <svg
-      className="paw-neighborhood-art"
-      viewBox="0 0 520 460"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M42 233C42 111 124 29 257 29c134 0 220 102 220 218v153H42V233Z"
-        fill="var(--paw-art-sky)"
-      />
-      <circle cx="366" cy="112" r="44" fill="var(--paw-sun)" />
-      <path
-        d="M42 262c93-99 132-19 203-52 91-43 145-27 232 52v138H42V262Z"
-        fill="var(--paw-art-hill)"
-      />
-      <path
-        d="M42 331c89-59 161-27 216-3 81 36 145-47 219-21v93H42v-69Z"
-        fill="var(--paw-art-ground)"
-      />
-      <path
-        d="M310 239c34-18 68-21 103-14M311 249c34-18 68-21 103-14"
-        stroke="var(--paw-art-line)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        opacity=".45"
-      />
-      <path
-        d="M90 190v75m29-85v75m-44-46h61m-57 31c14-15 32-15 51-7"
-        stroke="var(--paw-art-line)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        opacity=".45"
-      />
-      <path
-        d="M167 341c-29-24-33-67-5-88 16-12 44-6 59 17l27 47c15 26 36 38 58 44H167v-20Z"
-        fill="var(--paw-terracotta)"
-      />
-      <path
-        d="M173 340c-17-9-39-15-54-31-14-16-13-27-11-38"
-        stroke="var(--paw-terracotta)"
-        strokeWidth="17"
-        strokeLinecap="round"
-      />
-      <path
-        d="M229 283c26-17 39-43 31-67-8-25-35-34-57-18-23 17-13 49 1 68"
-        fill="var(--paw-terracotta)"
-      />
-      <path
-        d="M251 224l34 5c14 2 13 23 0 28l-36 13"
-        fill="var(--paw-terracotta)"
-      />
-      <path
-        d="M206 203c-15 1-31 13-29 33 1 11 6 18 15 17 13-1 21-18 25-37"
-        fill="var(--paw-art-line)"
-      />
-      <path
-        d="M231 285l-10 67c-1 7 9 11 28 11M264 280l2 70c0 10 10 13 25 13"
-        stroke="var(--paw-terracotta)"
-        strokeWidth="19"
-        strokeLinecap="round"
-      />
-      <path
-        d="M215 273l38-7"
-        stroke="var(--paw-art-line)"
-        strokeWidth="9"
-        strokeLinecap="round"
-      />
-      <circle cx="248" cy="223" r="3.5" fill="var(--paw-art-line)" />
-      <path d="M283 229h9c1 8-3 13-9 13" fill="var(--paw-art-line)" />
-      <path
-        d="M292 348c-9-46 1-79 33-79 33 0 47 37 48 77l-1 17h-80v-15Z"
-        fill="var(--paw-art-cat)"
-      />
-      <path d="M303 277l-6-43 26 20 23-22 2 48" fill="var(--paw-art-cat)" />
-      <path
-        d="M365 351c27-4 45-15 41-39-2-11-15-16-24-10"
-        stroke="var(--paw-art-cat)"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M316 277h3m17-2h3m-13 10 3 2-3 3m-21-5-15-3m16 9-17 2m54-10 16-5m-14 13 15 1"
-        stroke="var(--paw-art-line)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M145 378h245"
-        stroke="var(--paw-art-line)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        opacity=".3"
-      />
-      <circle cx="99" cy="365" r="16" fill="var(--paw-sun)" />
-      <path
-        d="M93 351c16 8 18 18 12 28"
-        stroke="var(--paw-art-line)"
-        strokeWidth="2"
-      />
-      <path
-        d="M426 352v-43m0 22c-14-1-20-10-20-20 15 2 21 11 20 20m0-9c0-15 6-25 20-28 2 13-6 24-20 28"
-        stroke="var(--paw-art-line)"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="m406 153 8-6 8 6m-234-33 8-6 8 6"
-        stroke="var(--paw-art-line)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return <PawBayIllustration />;
 }
+
 type ResourceProps = {
   resource: PetResource;
   community: string;
@@ -357,14 +246,17 @@ export function PetEventCard(props: ResourceProps) {
     </div>
   );
 }
-export function PawOfTheWeekCard(props: ResourceProps) {
+export function PawOfTheWeekCard(
+  props: ResourceProps & { pageHeading?: boolean },
+) {
   const href = safePetLink(props.href);
+  const Heading = props.pageHeading ? "h1" : "h2";
   return (
     <article className="paw-spotlight">
       <Photo {...props} large />
       <div className="paw-spotlight-copy">
         <p className="paw-context">{props.community}’s Paw of the Week</p>
-        <h2>Meet {props.resource.content.name}.</h2>
+        <Heading>Meet {props.resource.content.name}.</Heading>
         <p>{props.resource.content.story}</p>
         {href && (
           <a className="paw-button" href={href}>
@@ -488,7 +380,7 @@ export function PetsSection({
   const notices = resources.filter((r) => ["lost", "found"].includes(r.kind));
   const adoptions = resources.filter((r) => r.kind === "adoption");
   return (
-    <div className="paw">
+    <div className="paw paw-home">
       <header className="paw-masthead">
         <a href={basePath || "/"} className="paw-brand">
           <PawMark />
@@ -502,6 +394,20 @@ export function PetsSection({
           </a>
         )}
       </header>
+      <details className="paw-mobile-nav">
+        <summary>
+          Explore Bay Area Paw <span aria-hidden="true">＋</span>
+        </summary>
+        <nav aria-label="Mobile pet community">
+          <a href="#neighbors">Our pets</a>
+          <a href="#lost-found">Lost &amp; found</a>
+          {walksUrl && <a href={safePetLink(walksUrl)}>Paw Walks</a>}
+          {placesUrl && <a href={safePetLink(placesUrl)}>Paw Places</a>}
+          <a href="#adoption">Adoption</a>
+          <a href="#celebrations">Celebrations</a>
+          {eventsUrl && <a href={safePetLink(eventsUrl)}>Events</a>}
+        </nav>
+      </details>
       <nav className="paw-nav" aria-label="Pet community">
         <a href="#neighbors">Our pets</a>
         <a href="#lost-found">Lost & found</a>
@@ -512,7 +418,10 @@ export function PetsSection({
         {eventsUrl && <a href={safePetLink(eventsUrl)}>Events</a>}
       </nav>
       <div className="paw-community">
-        <p>A little closer to {location}.</p>
+        <p>
+          <span className="paw-location-dot" aria-hidden="true" /> Your pet
+          community in {location}.
+        </p>
         <form action={basePath || "/"} method="get">
           <label htmlFor="paw-community">Your community</label>
           <select
@@ -538,37 +447,95 @@ export function PetsSection({
           </p>
         </div>
       ) : spotlight ? (
-        <PawOfTheWeekCard
-          resource={spotlight}
-          community={local(spotlight.area_id)}
-          href={link(spotlight.id)}
-          mediaUrl={mediaUrl}
-        />
+        <section id="paw-week" aria-label="Paw of the Week">
+          <PawOfTheWeekCard
+            pageHeading
+            resource={spotlight}
+            community={local(spotlight.area_id)}
+            href={link(spotlight.id)}
+            mediaUrl={mediaUrl}
+          />
+        </section>
       ) : (
-        <section className="paw-welcome">
-          <div>
-            <p className="paw-eyebrow">Life is better together</p>
-            <h1>
-              Every pet.
+        <section className="paw-welcome" aria-labelledby="paw-welcome-title">
+          <div className="paw-welcome-copy">
+            <h1 id="paw-welcome-title">
+              Good company.
               <br />
-              <em>A local story.</em>
+              Right here.
             </h1>
-            <p>
-              A place for familiar faces, happy reunions and the everyday joy of
-              life with pets.
+            <p>For the pets we love. And the neighbors we haven’t met yet.</p>
+            <p className="paw-welcome-detail">
+              Share their story, find your next favorite walk, and make a little
+              more room for community.
             </p>
-            {contributeUrl && (
-              <a className="paw-button" href={safePetLink(contributeUrl)}>
-                Submit for Paw of the Week
+            <div className="paw-hero-actions">
+              {contributeUrl && (
+                <a className="paw-button" href={safePetLink(contributeUrl)}>
+                  Share your pet
+                </a>
+              )}
+              <a className="paw-text-link" href="#paw-week">
+                Meet Paw of the Week
               </a>
-            )}
-            <small>
-              Free to enter. Thoughtfully selected by local editors.
-            </small>
+            </div>
           </div>
           <div className="paw-illustration">
             <PawNeighborhoodIllustration />
-            <p>Good neighbors. Great companions.</p>
+          </div>
+        </section>
+      )}
+      {!unavailable && (
+        <nav className="paw-shortcuts" aria-label="Useful pet resources">
+          <a
+            href={safePetLink(browseBasePath + "/lost_found" + communityQuery)}
+          >
+            <span>Lost a pet?</span>
+            <strong>Let’s help them home</strong>
+            <span aria-hidden="true">↗</span>
+          </a>
+          {walksUrl && (
+            <a href={safePetLink(walksUrl)}>
+              <span>A little fresh air</span>
+              <strong>Find a Paw Walk</strong>
+              <span aria-hidden="true">↗</span>
+            </a>
+          )}
+          {placesUrl && (
+            <a href={safePetLink(placesUrl)}>
+              <span>Out with your companion</span>
+              <strong>Explore Paw Places</strong>
+              <span aria-hidden="true">↗</span>
+            </a>
+          )}
+        </nav>
+      )}
+      {!unavailable && !spotlight && (
+        <section
+          className="paw-week-invitation"
+          id="paw-week"
+          aria-labelledby="paw-week-title"
+        >
+          <div className="paw-invitation-art">
+            <PawInvitationArt />
+          </div>
+          <div>
+            <p className="paw-context">Paw of the Week</p>
+            <h2 id="paw-week-title">
+              Somebody’s favorite.
+              <br />
+              Soon, everybody’s.
+            </h2>
+            <p>
+              The couch companion. The trail buddy. The tiny character with a
+              very big personality. We’d love to meet yours.
+            </p>
+            {contributeUrl && (
+              <a className="paw-button" href={safePetLink(contributeUrl)}>
+                Introduce your pet
+              </a>
+            )}
+            <small>Always free. Selected with care by local editors.</small>
           </div>
         </section>
       )}
@@ -592,10 +559,24 @@ export function PetsSection({
                 ))}
               </div>
             ) : (
-              <p className="paw-empty">
-                The photo board is ready for its first neighbors. Share a
-                photograph and a few words about your pet.
-              </p>
+              <div className="paw-board-invitation">
+                <PawMark size={56} />
+                <div>
+                  <h3>There’s a place for your pet here.</h3>
+                  <p>
+                    The photo board is ready for its first neighbors. A favorite
+                    photograph, a few words, and a new familiar face.
+                  </p>
+                </div>
+                {contributeUrl && (
+                  <a
+                    className="paw-text-link"
+                    href={safePetLink(contributeUrl)}
+                  >
+                    Share a photograph
+                  </a>
+                )}
+              </div>
             )}
             <a
               href={safePetLink(browseBasePath + "/neighbors" + communityQuery)}
@@ -632,71 +613,77 @@ export function PetsSection({
               Open the lost &amp; found board
             </a>
           </section>
-          <section id="celebrations" className="paw-section">
-            <div className="paw-section-heading">
-              <h2>A life full of little milestones</h2>
-              <p>Birthdays, adoption days, new beginnings and fond memories.</p>
-            </div>
-            {celebrations.length ? (
-              <div className="paw-gallery">
-                {celebrations.map((r) => (
-                  <PetCelebrationCard
-                    key={r.id}
-                    resource={r}
-                    community={local(r.area_id)}
-                    href={link(r.id)}
-                    mediaUrl={mediaUrl}
-                  />
-                ))}
+          <div className="paw-discover-pair">
+            <section id="celebrations" className="paw-section">
+              <div className="paw-section-heading">
+                <h2>A life full of little milestones</h2>
+                <p>
+                  Birthdays, adoption days, new beginnings and fond memories.
+                </p>
               </div>
-            ) : (
-              <p className="paw-empty">
-                Celebrate someone who makes your days brighter. Every story is
-                reviewed with care.
-              </p>
-            )}
-            <a
-              href={safePetLink(
-                browseBasePath + "/celebration" + communityQuery,
+              {celebrations.length ? (
+                <div className="paw-gallery">
+                  {celebrations.map((r) => (
+                    <PetCelebrationCard
+                      key={r.id}
+                      resource={r}
+                      community={local(r.area_id)}
+                      href={link(r.id)}
+                      mediaUrl={mediaUrl}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="paw-empty">
+                  Celebrate someone who makes your days brighter. Every story is
+                  reviewed with care.
+                </p>
               )}
-            >
-              More pet celebrations
-            </a>
-          </section>
-          <section id="adoption" className="paw-section">
-            <div className="paw-section-heading">
-              <h2>A new chapter starts with hello.</h2>
-              <p>
-                Discover animals through local shelters and rescue
-                organizations.
-              </p>
-            </div>
-            {adoptions.length ? (
-              <div className="paw-gallery">
-                {adoptions.map((r) => (
-                  <AdoptionListingCard
-                    key={r.id}
-                    resource={r}
-                    community={local(r.area_id)}
-                    href={link(r.id)}
-                    mediaUrl={mediaUrl}
-                  />
-                ))}
+              <a
+                href={safePetLink(
+                  browseBasePath + "/celebration" + communityQuery,
+                )}
+              >
+                More pet celebrations
+              </a>
+            </section>
+            <section id="adoption" className="paw-section">
+              <div className="paw-section-heading">
+                <h2>A new chapter starts with hello.</h2>
+                <p>
+                  Discover animals through local shelters and rescue
+                  organizations.
+                </p>
               </div>
-            ) : (
-              <p className="paw-empty">
-                Our editors are gathering official shelter and rescue listings.
-                Check directly with your local organization for current
-                availability.
-              </p>
-            )}
-            <p className="paw-safety">{PET_SAFETY.adoption}</p>
-            <a
-              href={safePetLink(browseBasePath + "/adoption" + communityQuery)}
-            >
-              Explore adoption listings
-            </a>
-          </section>
+              {adoptions.length ? (
+                <div className="paw-gallery">
+                  {adoptions.map((r) => (
+                    <AdoptionListingCard
+                      key={r.id}
+                      resource={r}
+                      community={local(r.area_id)}
+                      href={link(r.id)}
+                      mediaUrl={mediaUrl}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="paw-empty">
+                  Our editors are gathering official shelter and rescue
+                  listings. Check directly with your local organization for
+                  current availability.
+                </p>
+              )}
+              <p className="paw-safety">{PET_SAFETY.adoption}</p>
+              <a
+                href={safePetLink(
+                  browseBasePath + "/adoption" + communityQuery,
+                )}
+              >
+                Explore adoption listings
+              </a>
+            </section>
+          </div>
           {nextUrl && (
             <a className="paw-button" href={safePetLink(nextUrl)}>
               More community pets
@@ -719,12 +706,22 @@ export function PetsSection({
         </section>
       )}
       <footer className="paw-footer">
-        <PawMark size={24} />
+        <div>
+          <a className="paw-brand" href={basePath || "/"}>
+            <PawMark size={40} />
+            {name}
+          </a>
+          <p>{tagline}</p>
+        </div>
         <p>
-          A community project from Bay Area News Network.
+          A community project from{" "}
+          <a href="https://bayareanewsnetwork.com">Bay Area News Network</a>.
           <br />
-          {tagline}
+          Made for the places we call home.
         </p>
+        <a href="#paw-community" className="paw-text-link">
+          Find your community
+        </a>
       </footer>
     </div>
   );

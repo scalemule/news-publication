@@ -53,7 +53,7 @@ async function call<T>(
       typeof body.error === "string"
         ? body.error
         : body.error?.message ||
-            "We couldn’t save this contribution. Please try again.",
+          "We couldn’t save this contribution. Please try again.",
     );
   return body.data ?? body;
 }
@@ -266,9 +266,12 @@ export function PetSubmissionForm({
         } else void save();
       }}
     >
-      <p className="paw-context">
-        {step === 0 ? "Your pet’s story" : "Your private preview"}
-      </p>
+      <ol className="paw-form-steps" aria-label="Submission progress">
+        <li aria-current={step === 0 ? "step" : undefined}>1. Their story</li>
+        <li aria-current={step === 1 ? "step" : undefined}>
+          2. Preview &amp; permission
+        </li>
+      </ol>
       <h1>
         {kind === "celebration" && content.category === "memorial"
           ? "Remember a beloved companion."

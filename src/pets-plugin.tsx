@@ -99,6 +99,51 @@ function Shell({
     </div>
   );
 }
+function LoadError({
+  error,
+  retry,
+  account,
+}: {
+  error: unknown;
+  retry: string;
+  account: string;
+}) {
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? error.status
+      : undefined;
+  if (status === 401 || status === 403)
+    return (
+      <div className="paw-load-error" role="status">
+        <h2>Reconnect your community account.</h2>
+        <p>
+          Your network sign-in gives you access to your pets across
+          participating publications.
+        </p>
+        <PetSignIn returnTo={retry} />
+      </div>
+    );
+  return (
+    <div className="paw-load-error" role="status">
+      <h2>We couldn’t open your pet community.</h2>
+      <p>
+        {status === 429
+          ? "There have been several requests in a short time. Wait a moment, then try again."
+          : "The connection is temporarily unavailable. Try loading this page again to continue."}
+      </p>
+      <div className="paw-form-actions">
+        <a className="paw-button" href={retry}>
+          Try again
+        </a>
+        {retry !== account && (
+          <a className="paw-text-link" href={account}>
+            Back to My pets
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
 export async function PetAccountPage({
   scope,
   signedIn,
@@ -179,30 +224,19 @@ export async function PetAccountPage({
         </>
       );
     } catch (error) {
-      body =
-        error &&
-        typeof error === "object" &&
-        "status" in error &&
-        error.status === 403 ? (
-          <>
-            <p>Connect your network sign-in to open this pet community.</p>
-            <PetSignIn returnTo={paths.account} />
-          </>
-        ) : (
-          <p role="status">
-            Your pets could not be loaded. Please try again shortly.
-          </p>
-        );
+      body = (
+        <LoadError
+          error={error}
+          retry={paths.account}
+          account={paths.account}
+        />
+      );
     }
   return (
     <Shell paths={paths} signedIn={signedIn}>
       <section className="paw-story">
         <p className="paw-eyebrow">Your community account</p>
-        <h1>
-          Your pets.
-          <br />
-          Your little corner.
-        </h1>
+        <h1>A home for your pets.</h1>
         {body}
       </section>
     </Shell>
@@ -287,12 +321,12 @@ export async function PetSubmitPage({
             accountUrl={paths.account}
           />
         );
-    } catch {
+    } catch (error) {
       form = (
-        <p role="status">
-          This contribution could not be loaded. Open it from My pets or try
-          again shortly.
-        </p>
+        <section className="paw-form">
+          <h1>Let’s meet your pet.</h1>
+          <LoadError error={error} retry={next} account={paths.account} />
+        </section>
       );
     }
   return <Shell paths={paths}>{form}</Shell>;
