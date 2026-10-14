@@ -44,6 +44,24 @@ export {
   validCalendarDate,
 } from "./editorial";
 export {
+  NAVIGATION_GROUPS,
+  NETWORK_NAVIGATION,
+  applyNavigationConfig,
+  resolveNavigation,
+} from "./navigation";
+export type {
+  FeaturedDestination,
+  NavigationConfig,
+  NavigationContext,
+  NavigationDestination,
+  NavigationGroup,
+  NavigationGroupLinks,
+  NavigationKind,
+  NavigationLink,
+  NavigationOverride,
+  ResolvedNavigation,
+} from "./navigation";
+export {
   articleMeta,
   articleUrl,
   llmsText,
