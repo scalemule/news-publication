@@ -1,3 +1,7 @@
+## 0.0.54
+
+- Broadsheet editorial in-article figure and caption typography: add dedicated broadsheet tokens for `<figure>`, `.article-figure`, and `<figcaption>` with 36px vertical breathing room, full clear boundaries, responsive image block rendering, and crisp 13px muted sans-serif caption styling.
+
 ## 0.0.53
 
 - Redesign the native pet community as a Bay Area field guide: original vector artwork, self-hosted licensed type, mobile navigation, useful local shortcuts and an editorial spotlight invitation. Preserve the approved logo and publication color inheritance.
