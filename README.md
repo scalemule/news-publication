@@ -299,3 +299,5 @@ OIDC provider. Auth resolves the verified provider subject; Knowledge authorizes
 each accepted view and keeps ownership collection-scoped. Never correlate local
 users by email or forward one application’s reader token/API key to another.
 Provision and verify each RP before enabling sign-in or contribution flags.
+
+The publisher-supplied `PawMark` preserves the approved SVG paths. Hosts may set `--paw-logo-ink` and `--paw-logo-heart` on their `.paw` scope; the defaults follow the accessible page foreground and coral accent.
