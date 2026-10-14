@@ -1,5 +1,5 @@
 import React from "react";
-import { PawBayIllustration, PawInvitationArt } from "./pets-art";
+import { PawBayIllustration } from "./pets-art";
 import {
   adoptionAvailability,
   PET_SAFETY,
@@ -460,11 +460,15 @@ export function PetsSection({
         <section className="paw-welcome" aria-labelledby="paw-welcome-title">
           <div className="paw-welcome-copy">
             <h1 id="paw-welcome-title">
-              Good company.
+              Life’s better
               <br />
-              Right here.
+              together.
             </h1>
-            <p>For the pets we love. And the neighbors we haven’t met yet.</p>
+            <p>
+              For the love of pets.
+              <br />
+              For the places we call home.
+            </p>
             <p className="paw-welcome-detail">
               Share their story, find your next favorite walk, and make a little
               more room for community.
@@ -480,9 +484,21 @@ export function PetsSection({
               </a>
             </div>
           </div>
-          <div className="paw-illustration">
-            <PawNeighborhoodIllustration />
-          </div>
+          <figure className="paw-cover-photo">
+            <div
+              role="img"
+              aria-label="A corgi enjoying a sunlit neighborhood walk"
+            />
+            <figcaption>
+              Cover photograph by{" "}
+              <a
+                href="https://unsplash.com/photos/a-happy-corgi-walking-on-a-cobblestone-path-qcfZw7nA0Ko"
+                rel="noopener noreferrer"
+              >
+                Alvan Nee
+              </a>
+            </figcaption>
+          </figure>
         </section>
       )}
       {!unavailable && (
@@ -516,15 +532,24 @@ export function PetsSection({
           id="paw-week"
           aria-labelledby="paw-week-title"
         >
-          <div className="paw-invitation-art">
-            <PawInvitationArt />
+          <div className="paw-week-cover" aria-hidden="true">
+            <PawMark size={100} />
+            <span>
+              A very
+              <br />
+              good week.
+            </span>
+            <small>
+              A little local recognition.
+              <br />A whole lot of love.
+            </small>
           </div>
           <div>
             <p className="paw-context">Paw of the Week</p>
             <h2 id="paw-week-title">
-              Somebody’s favorite.
+              Big personality.
               <br />
-              Soon, everybody’s.
+              Local legend.
             </h2>
             <p>
               The couch companion. The trail buddy. The tiny character with a

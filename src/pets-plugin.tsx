@@ -96,6 +96,14 @@ function Shell({
         </div>
       </header>
       {children}
+      <footer className="paw-footer paw-page-footer">
+        <a href={paths.home} className="paw-brand">
+          <PawMark size={28} />
+          Bay Area Paw
+        </a>
+        <p>Happier pets. Closer communities.</p>
+        <a href={paths.home}>Back to your community</a>
+      </footer>
     </div>
   );
 }
