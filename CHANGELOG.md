@@ -1,4 +1,7 @@
-## 0.0.48 - 2026-10-13
+## 0.0.51
+
+- Preserve the current home community when editing a pet from another publication; keep new contributions within host coverage.
+- Secure recovery contact and community notification delivery remain deferred.
 
 ## 0.0.50
 
@@ -7,6 +10,8 @@
 - Shared community preferences, local Newsroom links and an accessible mobile layout with original vector pet artwork.
 - Shared ownership requires the collection’s verified OIDC policy and an accepted view; notification delivery and private recovery messaging remain deferred.
 
+
+## 0.0.48 - 2026-10-13
 
 - Broadsheet section layout: Break out single child sections and odd trailing sections across the full grid (`grid-column: 1 / -1`) with an asymmetric two-column spread (Lead story + supporting rail), eliminating huge empty right-side gaps on desktop.
 - Canonical editorial section resolution: Added `resolveSection` normalizing section aliases and using content/tag heuristics to categorize unassigned stories into civic, health, business, events, schools, and community desks rather than dropping them into unrendered local buckets.
