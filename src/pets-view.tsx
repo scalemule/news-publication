@@ -487,17 +487,9 @@ export function PetsSection({
           <figure className="paw-cover-photo">
             <div
               role="img"
-              aria-label="A corgi enjoying a sunlit neighborhood walk"
+              aria-label="A white Labrador retriever resting on a sunlit lawn"
             />
-            <figcaption>
-              Cover photograph by{" "}
-              <a
-                href="https://unsplash.com/photos/a-happy-corgi-walking-on-a-cobblestone-path-qcfZw7nA0Ko"
-                rel="noopener noreferrer"
-              >
-                Alvan Nee
-              </a>
-            </figcaption>
+            <figcaption>Cover photograph by Boyko Mihaylov</figcaption>
           </figure>
         </section>
       )}
