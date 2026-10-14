@@ -14,6 +14,7 @@ import {
 } from "./pets";
 import {
   PetsSection,
+  type PetCoverPhoto,
   PetProfileCard,
   LostPetNotice,
   PetCelebrationCard,
@@ -47,7 +48,10 @@ export async function PublicationPetsSection({
   const mediaUrl = (id: string, photo: string) =>
     `/api/pets/${id}/media/${photo}`;
   try {
-    const collection = await petRequest<{ areas: PetCommunity[] }>(scope, root);
+    const collection = await petRequest<{
+      areas: PetCommunity[];
+      config?: { presentation?: { cover_photo?: PetCoverPhoto | null } };
+    }>(scope, root);
     const home =
       defaultCommunity ||
       collection.areas.find(
@@ -128,6 +132,7 @@ export async function PublicationPetsSection({
         )}
         <PetsSection
           basePath="/pets"
+          coverPhoto={collection.config?.presentation?.cover_photo}
           regionLabel={region}
           resourceBasePath={native ? "/pets" : canonicalOrigin + "/pets"}
           accountUrl={native ? "/pets/account" : undefined}
