@@ -250,9 +250,24 @@ export function resolveNavigation(context: NavigationContext): ResolvedNavigatio
     left.order - right.order || left.label.localeCompare(right.label);
 
   const primary = visible.filter(destination => destination.primary).sort(byOrder).map(link);
+
+  // A section alive in the feed but absent from the configuration still deserves a
+  // reachable destination; it joins News & knowledge instead of stretching the row.
+  const covered = new Set(destinations.map(destination => destination.section).filter(Boolean));
+  const stray = [...new Set(context.discovered ?? [])]
+    .filter(name => name !== "Local news" && !covered.has(name))
+    .sort((left, right) => left.localeCompare(right))
+    .map((name): NavigationLink => {
+      const definition = sectionDefinition(name);
+      return { id: definition.id, label: definition.label, href: sectionPath(name), kind: "editorial", priority: 0 };
+    });
+
   const groups = NAVIGATION_GROUPS.map(group => ({
     ...group,
-    links: visible.filter(destination => destination.more && destination.group === group.id).sort(byOrder).map(link),
+    links: [
+      ...visible.filter(destination => destination.more && destination.group === group.id).sort(byOrder).map(link),
+      ...(group.id === "news-knowledge" ? stray : []),
+    ],
   })).filter(group => group.links.length > 0);
 
   return { primary, groups, featured: activeFeatured(context.config, now) };

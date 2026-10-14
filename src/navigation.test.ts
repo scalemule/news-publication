@@ -64,6 +64,14 @@ describe("network navigation defaults", () => {
     expect(groups.find(group => group.id === "news-knowledge")?.links.map(link => link.label)).toContain("Schools & education");
   });
 
+  it("routes a discovered section with no configured destination into News & knowledge", () => {
+    const { primary, groups } = paper(undefined, { discovered: ["Celebrations"] });
+    expect(primary.map(item => item.label)).not.toContain("Celebrations");
+    expect(groups.find(group => group.id === "news-knowledge")?.links).toContainEqual(
+      expect.objectContaining({ label: "Celebrations", href: "/sections/celebrations" }),
+    );
+  });
+
   it("prepares Autos but keeps it hidden until a record enables it", () => {
     expect(NETWORK_NAVIGATION.find(destination => destination.id === "autos")?.enabled).toBe(false);
     const { primary } = paper({ destinations: [{ id: "autos", enabled: true }] });
