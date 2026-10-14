@@ -91,7 +91,7 @@ export async function PublicationPetsSection({
       week: monday.toISOString().split("T")[0],
     });
     if (chosen) weekly.set("area_id", chosen.id);
-    const [feeds, spotlights] = await Promise.all([
+    const [feeds, spotlights, acknowledgments] = await Promise.all([
       Promise.all(
         ["neighbors", "lost_found", "celebration", "adoption"].map((kind) => {
           const q = new URLSearchParams(filter);
@@ -104,6 +104,7 @@ export async function PublicationPetsSection({
         }),
       ),
       petRequest<{ items: PetResource[] }>(scope, root + "/pets?" + weekly),
+      petAcknowledgments(scope, chosen?.slug),
     ]);
     const clean = (r: PetResource) => ({
       ...r,
@@ -132,7 +133,7 @@ export async function PublicationPetsSection({
           accountUrl={native ? "/pets/account" : undefined}
           communities={collection.areas}
           community={chosen}
-          acknowledgments={await petAcknowledgments(scope, chosen?.slug)}
+          acknowledgments={acknowledgments}
           resources={feeds.flatMap((feed) => feed.items).map(clean)}
           spotlight={spotlights.items[0] && clean(spotlights.items[0])}
           mediaUrl={mediaUrl}

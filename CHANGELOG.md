@@ -1,3 +1,9 @@
+## 0.0.53
+
+- Redesign the native pet community as a Bay Area field guide: original vector artwork, self-hosted licensed type, mobile navigation, useful local shortcuts and an editorial spotlight invitation. Preserve the approved logo and publication color inheritance.
+- Provide explicit retry and network reconnection actions on account/submission failures. Keep community selection attached to native contribution links and fetch independent homepage resources concurrently.
+- Retain moderated publication, honest empty states, anonymous browsing, dark appearance and reduced-motion support. Secure recovery contact and community notification delivery remain deferred.
+
 ## 0.0.52
 
 - Use the publisher-supplied Bay Area Paw dog/cat/heart icon in all shared pet pages. Preserve its geometry and expose logo ink/heart color tokens for publication themes and dark appearance.
