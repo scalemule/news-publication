@@ -1127,6 +1127,7 @@
 
 /* The photographic cover is the one expressive moment. */
 .paw-welcome {
+  padding: 0;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -1138,7 +1139,7 @@
   color: #fff;
   border-radius: 4px;
 }
-.paw-cover-photo {
+.paw .paw-cover-photo {
   position: absolute;
   inset: 0 0 0 43%;
   margin: 0;
@@ -1475,7 +1476,7 @@
   .paw-welcome h1 {
     font-size: 72px;
   }
-  .paw-cover-photo {
+  .paw .paw-cover-photo {
     left: 30%;
   }
   .paw-week-invitation {
@@ -1523,7 +1524,7 @@
     align-items: flex-start;
     border-radius: 0;
   }
-  .paw-cover-photo {
+  .paw .paw-cover-photo {
     inset: 0;
   }
   .paw-cover-photo > div {
