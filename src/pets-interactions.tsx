@@ -25,7 +25,7 @@ async function request<T>(
     );
   return value.data ?? value;
 }
-export function PetSignOut() {
+export function PetSignOut({ returnTo = "/" }: { returnTo?: string }) {
   const [error, setError] = useState("");
   return (
     <div>
@@ -33,13 +33,13 @@ export function PetSignOut() {
         onClick={async () => {
           try {
             await request("/api/paw-auth/logout", "POST");
-            window.location.assign("/");
+            window.location.assign(returnTo);
           } catch {
             setError("Sign-out could not be completed. Please try again.");
           }
         }}
       >
-        Sign out
+        Sign out of this site
       </button>
       {error && <p role="alert">{error}</p>}
     </div>
@@ -222,10 +222,12 @@ export function PetResourceActions({
   resource,
   signedIn,
   apiPath = "/api/pets",
+  accountUrl = "/account",
 }: {
   resource: PetResource;
   signedIn: boolean;
   apiPath?: string;
+  accountUrl?: string;
 }) {
   const [active, setActive] = useState(false),
     [reporting, setReporting] = useState(false),
@@ -364,7 +366,7 @@ export function PetResourceActions({
           <p>
             <a
               href={
-                "/account?next=" + encodeURIComponent(`/pets/${resource.id}`)
+                accountUrl + "?next=" + encodeURIComponent(`/pets/${resource.id}`)
               }
             >
               Sign in to send a private report.

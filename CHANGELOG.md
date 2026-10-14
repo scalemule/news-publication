@@ -1,5 +1,13 @@
 ## 0.0.48 - 2026-10-13
 
+## 0.0.50
+
+- Native server-rendered pet account, submission, browsing and story pages, sharing the host publication’s reader cookie and API key.
+- Ledvery session resume through a top-level OIDC code flow; signed callback state, local sign-out suppression and the existing publication callback are supported without iframes or shared cross-domain cookies.
+- Shared community preferences, local Newsroom links and an accessible mobile layout with original vector pet artwork.
+- Shared ownership requires the collection’s verified OIDC policy and an accepted view; notification delivery and private recovery messaging remain deferred.
+
+
 - Broadsheet section layout: Break out single child sections and odd trailing sections across the full grid (`grid-column: 1 / -1`) with an asymmetric two-column spread (Lead story + supporting rail), eliminating huge empty right-side gaps on desktop.
 - Canonical editorial section resolution: Added `resolveSection` normalizing section aliases and using content/tag heuristics to categorize unassigned stories into civic, health, business, events, schools, and community desks rather than dropping them into unrendered local buckets.
 

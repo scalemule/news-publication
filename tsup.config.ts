@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     pets: "src/pets.ts",
+    "pets-plugin": "src/pets-plugin.tsx",
     "pets-view": "src/pets-view.tsx",
     "pets-forms": "src/pets-forms.tsx",
     "pets-interactions": "src/pets-interactions.tsx",
@@ -33,5 +34,5 @@ export default defineConfig({
   sourcemap: false,
   clean: true,
   treeshake: true,
-  external: ["react", "@scalemule/react", "@scalemule/sdk"],
+  external: ["@scalemule/news-publication/pets-forms", "@scalemule/news-publication/pets-interactions", "react", "@scalemule/react", "@scalemule/sdk"],
 });

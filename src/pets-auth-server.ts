@@ -2,18 +2,19 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { petPrivateHeaders, petRequest, type PetScope } from "./pets-server";
 export const PAW_SESSION_COOKIE = "__Host-paw-reader";
-const FLOW = "__Host-paw-signin";
+export const PAW_FLOW_COOKIE = "__Host-paw-signin";
+export const PAW_SIGNED_OUT_COOKIE = "__Host-paw-signed-out";
+const FLOW = PAW_FLOW_COOKIE;
 const attrs = "Path=/; HttpOnly; Secure; SameSite=Lax";
 export function pawCookie(
   request: Request,
   name = PAW_SESSION_COOKIE,
 ): string | undefined {
-  return request.headers
-    .get("cookie")
-    ?.split(";")
+  const values = (request.headers.get("cookie") || "")
+    .split(";")
     .map((v) => v.trim())
-    .find((v) => v.startsWith(name + "="))
-    ?.slice(name.length + 1);
+    .filter((v) => v.startsWith(name + "="));
+  return values.length === 1 ? values[0].slice(name.length + 1) : undefined;
 }
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -88,6 +89,10 @@ export function createPawAuthHandler(options: {
   resolve(request: Request): Promise<PetScope>;
   enabled: boolean;
   issuerOrigin: string;
+  /** Reuse the publication’s existing host-only reader cookie and registered callback. */
+  sessionCookie?: string;
+  callbackPath?: string;
+  accountPath?: string;
   fetch?: typeof fetch;
 }) {
   return async (request: Request, action: string): Promise<Response> => {
@@ -100,6 +105,15 @@ export function createPawAuthHandler(options: {
         origin = new URL(scope.origin).origin;
       if (!origin.startsWith("https://") || !scope.apiKey)
         return json({ error: "Sign-in is not configured." }, 503);
+      const account = returnPath(options.accountPath || "/account");
+      const sessionCookie = options.sessionCookie || PAW_SESSION_COOKIE;
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(sessionCookie))
+        throw new Error("Invalid cookie name");
+      const retryPath = (path: string, reason: string) => {
+        const target = new URL(returnPath(path), origin);
+        target.searchParams.set("signin", reason);
+        return target.pathname + target.search;
+      };
       const redirect = (path: string) =>
         new Response(null, {
           status: 303,
@@ -108,19 +122,37 @@ export function createPawAuthHandler(options: {
             location: origin + returnPath(path),
           },
         });
-      if (action === "start" && request.method === "POST") {
-        if (request.headers.get("origin") !== origin)
+      const resuming = action === "resume" && request.method === "GET";
+      if (resuming || (action === "start" && request.method === "POST")) {
+        if (
+          (!resuming && request.headers.get("origin") !== origin) ||
+          (resuming &&
+            ((request.headers.has("sec-fetch-mode") &&
+              request.headers.get("sec-fetch-mode") !== "navigate") ||
+              (request.headers.has("sec-fetch-dest") &&
+                request.headers.get("sec-fetch-dest") !== "document")))
+        )
           return json({ error: "Sign in from this website." }, 403);
-        const callback = origin + "/api/paw-auth/callback";
+        const next = returnPath(
+          new URL(request.url).searchParams.get("next") || account,
+        );
+        if (resuming && pawCookie(request, PAW_SIGNED_OUT_COOKIE))
+          return redirect(retryPath(next, "required"));
+        const callback =
+          origin + returnPath(options.callbackPath || "/api/paw-auth/callback");
         const result = await petRequest<{ url: string; state: string }>(
           scope,
           "/v1/auth/oauth/ledvery/authorize?" +
-            new URLSearchParams({ redirect_uri: callback }),
+            new URLSearchParams({
+              redirect_uri: callback,
+              ...(resuming ? { prompt: "none" } : {}),
+            }),
           {},
           options.fetch,
         );
         const url = new URL(result.url);
         if (
+          url.protocol !== "https:" ||
           url.origin !== new URL(options.issuerOrigin).origin ||
           url.pathname !== "/authorize" ||
           url.username ||
@@ -131,10 +163,20 @@ export function createPawAuthHandler(options: {
           !url.searchParams.get("code_challenge")
         )
           throw new Error("Invalid authorization response");
-        const response = json({ url: url.href });
+        const response = resuming
+          ? new Response(null, {
+              status: 303,
+              headers: { ...petPrivateHeaders, location: url.href },
+            })
+          : json({ url: url.href });
+        if (!resuming)
+          response.headers.append(
+            "set-cookie",
+            `${PAW_SIGNED_OUT_COOKIE}=; ${attrs}; Max-Age=0`,
+          );
         response.headers.append(
           "set-cookie",
-          `${FLOW}=${sealPawFlow(result.state, returnPath(new URL(request.url).searchParams.get("next")), scope.apiKey)}; ${attrs}; Max-Age=600`,
+          `${FLOW}=${sealPawFlow(result.state, next, scope.apiKey)}; ${attrs}; Max-Age=600`,
         );
         return response;
       }
@@ -143,10 +185,23 @@ export function createPawAuthHandler(options: {
           code = query.get("code"),
           state = query.get("state");
         const next = openPawFlow(pawCookie(request, FLOW), state, scope.apiKey);
-        const response = redirect(next || "/account?signin=retry");
+        const response = redirect(next || retryPath(account, "retry"));
         response.headers.append("set-cookie", `${FLOW}=; ${attrs}; Max-Age=0`);
-        if (!next || !code || code.length > 4096 || query.has("error"))
+        if (!next || !code || code.length > 4096 || query.has("error")) {
+          response.headers.set(
+            "location",
+            origin +
+              retryPath(
+                next || account,
+                ["login_required", "consent_required"].includes(
+                  query.get("error") || "",
+                )
+                  ? "required"
+                  : "retry",
+              ),
+          );
           return response;
+        }
         try {
           // Auth owns PKCE, nonce, signature, issuer/audience and one-use exchange. No local users database.
           const session = await petRequest<{
@@ -177,11 +232,11 @@ export function createPawAuthHandler(options: {
             throw new Error("Verified reader required");
           response.headers.append(
             "set-cookie",
-            `${PAW_SESSION_COOKIE}=${session.session_token}; ${attrs}; Expires=${new Date(expiry).toUTCString()}`,
+            `${sessionCookie}=${session.session_token}; ${attrs}; Expires=${new Date(expiry).toUTCString()}`,
           );
           return response;
         } catch {
-          response.headers.set("location", origin + "/account?signin=retry");
+          response.headers.set("location", origin + retryPath(next, "retry"));
           return response;
         }
       }
@@ -210,7 +265,11 @@ export function createPawAuthHandler(options: {
         const response = json({ authenticated: false });
         response.headers.append(
           "set-cookie",
-          `${PAW_SESSION_COOKIE}=; ${attrs}; Max-Age=0`,
+          `${sessionCookie}=; ${attrs}; Max-Age=0`,
+        );
+        response.headers.append(
+          "set-cookie",
+          `${PAW_SIGNED_OUT_COOKIE}=1; ${attrs}; Max-Age=2592000`,
         );
         return response;
       }

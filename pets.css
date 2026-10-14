@@ -1,12 +1,18 @@
 .paw {
-  --paw-bg: #f7faf9;
-  --paw-ink: #18343c;
-  --paw-muted: #4b6268;
-  --paw-blue: #123c4a;
-  --paw-green: #dcebe1;
+  --paw-bg: #f8f3e9;
+  --paw-ink: #173e35;
+  --paw-muted: #52675e;
+  --paw-blue: #173e35;
+  --paw-green: #e2e9dd;
   --paw-leaf: #356b4d;
-  --paw-line: #c5d6d4;
-  --paw-sun: #f2cf66;
+  --paw-line: #cbd3c5;
+  --paw-sun: #efc563;
+  --paw-terracotta: #cd8065;
+  --paw-art-sky: #c5ddd6;
+  --paw-art-hill: #a9c4ac;
+  --paw-art-ground: #dce4c7;
+  --paw-art-cat: #f3e4bd;
+  --paw-art-line: #254b3b;
   color: var(--paw-ink);
   background: var(--paw-bg);
   font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
@@ -535,4 +541,206 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+/* A quiet editorial identity, designed at phone size first. */
+.paw-eyebrow,
+.paw-welcome .paw-eyebrow {
+  font:
+    650 11px/1.5 "Avenir Next",
+    Avenir,
+    sans-serif;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  margin: 0 0 22px;
+  color: var(--paw-muted);
+}
+.paw-welcome h1 {
+  font-size: clamp(46px, 6.6vw, 88px);
+  letter-spacing: -0.055em;
+  line-height: 0.99;
+}
+.paw-welcome h1 em {
+  font-weight: 400;
+}
+.paw-illustration {
+  position: relative;
+  align-self: end;
+}
+.paw-neighborhood-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.paw-illustration > p {
+  text-align: center;
+  font:
+    500 12px/1.5 "Avenir Next",
+    Avenir,
+    sans-serif;
+  letter-spacing: 0.05em;
+  max-width: none;
+  margin: -18px 0 15px;
+}
+.paw-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.paw-nav {
+  padding: 3px 0;
+}
+.paw-page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--paw-line);
+}
+.paw-page-heading .paw-form-actions {
+  margin: 0;
+  align-items: center;
+}
+.paw-page-heading a:not(.paw-brand) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.paw-story {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: clamp(36px, 7vw, 80px) 0;
+}
+.paw-story > h1 {
+  margin-bottom: 36px;
+}
+.paw-story > p {
+  font-size: 19px;
+  line-height: 1.8;
+}
+.paw-story figure {
+  margin: 30px 0;
+}
+.paw-story img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+.paw-story figcaption {
+  font-size: 12px;
+  color: var(--paw-muted);
+  margin-top: 8px;
+}
+.paw-account-row {
+  padding: 25px 0;
+  border-bottom: 1px solid var(--paw-line);
+}
+.paw-account-row h2 {
+  font-size: 32px;
+}
+.paw-account-row > p {
+  margin: 12px 0 0;
+}
+.paw a,
+.paw button {
+  -webkit-tap-highlight-color: transparent;
+}
+.paw button,
+.paw .paw-button {
+  transition:
+    background-color 0.15s,
+    transform 0.15s;
+}
+.paw button:active,
+.paw .paw-button:active {
+  transform: translateY(1px);
+}
+@media (max-width: 780px) {
+  .paw-welcome {
+    gap: 8px;
+    padding: 28px 0 28px;
+  }
+  .paw-welcome > div:first-child {
+    position: relative;
+    z-index: 1;
+  }
+  .paw-illustration {
+    width: min(100%, 420px);
+    margin: 0 auto;
+  }
+  .paw-welcome p:not(.paw-eyebrow) {
+    font-size: 17px;
+  }
+  .paw-welcome .paw-eyebrow {
+    margin-bottom: 17px;
+  }
+  .paw-illustration > p {
+    font-size: 11px !important;
+    margin-top: -20px;
+  }
+  .paw-page-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .paw-page-heading .paw-form-actions {
+    gap: 16px;
+  }
+}
+@media (max-width: 380px) {
+  .paw {
+    padding-inline: 18px;
+  }
+  .paw-community form {
+    flex-wrap: wrap;
+  }
+  .paw-community label {
+    flex-basis: 100%;
+  }
+  .paw-community select {
+    flex: 1;
+    max-width: none;
+  }
+  .paw-welcome h1 {
+    font-size: 44px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .paw {
+    --paw-bg: #142d27;
+    --paw-ink: #f3efdf;
+    --paw-muted: #b9cbbb;
+    --paw-blue: #d9e8ce;
+    --paw-green: #29483c;
+    --paw-line: #496253;
+    --paw-art-sky: #42665c;
+    --paw-art-hill: #617c62;
+    --paw-art-ground: #819171;
+  }
+}
+
+@media (max-width: 780px) {
+  .paw-masthead > .paw-button {
+    display: none;
+  }
+  .paw-masthead {
+    justify-content: space-between;
+  }
+  .paw-masthead > a:not(.paw-brand) {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+  }
+}
+/* Honor the publication's explicit appearance preference ahead of the device. */
+[data-theme="light"] .paw {
+  --paw-bg: #f8f3e9; --paw-ink: #173e35; --paw-muted: #52675e;
+  --paw-blue: #173e35; --paw-green: #e2e9dd; --paw-leaf: #356b4d; --paw-line: #cbd3c5;
+  --paw-art-sky: #c5ddd6; --paw-art-hill: #a9c4ac; --paw-art-ground: #dce4c7;
+}
+[data-theme="dark"] .paw {
+  --paw-bg: #142d27; --paw-ink: #f3efdf; --paw-muted: #b9cbbb;
+  --paw-blue: #d9e8ce; --paw-green: #29483c; --paw-leaf: #b5dabd; --paw-line: #496253;
+  --paw-art-sky: #42665c; --paw-art-hill: #617c62; --paw-art-ground: #819171;
 }

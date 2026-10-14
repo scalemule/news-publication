@@ -5,7 +5,13 @@ import {
   createPublicationPetsHandler,
   type PetScope,
 } from "./pets-server";
-import { createPawAuthHandler } from "./pets-auth-server";
+import {
+  createPawAuthHandler,
+  pawCookie,
+  sealPawFlow,
+  PAW_FLOW_COOKIE,
+  PAW_SIGNED_OUT_COOKIE,
+} from "./pets-auth-server";
 const id = "019a1234-1234-7123-8123-123456789abc";
 const scope: PetScope = {
   apiKey: "isolated-server-test-key",
@@ -208,5 +214,162 @@ describe("live resource and sponsorship references", () => {
       ),
     ).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("native publication SSO", () => {
+  const origin = scope.origin,
+    state = "one-use-auth-state";
+  function setup() {
+    const fetch = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input));
+        expect(init?.headers).toMatchObject({ "x-api-key": scope.apiKey });
+        if (url.pathname.endsWith("/authorize"))
+          return Response.json({
+            data: {
+              state,
+              url:
+                "https://identity.example.test/authorize?" +
+                new URLSearchParams({
+                  state,
+                  redirect_uri: origin + "/api/news/ledvery-callback",
+                  code_challenge: "challenge",
+                  code_challenge_method: "S256",
+                }),
+            },
+          });
+        if (url.pathname.endsWith("/callback"))
+          return Response.json({
+            data: {
+              session_token: "verified-reader-session",
+              expires_at: new Date(Date.now() + 3600000).toISOString(),
+            },
+          });
+        if (url.pathname.endsWith("/me"))
+          return Response.json({ data: { id, email_verified: true } });
+        return Response.json({ data: {} });
+      },
+    );
+    const handler = createPawAuthHandler({
+      resolve: async (req) => ({
+        ...scope,
+        accessToken: pawCookie(req, "__Host-existing-reader"),
+      }),
+      enabled: true,
+      issuerOrigin: "https://identity.example.test",
+      sessionCookie: "__Host-existing-reader",
+      callbackPath: "/api/news/ledvery-callback",
+      accountPath: "/pets/account",
+      fetch,
+    });
+    return { handler, fetch };
+  }
+  it("automatically resumes at the IdP using prompt=none and the existing registered callback", async () => {
+    const { handler, fetch } = setup();
+    const response = await handler(
+      new Request(origin + "/api/paw-auth/resume?next=/pets/submit", {
+        headers: {
+          "sec-fetch-site": "cross-site",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-dest": "document",
+        },
+      }),
+      "resume",
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toMatch(
+      /^https:\/\/identity.example.test\/authorize/,
+    );
+    expect(
+      new URL(String(fetch.mock.calls[0][0])).searchParams.get("prompt"),
+    ).toBe("none");
+    expect(response.headers.get("set-cookie")).toContain("__Host-paw-signin=");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+  it("writes the publication's existing reader cookie after a bound callback", async () => {
+    const { handler } = setup(),
+      flow = sealPawFlow(state, "/pets/account", scope.apiKey);
+    const response = await handler(
+      new Request(
+        origin +
+          "/api/news/ledvery-callback?" +
+          new URLSearchParams({ state, code: "one-use-code" }),
+        { headers: { cookie: `${PAW_FLOW_COOKIE}=${flow}` } },
+      ),
+      "callback",
+    );
+    expect(response.headers.get("location")).toBe(origin + "/pets/account");
+    expect(response.headers.getSetCookie()).toContainEqual(
+      expect.stringContaining(
+        "__Host-existing-reader=verified-reader-session; Path=/; HttpOnly; Secure; SameSite=Lax",
+      ),
+    );
+    expect(response.headers.get("set-cookie")).not.toContain(
+      "__Host-paw-reader=",
+    );
+    expect(await response.text()).toBe("");
+  });
+  it("rejects a foreign state without exchanging a code and stops unsuccessful silent-flow loops", async () => {
+    const { handler, fetch } = setup(),
+      flow = sealPawFlow(state, "/pets/submit", scope.apiKey);
+    let response = await handler(
+      new Request(
+        origin + "/api/news/ledvery-callback?state=attacker&code=bad",
+        { headers: { cookie: `${PAW_FLOW_COOKIE}=${flow}` } },
+      ),
+      "callback",
+    );
+    expect(response.headers.get("location")).toBe(
+      origin + "/pets/account?signin=retry",
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    response = await handler(
+      new Request(
+        origin +
+          "/api/news/ledvery-callback?" +
+          new URLSearchParams({ state, error: "login_required" }),
+        { headers: { cookie: `${PAW_FLOW_COOKIE}=${flow}` } },
+      ),
+      "callback",
+    );
+    expect(response.headers.get("location")).toBe(
+      origin + "/pets/submit?signin=required",
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("respects explicit local sign-out and requires same-origin mutation", async () => {
+    const { handler, fetch } = setup();
+    let response = await handler(
+      new Request(origin + "/api/paw-auth/resume?next=/pets/account", {
+        headers: { cookie: `${PAW_SIGNED_OUT_COOKIE}=1` },
+      }),
+      "resume",
+    );
+    expect(response.headers.get("location")).toBe(
+      origin + "/pets/account?signin=required",
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    response = await handler(
+      new Request(origin + "/api/paw-auth/logout", {
+        method: "POST",
+        headers: { origin: "https://attacker.example" },
+      }),
+      "logout",
+    );
+    expect(response.status).toBe(403);
+    response = await handler(
+      new Request(origin + "/api/paw-auth/logout", {
+        method: "POST",
+        headers: { origin, cookie: "__Host-existing-reader=session" },
+      }),
+      "logout",
+    );
+    expect(response.headers.getSetCookie()).toContainEqual(
+      expect.stringContaining(`${PAW_SIGNED_OUT_COOKIE}=1`),
+    );
+    expect(response.headers.getSetCookie()).toContainEqual(
+      expect.stringContaining("__Host-existing-reader=;"),
+    );
   });
 });
