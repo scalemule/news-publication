@@ -323,9 +323,35 @@ export function SponsorAcknowledgment({
     </div>
   );
 }
+/** Collection-managed cover photograph (config.presentation.cover_photo). */
+export type PetCoverPhoto = {
+  url: string;
+  alt: string;
+  credit: string;
+  credit_url?: string | null;
+};
+const DEFAULT_COVER: PetCoverPhoto = {
+  url: "https://cdn-public.scalemule.com/01a1382e-6aff-7091-a757-12433a04eed1/anonymous/photos/01a13b52-a168-7131-90f6-a216dbe8dc3b/w800_h0_scaledown_q85_webp.webp",
+  alt: "A white Labrador retriever resting on a sunlit lawn",
+  credit: "Boyko Mihaylov",
+};
+function safeCoverUrl(url: string | undefined | null): string | null {
+  if (!url || !/^https:\/\/[^\s"\\]+$/.test(url)) return null;
+  try {
+    return new URL(url).protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+function resolveCover(cover?: PetCoverPhoto | null): PetCoverPhoto {
+  if (!cover || !safeCoverUrl(cover.url) || !cover.alt || !cover.credit)
+    return DEFAULT_COVER;
+  return cover;
+}
 export type PetsSectionProps = {
   name?: string;
   tagline?: string;
+  coverPhoto?: PetCoverPhoto | null;
   community?: PetCommunity;
   communities: PetCommunity[];
   resources: PetResource[];
@@ -347,6 +373,7 @@ export type PetsSectionProps = {
 export function PetsSection({
   name = "Bay Area Paw",
   tagline = "Happier pets. Closer communities.",
+  coverPhoto,
   community,
   communities,
   resources,
@@ -365,6 +392,8 @@ export function PetsSection({
   eventsUrl,
   accountUrl,
 }: PetsSectionProps) {
+  const cover = resolveCover(coverPhoto);
+  const coverCreditUrl = safeCoverUrl(cover.credit_url);
   const location = community?.name || regionLabel || "the Bay Area";
   const link = (id: string) =>
     `${resourceBasePath || basePath}/${encodeURIComponent(id)}`;
@@ -487,9 +516,19 @@ export function PetsSection({
           <figure className="paw-cover-photo">
             <div
               role="img"
-              aria-label="A white Labrador retriever resting on a sunlit lawn"
+              aria-label={cover.alt}
+              style={{ backgroundImage: `url("${cover.url}")` }}
             />
-            <figcaption>Cover photograph by Boyko Mihaylov</figcaption>
+            <figcaption>
+              Cover photograph by{" "}
+              {coverCreditUrl ? (
+                <a href={coverCreditUrl} rel="noopener noreferrer">
+                  {cover.credit}
+                </a>
+              ) : (
+                cover.credit
+              )}
+            </figcaption>
           </figure>
         </section>
       )}

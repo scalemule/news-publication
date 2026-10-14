@@ -112,6 +112,43 @@ describe("pet publication boundaries", () => {
     expect(html).not.toContain("<img");
     expect(html).not.toContain("iframe");
   });
+  it("renders the collection-managed cover and refuses unsafe cover URLs", () => {
+    const base = { communities: [], resources: [], mediaUrl: () => "" };
+    const fallback = renderToStaticMarkup(<PetsSection {...base} />);
+    expect(fallback).toContain("Boyko Mihaylov");
+    expect(fallback).toContain("cdn-public.scalemule.com");
+
+    const managed = renderToStaticMarkup(
+      <PetsSection
+        {...base}
+        coverPhoto={{
+          url: "https://cdn-public.scalemule.com/app/anonymous/photos/p/w800.webp",
+          alt: "A seasonal cover — Джаспър 🐾",
+          credit: "Community photographer",
+          credit_url: "https://example.com/photographer",
+        }}
+      />,
+    );
+    expect(managed).toContain("w800.webp");
+    expect(managed).toContain("Community photographer");
+    expect(managed).toContain("https://example.com/photographer");
+    expect(managed).not.toContain("Boyko Mihaylov");
+
+    for (const url of [
+      "http://insecure.example/x.webp",
+      'https://x/" onload="alert(1)',
+      "javascript:alert(1)",
+    ]) {
+      const html = renderToStaticMarkup(
+        <PetsSection
+          {...base}
+          coverPhoto={{ url, alt: "a", credit: "c", credit_url: url }}
+        />,
+      );
+      expect(html).toContain("Boyko Mihaylov");
+      expect(html).not.toContain("alert(1)");
+    }
+  });
   it("never treats an upstream outage as an empty lost-pet board", () => {
     const html = renderToStaticMarkup(
       <PetsSection
