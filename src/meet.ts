@@ -1,4 +1,5 @@
 /** Rules for in-person meetups and the paper's chat. */
+import { preparePawWalk, type PawWalkDetails } from "./pets";
 
 export const MEET_ACTIVITIES = [
   { value: "coffee", label: "Coffee" },
@@ -27,6 +28,7 @@ export type MeetupInput = {
   startsAt?: unknown;
   notes?: unknown;
   capacity?: unknown;
+  walk?: Partial<PawWalkDetails>;
 };
 
 export type PreparedMeetup = {
@@ -38,6 +40,7 @@ export type PreparedMeetup = {
   startsAt: string;
   notes: string;
   capacity: number;
+  walk?: PawWalkDetails;
 };
 
 const HOST_WAIT_MS = 48 * 60 * 60 * 1000;
@@ -89,6 +92,10 @@ export function prepareMeetup(input: MeetupInput, places: PublicPlace[], now = n
   if (!notes.ok) throw new Error(notes.reason);
   const capacity = Number(input.capacity ?? 6);
   if (!Number.isInteger(capacity) || capacity < 2 || capacity > 12) throw new Error("Choose a group size from 2 to 12.");
+  const walk = activity === "dogs" && input.walk ? preparePawWalk(input.walk) : undefined;
+  if (walk) for (const guidance of [walk.size_guidance, walk.accessibility]) {
+    if (guidance.trim()) { const screened = screenMessage(guidance); if (!screened.ok) throw new Error(screened.reason); }
+  }
   return {
     activity: activity as MeetActivity,
     activityLabel: label,
@@ -98,5 +105,6 @@ export function prepareMeetup(input: MeetupInput, places: PublicPlace[], now = n
     startsAt: new Date(starts).toISOString(),
     notes: notes.text,
     capacity,
+    ...(walk ? { walk } : {}),
   };
 }

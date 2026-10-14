@@ -1,10 +1,12 @@
 import { activityLabel, MEET_ACTIVITIES, type PreparedMeetup } from "./meet";
+import { PET_SAFETY } from "./pets";
 
 export type MeetupCard = PreparedMeetup & {
   id: string;
   hostName: string;
   going: number;
   conversationId?: string | null;
+  status?: "open" | "cancelled";
 };
 
 export function MeetBoard({ region, meetups }: { region: string; meetups: MeetupCard[] }) {
@@ -43,12 +45,15 @@ export function MeetupDetail({ meetup, joined }: { meetup: MeetupCard; joined: b
       <p className="meta">{meetup.placeName} · {meetup.placeDetail}</p>
       <p className="meta">{new Date(meetup.startsAt).toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} · Host {meetup.hostName} · {meetup.going} of {meetup.capacity}</p>
       <div className="body">{meetup.notes}</div>
-      {!joined && meetup.going < meetup.capacity && (
+      {meetup.activity === "dogs" && <aside>{meetup.walk && <><p>{meetup.walk.duration_minutes} minutes{meetup.walk.distance_km !== undefined ? ` · ${meetup.walk.distance_km} km` : ""} · {meetup.walk.leash === "required" ? "Leashes required" : "Follow venue leash rules"}</p><p>{meetup.walk.size_guidance}</p><p>{meetup.walk.accessibility}</p></>}<p>{PET_SAFETY.walks}</p></aside>}
+      {meetup.status === "cancelled" && <p role="status">This meetup has been cancelled.</p>}
+      {meetup.status !== "cancelled" && !joined && meetup.going < meetup.capacity && (
         <form className="actions" method="post" action={`/api/meet/${encodeURIComponent(meetup.id)}/join`}>
           <button className="primary" type="submit">I’ll be there</button>
         </form>
       )}
-      {joined && <p className="meta">You’re going. Use the chat below. Keep phone numbers for when you meet.</p>}
+      {meetup.status !== "cancelled" && joined && <p className="meta">You’re going. Use the chat below. Keep phone numbers for when you meet.</p>}
+      <p><a href={"/corrections?resource=" + encodeURIComponent(`/meet/${meetup.id}`)}>Report this meetup to the publication</a></p>
     </article>
   );
 }

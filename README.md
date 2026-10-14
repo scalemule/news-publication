@@ -245,3 +245,31 @@ publication must validate that return path and preserve it through sign-in.
 Inventory is unavailable until a verified operational placement is active. `placementAvailable` enforces verification freshness and keeps paid briefings disabled. Campaign approval, authorization, allocation capacity and manual commercial references remain server responsibilities. Report HTML distinguishes observed counts from unavailable data and can be printed or rendered to PDF. No invoice or payment is initiated by this SDK.
 
 The consent banner now offers a choice in every geography where optional measurement requires one. `measurementConsent` is the server gate for current, explicitly allowed categories and GPC/DNT. Positive permission is local: unsigned URL parameters and a binary network hub cannot grant all categories. Rendering sponsorship recognition does not require tracking consent; measuring it requires both performance and advertising permission.
+
+## Community pet sections
+
+The `pets`, `pets-view`, `pets-forms`, `pets-interactions`, `pets-server`,
+`pets-auth-server`, and `pets-publication` entry points add typed, moderated pet
+resources to existing Community Maps collections. Import `pets.css` for the
+scoped presentation. Server adapters require each application's own API key;
+never pass credentials or a `PetScope` to a client component.
+
+`PublicationPetsSection` resolves an accepted collection view and its coverage.
+`PublicationPetReferences` resolves `metadata.pet_resources` at render time:
+each reference has `collection_slug`, the API-returned `id`, and `kind`.
+Removed/private resources are omitted; article records need no copied pet data.
+`PublicationPetEvents` extends the existing publication calendar with reviewed
+pet event references and official registration links. Meet's optional `walk`
+field extends its existing dog-walk activity without creating another join system.
+
+`createPawAuthHandler` delegates authentication to the platform's supported
+Ledvery OIDC flow. Enable it only after configuring and testing the application
+client and callback. `createPublicationPetsHandler` restricts routes, requires
+same-origin authenticated writes, and proxies visibility-checked photographs.
+Approved sponsorships come from existing Blog campaign delivery and reporting.
+There is no fictional sponsor fallback and no public demonstration inventory.
+
+Private recovery contact and broad community alert delivery are not implemented
+by these components. Notification controls default to disabled. The canonical
+application, collections, publication views and legitimate source content must
+be provisioned separately before launch.
