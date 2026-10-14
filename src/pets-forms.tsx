@@ -1036,7 +1036,9 @@ export function PetSubmissionForm({
           <p className="paw-form-endnote">
             {step === 0
               ? "Next: a private preview. Nothing is published yet."
-              : "Your contribution stays private until editorial approval."}
+              : kind === "profile" && visibility === "private"
+                ? "Only you can see this private profile."
+                : "Your contribution stays private until editorial approval."}
           </p>
         </div>
       </form>
