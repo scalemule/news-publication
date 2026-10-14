@@ -1274,6 +1274,7 @@
 }
 .paw-week-cover small {
   line-height: 1.5;
+  color: inherit;
 }
 .paw-week-invitation h2 {
   font-size: clamp(36px, 4vw, 54px);
