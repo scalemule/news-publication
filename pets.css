@@ -1,8 +1,8 @@
 .paw {
   --paw-bg: #f8f3e9;
-  --paw-ink: #173e35;
+  --paw-ink: #12314e;
   --paw-muted: #52675e;
-  --paw-blue: #173e35;
+  --paw-blue: #12314e;
   --paw-green: #e2e9dd;
   --paw-leaf: #356b4d;
   --paw-line: #cbd3c5;
@@ -458,7 +458,7 @@
     max-width: 160px;
   }
   .paw-brand svg {
-    width: 28px;
+    width: 36px;
   }
   .paw-masthead > .paw-button {
     font-size: 12px;
@@ -735,8 +735,8 @@
 }
 /* Honor the publication's explicit appearance preference ahead of the device. */
 [data-theme="light"] .paw {
-  --paw-bg: #f8f3e9; --paw-ink: #173e35; --paw-muted: #52675e;
-  --paw-blue: #173e35; --paw-green: #e2e9dd; --paw-leaf: #356b4d; --paw-line: #cbd3c5;
+  --paw-bg: #f8f3e9; --paw-ink: #12314e; --paw-muted: #52675e;
+  --paw-blue: #12314e; --paw-green: #e2e9dd; --paw-leaf: #356b4d; --paw-line: #cbd3c5;
   --paw-art-sky: #c5ddd6; --paw-art-hill: #a9c4ac; --paw-art-ground: #dce4c7;
 }
 [data-theme="dark"] .paw {
@@ -744,3 +744,9 @@
   --paw-blue: #d9e8ce; --paw-green: #29483c; --paw-leaf: #b5dabd; --paw-line: #496253;
   --paw-art-sky: #42665c; --paw-art-hill: #617c62; --paw-art-ground: #819171;
 }
+
+/* The supplied logo keeps its geometry; host publications can tune these tokens. */
+.paw { --paw-logo-ink: var(--paw-ink); --paw-logo-heart: #ef7152; }
+.paw-mark { display: block; flex: 0 0 auto; }
+
+.publication .paw { --paw-logo-ink: var(--pub-ink, #12314e); --paw-logo-heart: var(--pub-accent, #ef7152); }

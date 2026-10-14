@@ -1,3 +1,8 @@
+## 0.0.52
+
+- Use the publisher-supplied Bay Area Paw dog/cat/heart icon in all shared pet pages. Preserve its geometry and expose logo ink/heart color tokens for publication themes and dark appearance.
+- Secure recovery contact and community notification delivery remain deferred.
+
 ## 0.0.51
 
 - Preserve the current home community when editing a pet from another publication; keep new contributions within host coverage.
