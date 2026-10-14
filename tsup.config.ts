@@ -2,6 +2,13 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: {
+    pets: "src/pets.ts",
+    "pets-view": "src/pets-view.tsx",
+    "pets-forms": "src/pets-forms.tsx",
+    "pets-interactions": "src/pets-interactions.tsx",
+    "pets-publication": "src/pets-publication.tsx",
+    "pets-server": "src/pets-server.ts",
+    "pets-auth-server": "src/pets-auth-server.ts",
     index: "src/index.ts",
     "sponsorship-view": "src/sponsorship-view.tsx",
     "community-maps-server": "src/community-maps-server.ts",
