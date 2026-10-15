@@ -26,6 +26,12 @@
       ],
       "@scalemule/news-publication/pets-interactions": [
         "./src/pets-interactions.tsx"
+      ],
+      "@scalemule/news-publication/toys-forms": [
+        "./src/toys-forms.tsx"
+      ],
+      "@scalemule/news-publication/toys-interactions": [
+        "./src/toys-interactions.tsx"
       ]
     }
   },

@@ -42,7 +42,7 @@ describe("network navigation defaults", () => {
     const { groups } = paper();
     const byId = Object.fromEntries(groups.map(group => [group.id, group.links.map(link => link.label)]));
     expect(byId["news-knowledge"]).toEqual(["Civic life"]); // AI, Schools, Environment, Transportation are not configured sections yet.
-    expect(byId["local-life"]).toEqual(["Pets", "Community maps", "Town chat", "Poll"]);
+    expect(byId["local-life"]).toEqual(["Pets", "Toy Swap", "Community maps", "Town chat", "Poll"]);
     expect(byId["marketplace"]).toEqual(["Jobs", "Classifieds"]); // Autos and Local services ship disabled.
     expect(byId["publication"]).toEqual(["Latest", "This week", "Newsletter", "About", "Advertise", "Contact"]);
   });

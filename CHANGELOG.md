@@ -1,3 +1,8 @@
+## 0.0.62
+
+- ToyRound: shared community toy exchange (`toys`, `toys-view`, `toys-forms`, `toys-interactions`, `toys-plugin`, `toys-publication`, `toys-server`, `toys.css`) on the Knowledge `toy-exchange` collection kind. Free giveaways and direct swaps only; every listing is editor-reviewed; adult, email- and phone-verified members; atomic reservation; public-place daytime appointments in the place's timezone; private two-party threads with scam warnings; block, report, feedback, account deletion.
+- `createPublicationToysHandler` proxies an explicit allowlist of exchange routes plus Auth phone OTP; `createToyCommunityHandler` remembers the chosen community on-device. Publications mount `/toys` natively with their existing reader cookie and API key; "Toy Swap" lives in More ▸ Local life.
+
 ## 0.0.54
 
 - Broadsheet editorial in-article figure and caption typography: add dedicated broadsheet tokens for `<figure>`, `.article-figure`, and `<figcaption>` with 36px vertical breathing room, full clear boundaries, responsive image block rendering, and crisp 13px muted sans-serif caption styling.

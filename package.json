@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.61",
+  "version": "0.0.62",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -143,7 +143,43 @@
       "types": "./dist/pets-plugin.d.ts",
       "import": "./dist/pets-plugin.js",
       "require": "./dist/pets-plugin.cjs"
-    }
+    },
+    "./toys": {
+      "types": "./dist/toys.d.ts",
+      "import": "./dist/toys.js",
+      "require": "./dist/toys.cjs"
+    },
+    "./toys-view": {
+      "types": "./dist/toys-view.d.ts",
+      "import": "./dist/toys-view.js",
+      "require": "./dist/toys-view.cjs"
+    },
+    "./toys-forms": {
+      "types": "./dist/toys-forms.d.ts",
+      "import": "./dist/toys-forms.js",
+      "require": "./dist/toys-forms.cjs"
+    },
+    "./toys-interactions": {
+      "types": "./dist/toys-interactions.d.ts",
+      "import": "./dist/toys-interactions.js",
+      "require": "./dist/toys-interactions.cjs"
+    },
+    "./toys-plugin": {
+      "types": "./dist/toys-plugin.d.ts",
+      "import": "./dist/toys-plugin.js",
+      "require": "./dist/toys-plugin.cjs"
+    },
+    "./toys-publication": {
+      "types": "./dist/toys-publication.d.ts",
+      "import": "./dist/toys-publication.js",
+      "require": "./dist/toys-publication.cjs"
+    },
+    "./toys-server": {
+      "types": "./dist/toys-server.d.ts",
+      "import": "./dist/toys-server.js",
+      "require": "./dist/toys-server.cjs"
+    },
+    "./toys.css": "./toys.css"
   },
   "files": [
     "dist",
@@ -157,7 +193,8 @@
     "sponsorship.css",
     "pets.css",
     "fonts",
-    "images"
+    "images",
+    "toys.css"
   ],
   "peerDependencies": {
     "@scalemule/react": "0.0.21",
