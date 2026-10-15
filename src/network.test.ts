@@ -3,6 +3,7 @@ import {
   localPublications,
   listedPublications,
   communityPublications,
+  topicalPublications,
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
@@ -19,9 +20,10 @@ describe("publication network", () => {
     expect(NETWORK_PARENT.principles.length).toBe(6);
   });
 
-  it("includes all 11 publications in the Bay Area network", () => {
-    expect(localPublications.length).toBe(11);
+  it("includes all 12 publications in the Bay Area network", () => {
+    expect(localPublications.length).toBe(12);
     const slugs = localPublications.map((p) => p.slug);
+    expect(slugs[0]).toBe("lazytensor"); // the technology title opens the network bar
     expect(slugs).toContain("bayareachronicle");
     expect(slugs).toContain("walnutcreektimes");
     expect(slugs).toContain("danvilletimes");
@@ -36,9 +38,13 @@ describe("publication network", () => {
   });
 
   it("filters listed and community publications correctly", () => {
-    expect(listedPublications.length).toBe(10); // napagate is unlisted
-    expect(communityPublications.length).toBe(9); // excludes bayareachronicle
+    expect(listedPublications.length).toBe(11); // napagate is unlisted
+    expect(communityPublications.length).toBe(9); // excludes bayareachronicle and the topical title
     expect(communityPublications.some((p) => p.slug === "bayareachronicle")).toBe(false);
+    expect(communityPublications.some((p) => p.slug === "lazytensor")).toBe(false);
+    expect(topicalPublications.map((p) => p.slug)).toEqual(["lazytensor"]);
+    expect(findPublicationBySlug("lazytensor")?.kind).toBe("topical");
+    expect(findPublicationBySlug("lazytensor")?.focus).toBe("AI & Technology");
   });
 
   it("finds publications by slug", () => {
@@ -64,7 +70,9 @@ describe("publication network", () => {
     expect(url).toContain("https://alamoweekly.com/");
   });
 
-  it("identifies network hostnames across all 11 publications", () => {
+  it("identifies network hostnames across all 12 publications", () => {
+    expect(isNetworkHostname("lazytensor.com")).toBe(true);
+    expect(isNetworkHostname("www.lazytensor.com")).toBe(true);
     expect(isNetworkHostname("bayareachronicle.com")).toBe(true);
     expect(isNetworkHostname("www.bayareachronicle.com")).toBe(true);
     expect(isNetworkHostname("concordchronicle.com")).toBe(true);
