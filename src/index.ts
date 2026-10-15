@@ -204,6 +204,7 @@ export {
   localPublications,
   listedPublications,
   communityPublications,
+  topicalPublications,
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,

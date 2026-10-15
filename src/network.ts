@@ -150,6 +150,14 @@ export interface PublicationNetworkItem {
   slogan?: string;
   aboutIntro?: string;
   listed?: boolean;
+  /**
+   * `local` (default) papers cover towns; a `topical` publication covers a
+   * subject for the whole network (Lazy Tensor: AI & technology). Topical
+   * titles sit in the network bar but not among the community papers.
+   */
+  kind?: "local" | "topical";
+  /** Short subject line shown beside the name in directories, e.g. "AI & Technology". */
+  focus?: string;
 }
 
 /**
@@ -157,6 +165,19 @@ export interface PublicationNetworkItem {
  * Menu order follows the central corridor from north to south.
  */
 export const localPublications: readonly PublicationNetworkItem[] = [
+  {
+    slug: "lazytensor",
+    name: "Lazy Tensor",
+    url: "https://lazytensor.com",
+    area: "Silicon Valley · AI & Technology",
+    focus: "AI & Technology",
+    kind: "topical",
+    slogan: "Technology, Intelligence & Everything in Between.",
+    description:
+      "The network's technology publication: artificial intelligence, computing, science, startups and what technology means for the people and communities of Silicon Valley and the Bay Area.",
+    aboutIntro:
+      "Lazy Tensor is the Bay Area News Network's dedicated technology publication. We report on artificial intelligence, computing, science and the companies, researchers and founders of Silicon Valley, and we explain what those developments mean for readers' lives, work and communities. Our principle is simple: understand the technology, question the hype, explain what matters. Lazy Tensor also gathers the technology reporting of the network's local newsrooms in one place, always with credit to the paper that reported the story first.",
+  },
   {
     slug: "bayareachronicle",
     name: "Bay Area Chronicle",
@@ -286,7 +307,12 @@ export const listedPublications: readonly PublicationNetworkItem[] = localPublic
 );
 
 export const communityPublications: readonly PublicationNetworkItem[] = listedPublications.filter(
-  (publication) => publication.slug !== "bayareachronicle",
+  (publication) => publication.slug !== "bayareachronicle" && publication.kind !== "topical",
+);
+
+/** Subject publications that serve the whole network (currently Lazy Tensor). */
+export const topicalPublications: readonly PublicationNetworkItem[] = listedPublications.filter(
+  (publication) => publication.kind === "topical",
 );
 
 /** Find a publication in the network by its slug. */
