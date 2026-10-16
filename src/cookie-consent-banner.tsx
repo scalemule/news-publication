@@ -8,6 +8,7 @@ import {
   recordConsentToCompliance,
   COOKIE_CONSENT_EVENT,
   isGpcActive,
+  consentModel,
   DEFAULT_CONSENT_HUB_URL,
 } from "./cookies";
 
@@ -26,7 +27,7 @@ export interface CookieConsentBannerProps {
   complianceEndpoint?: string;
   /** Explicit ISO 3166-1 alpha-2 country code (e.g. from server headers or GeoIP) */
   countryCode?: string | null;
-  /** Force display of banner regardless of visitor geography */
+  /** Force display of banner regardless of visitor geography (opt-out regions show no banner by default) */
   forceShow?: boolean;
   /** URL of the central network consent iframe bridge. Default: "https://bayareachronicle.com/consent-bridge.html" */
   consentHubUrl?: string;
@@ -48,9 +49,14 @@ export function CookieConsentBanner({
 
   useEffect(() => {
     setMounted(true);
-    // Analytics requires an explicit choice everywhere. Geography must not hide
-    // the only way to make that choice. An unsigned URL or a binary network hub
-    // response cannot grant category-level permission on this publication.
+    // Regional consent model: opt-in regions (EU/EEA/UK/CH) need a prior choice
+    // before optional cookies, so the banner asks. Opt-out regions carry notice
+    // in the footer and the settings page instead of an interruption; first-party
+    // measurement is implied there and can be turned off at any time. An unsigned
+    // URL or a binary network hub response cannot grant category-level permission.
+    if (countryCode && /^[A-Za-z]{2}$/.test(countryCode)) {
+      try { document.cookie = `sm_geo_country=${countryCode.toUpperCase()}; Path=/; SameSite=Lax`; } catch { /* hint only */ }
+    }
     const url = new URL(window.location.href);
     if (url.searchParams.has("sm_consent")) {
       if (url.searchParams.get("sm_consent") === "0" && !hasConsented())
@@ -58,12 +64,13 @@ export function CookieConsentBanner({
       url.searchParams.delete("sm_consent");
       window.history.replaceState(window.history.state, "", url);
     }
-    setVisible(!hasConsented() && !isGpcActive());
+    const asks = forceShow || consentModel(countryCode) === "opt-in";
+    setVisible(asks && !hasConsented() && !isGpcActive());
   }, [countryCode, forceShow, consentHubUrl]);
 
   useEffect(() => {
     const onConsentChange = () => {
-      setVisible(!hasConsented() && !isGpcActive());
+      setVisible(visible => visible && !hasConsented() && !isGpcActive());
     };
     window.addEventListener(COOKIE_CONSENT_EVENT, onConsentChange);
     return () =>
@@ -92,7 +99,8 @@ export function CookieConsentBanner({
 
   const defaultText = (
     <>
-      With your permission, we measure reading activity and sponsor
+      We count page views without cookies or identifiers. With your permission,
+      first-party cookies also let us measure reading sessions and sponsor
       acknowledgments. You can read the publication with optional cookies turned
       off. View{" "}
       <a href={settingsUrl} className="sm-cookie-banner-link">

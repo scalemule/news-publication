@@ -41,7 +41,11 @@ describe("Cookie Consent State & Disclosures", () => {
   it("essential category is always allowed even before explicit consent", () => {
     expect(hasConsented()).toBe(false);
     expect(isCategoryAllowed("essential")).toBe(true);
-    expect(isCategoryAllowed("performance")).toBe(false);
+    // Regional default before a choice: opt-in regions imply nothing, opt-out regions imply
+    // first-party measurement with notice; advertising is never implied.
+    expect(isCategoryAllowed("performance", "DE")).toBe(false);
+    expect(isCategoryAllowed("performance", "US")).toBe(true);
+    expect(isCategoryAllowed("advertising", "US")).toBe(false);
   });
 
   it("acceptAllCookies enables all categories and saves record", () => {

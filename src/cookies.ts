@@ -8,6 +8,9 @@ import {
   isCategoryAllowed,
   isGpcActive,
   isGeoConsentRequired,
+  consentModel,
+  impliedPreferences,
+  effectivePreferences,
   checkUrlConsentBridge,
   decorateNetworkUrl,
   queryNetworkConsentHub,
@@ -111,6 +114,9 @@ export {
   isCategoryAllowed,
   isGpcActive,
   isGeoConsentRequired,
+  consentModel,
+  impliedPreferences,
+  effectivePreferences,
   checkUrlConsentBridge,
   decorateNetworkUrl,
   queryNetworkConsentHub,
@@ -167,7 +173,7 @@ export const COOKIE_CATEGORIES: CookieCategoryDefinition[] = [
     title: "Performance & Analytics Cookies",
     shortDescription: "Help us measure reader engagement, story completion, and site reliability.",
     fullDescription:
-      "With your permission, first-party identifiers support page-visit and reading measurements. Aggregate reports help us improve the publication. Measurements are incomplete when readers decline consent and are not a count of unique people.",
+      "We always count page views and reading activity without cookies or any identifier stored on your device: the server derives a daily-rotating, non-reversible hash that cannot be linked back to you, and your IP address is truncated before it is stored. With these cookies turned on, first-party identifiers additionally let us recognise a return visit and measure sessions. In the United States and most other regions they are on by default and you can turn them off here; in the EU, EEA, UK and Switzerland they stay off until you accept them.",
     required: false,
     cookies: [
       {

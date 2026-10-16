@@ -252,6 +252,17 @@ describe("search metadata", () => {
     expect(graph.publisher).toMatchObject({ "@type": "NewsMediaOrganization", name: "Walnut Creek Times" });
     expect(graph.url).toBe("https://walnutcreektimes.com/news/tenant-rights");
     expect(graph).not.toHaveProperty("dateModified");
+
+    const modifiedArticle = {
+      ...storyArticle,
+      metadata: {
+        ...storyArticle.metadata,
+        editorial: { modified_at: "2026-10-15T20:38:00Z" },
+      },
+    };
+    const modifiedGraph = newsArticleJsonLd(walnutCreekTimes, modifiedArticle, "https://walnutcreektimes.com", "Walnut Creek Times");
+    expect(modifiedGraph.dateModified).toBe("2026-10-15T20:38:00Z");
+
     const meta = articleMeta(walnutCreekTimes, { ...storyArticle, seo_title: "Tenant ri" }, "https://walnutcreektimes.com", true);
     expect(meta.title).toBe(storyArticle.title);
     expect(meta.openGraph).not.toHaveProperty("modifiedTime");

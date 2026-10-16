@@ -5,6 +5,7 @@ import {
   COOKIE_CATEGORIES,
   DEFAULT_PREFERENCES_ACCEPTED,
   DEFAULT_PREFERENCES_REJECTED,
+  effectivePreferences,
   getCookieConsent,
   setCookieConsent,
   recordConsentToCompliance,
@@ -30,8 +31,9 @@ export function CookieSettingsView({
   publicationSlug,
 }: CookieSettingsViewProps) {
   const [preferences, setPreferences] = useState<CookiePreferences>(() => {
-    const existing = getCookieConsent();
-    return existing ? existing.preferences : { ...DEFAULT_PREFERENCES_ACCEPTED };
+    // The explicit record, else the regional default (implied first-party measurement in
+    // opt-out regions, nothing optional in opt-in regions), so the switches show the truth.
+    return { ...effectivePreferences() };
   });
 
   const [expandedCategories, setExpandedCategories] = useState<Record<CookieCategory, boolean>>({
