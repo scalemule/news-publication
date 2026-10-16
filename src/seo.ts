@@ -31,6 +31,7 @@ export function newsArticleJsonLd(
     headline: article.title,
     description: article.excerpt ?? undefined,
     datePublished: article.published_at,
+    ...(article.metadata?.editorial?.modified_at ? { dateModified: article.metadata.editorial.modified_at } : {}),
     // updated_at also changes for media/operational maintenance. A trusted
     // editorial modification timestamp is required before emitting dateModified.
     image: image ? [image] : undefined,

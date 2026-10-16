@@ -85,9 +85,46 @@ describe("verified-card functionality and security", () => {
     expect(first.verificationNote).toBe("Official portal verified with City staff");
     expect(first.verifiedAt).toBe("October 2, 2026");
 
-    // Unknown card_type defaults safely to PLACE
-    expect(cards[1].cardType).toBe("PLACE");
+    // Unknown card_type defaults safely to REFERENCE (never falsely claiming PLACE / LOCAL VENUE)
+    expect(cards[1].cardType).toBe("REFERENCE");
+    expect(cards[1].kicker).toBe("FACTSHEET");
     expect(cards[1].title).toBe("Default Fallback Entity");
+    expect(cards[1].verificationNote).toBeUndefined();
+  });
+
+  it("handles technical framework and non-location cards without venue defaults", () => {
+    const techCards = getArticleCards([
+      {
+        id: "card-webmcp",
+        card_type: "RESEARCH_FRAMEWORK",
+        title: "WebMCP Protocol",
+        subtitle: "Machine-Operated Digital Services",
+        website: "https://developer.chrome.com/docs/ai/webmcp",
+        address: "Mountain View, CA",
+        hours: "Chrome Developer Runtime Working Group",
+      },
+    ]);
+
+    expect(techCards).toHaveLength(1);
+    const card = techCards[0];
+    expect(card.cardType).toBe("FRAMEWORK");
+    expect(card.kicker).toBe("TECHNICAL FRAMEWORK");
+    // Non-location cards should not generate Google Maps venue links or label hours as store hours
+    expect(card.facts).toEqual([
+      { label: "Location", value: "Mountain View, CA" },
+      { label: "Details", value: "Chrome Developer Runtime Working Group" },
+      {
+        label: "Website",
+        value: "developer.chrome.com/docs/ai/webmcp",
+        href: "https://developer.chrome.com/docs/ai/webmcp",
+      },
+    ]);
+    // Does NOT fabricate a verification seal
+    expect(card.verificationNote).toBeUndefined();
+
+    const rendered = JSON.stringify(VerifiedCardComponent({ card }));
+    expect(rendered).not.toContain("LOCAL VENUE");
+    expect(rendered).not.toContain("Verified by publication reporting staff");
   });
 
   it("renders broadsheet verified card and section elements without throwing", () => {

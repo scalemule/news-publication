@@ -36,20 +36,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("explicit privacy choices", () => {
-  it("offers US readers a choice and preserves reject as an equal action", async () => {
+  it("does not interrupt US readers: first-party measurement is implied with notice", () => {
     render(<CookieConsentBanner countryCode="US" />);
+    expect(screen.queryByText("Your privacy choices")).toBeNull();
+    expect(getCookieConsent()).toBeNull();
+    expect(isCategoryAllowed("performance", "US")).toBe(true);
+    expect(isCategoryAllowed("advertising", "US")).toBe(false);
+  });
+  it("asks EU readers first and preserves reject as an equal action", async () => {
+    render(<CookieConsentBanner countryCode="DE" />);
     expect(screen.getByText("Your privacy choices")).toBeTruthy();
+    expect(isCategoryAllowed("performance", "DE")).toBe(false);
     await act(async () =>
       fireEvent.click(screen.getByRole("button", { name: "Reject" })),
     );
-    expect(isCategoryAllowed("performance")).toBe(false);
+    expect(isCategoryAllowed("performance", "DE")).toBe(false);
+    expect(isCategoryAllowed("performance", "US")).toBe(false);
     expect(screen.queryByText("Your privacy choices")).toBeNull();
   });
   it("never grants optional consent from an unsigned URL", () => {
     window.history.replaceState(null, "", "/?sm_consent=1");
     expect(checkUrlConsentBridge()).toBe(false);
     expect(getCookieConsent()).toBeNull();
-    render(<CookieConsentBanner countryCode="US" />);
+    render(<CookieConsentBanner countryCode="DE" />);
     expect(screen.getByText("Your privacy choices")).toBeTruthy();
   });
   it("sees another tab withdrawing previously cached acceptance", () => {
@@ -81,8 +90,8 @@ describe("explicit privacy choices", () => {
       configurable: true,
       value: true,
     });
-    render(<CookieConsentBanner countryCode="US" />);
-    expect(isCategoryAllowed("performance")).toBe(false);
+    render(<CookieConsentBanner countryCode="DE" />);
+    expect(isCategoryAllowed("performance", "US")).toBe(false);
     expect(screen.queryByText("Your privacy choices")).toBeNull();
   });
 });

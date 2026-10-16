@@ -138,7 +138,18 @@ export type CoverImageMetadata = {
 
 export type ArticleCitation = { url: string; title?: string; publisher?: string };
 
-export type CardType = "PLACE" | "ACTIVITY" | "EVENT" | "ORGANIZATION" | "PRODUCT";
+export type CardType =
+  | "PLACE"
+  | "ACTIVITY"
+  | "EVENT"
+  | "ORGANIZATION"
+  | "PRODUCT"
+  | "FRAMEWORK"
+  | "STANDARD"
+  | "SPECIFICATION"
+  | "TOPIC"
+  | "RESOURCE"
+  | "REFERENCE";
 
 export type VerifiedCardAction = {
   label: string;
@@ -175,8 +186,8 @@ export type VerifiedCard = {
   badge?: string;
   facts: VerifiedCardFact[];
   actions: VerifiedCardAction[];
-  verificationNote: string;
-  verifiedAt: string;
+  verificationNote?: string;
+  verifiedAt?: string;
   image?: VerifiedCardImage;
   rating?: number | string;
 };
@@ -200,6 +211,10 @@ export type NewsArticle = NewsItem & {
       attribution: string;
       ai_generated: boolean;
     }[];
+    editorial?: {
+      modified_at?: string;
+      notices?: { id?: string; kind: string; published_at?: string; text: string }[];
+    };
     cards?: VerifiedCard[] | unknown[];
   };
 };

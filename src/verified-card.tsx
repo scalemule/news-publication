@@ -13,6 +13,12 @@ const ALLOWED_CARD_TYPES = new Set<CardType>([
   "EVENT",
   "ORGANIZATION",
   "PRODUCT",
+  "FRAMEWORK",
+  "STANDARD",
+  "SPECIFICATION",
+  "TOPIC",
+  "RESOURCE",
+  "REFERENCE",
 ]);
 
 /**
@@ -95,15 +101,36 @@ function parseRawCards(rawCards: unknown[]): VerifiedCard[] {
     const title = clip(c.title, 300);
     if (!id || !title) continue;
 
-    const rawType = (typeof c.card_type === "string" ? c.card_type : c.cardType) as CardType;
-    const cardType: CardType = ALLOWED_CARD_TYPES.has(rawType) ? rawType : "PLACE";
+    const rawKind = (
+      typeof c.card_type === "string"
+        ? c.card_type
+        : typeof c.cardType === "string"
+          ? c.cardType
+          : ""
+    ).trim().toUpperCase();
+    let cardType: CardType;
+    if (ALLOWED_CARD_TYPES.has(rawKind as CardType)) {
+      cardType = rawKind as CardType;
+    } else if (rawKind === "RESEARCH_FRAMEWORK") {
+      cardType = "FRAMEWORK";
+    } else if (c.address && c.hours) {
+      cardType = "PLACE";
+    } else {
+      cardType = "REFERENCE";
+    }
 
     const kicker = clip(c.kicker, 120) || (
-      cardType === "PLACE" ? "LOCAL VENUE · VERIFIED DIRECTORY" :
-      cardType === "EVENT" ? "COMMUNITY EVENT · VERIFIED FACTSHEET" :
-      cardType === "ACTIVITY" ? "COMMUNITY ACTIVITY · VERIFIED FACTSHEET" :
-      cardType === "ORGANIZATION" ? "COMMUNITY ORGANIZATION · DIRECTORY" :
-      "VERIFIED FACTSHEET"
+      cardType === "PLACE" ? "LOCAL VENUE · DIRECTORY" :
+      cardType === "EVENT" ? "COMMUNITY EVENT · FACTSHEET" :
+      cardType === "ACTIVITY" ? "COMMUNITY ACTIVITY · FACTSHEET" :
+      cardType === "ORGANIZATION" ? "ORGANIZATION · DIRECTORY" :
+      cardType === "PRODUCT" ? "PRODUCT · FACTSHEET" :
+      cardType === "FRAMEWORK" ? "TECHNICAL FRAMEWORK" :
+      cardType === "STANDARD" ? "TECHNICAL STANDARD" :
+      cardType === "SPECIFICATION" ? "SPECIFICATION" :
+      cardType === "TOPIC" ? "TOPIC REFERENCE" :
+      cardType === "RESOURCE" ? "DIGITAL RESOURCE" :
+      "FACTSHEET"
     );
 
     const subtitle = clip(c.subtitle, 300);
@@ -133,17 +160,26 @@ function parseRawCards(rawCards: unknown[]): VerifiedCard[] {
       const timeframe = clip(c.timeframe, 200);
       if (timeframe) facts.push({ label: "Timeframe", value: timeframe });
 
+      const isPhysicalPlace = cardType === "PLACE" || cardType === "EVENT" || cardType === "ACTIVITY";
+
       const address = clip(c.address, 300);
       if (address) {
         facts.push({
-          label: "Address",
+          label: isPhysicalPlace ? "Address" : "Location",
           value: address,
-          href: `https://maps.google.com/?q=${encodeURIComponent(address)}`,
+          href: isPhysicalPlace ? `https://maps.google.com/?q=${encodeURIComponent(address)}` : undefined,
         });
       }
 
       const hours = clip(c.hours, 300);
-      if (hours) facts.push({ label: "Hours", value: hours });
+      if (hours) {
+        facts.push({ label: isPhysicalPlace ? "Hours" : "Details", value: hours });
+      }
+
+      const website = clip(c.website || c.url, 500);
+      if (website && isSafeActionUrl(website)) {
+        facts.push({ label: "Website", value: website.replace(/^https?:\/\//, ""), href: website });
+      }
 
       const phone = clip(c.phone, 80);
       if (phone) {
@@ -198,11 +234,9 @@ function parseRawCards(rawCards: unknown[]): VerifiedCard[] {
       }
     }
 
-    const verificationNote =
-      clip(c.verification_note || c.verificationNote, 300) ||
-      "Verified by publication reporting staff";
-    const verifiedAt =
-      clip(c.verified_at || c.verifiedAt, 100) || "October 2026";
+    // Never generate verification claims automatically. Only preserve if explicitly supplied.
+    const verificationNote = clip(c.verification_note || c.verificationNote, 300);
+    const verifiedAt = clip(c.verified_at || c.verifiedAt, 100);
 
     let rating: number | string | undefined = undefined;
     if (typeof c.rating === "number" || typeof c.rating === "string") {
@@ -322,15 +356,21 @@ export function VerifiedCardComponent({
         </div>
       )}
 
-      <footer className="article-verified-card__footer">
-        <div className="article-verified-card__seal">
-          <span className="article-verified-card__seal-check" aria-hidden="true">
-            ✓
-          </span>
-          <span>{card.verificationNote}</span>
-        </div>
-        <span className="article-verified-card__date">{card.verifiedAt}</span>
-      </footer>
+      {(card.verificationNote || card.verifiedAt) && (
+        <footer className="article-verified-card__footer">
+          {card.verificationNote && (
+            <div className="article-verified-card__seal">
+              <span className="article-verified-card__seal-check" aria-hidden="true">
+                ✓
+              </span>
+              <span>{card.verificationNote}</span>
+            </div>
+          )}
+          {card.verifiedAt && (
+            <span className="article-verified-card__date">{card.verifiedAt}</span>
+          )}
+        </footer>
+      )}
     </aside>
   );
 }
