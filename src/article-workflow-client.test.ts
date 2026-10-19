@@ -170,3 +170,23 @@ describe("standard agent article package", () => {
     }).options();
   });
 });
+
+it("uses returned processing fences for explicit retries and revision narration without hidden work", async () => {
+  const calls: { path: string; method: string; body?: any }[] = [];
+  const client = new PublicationArticleClient({ apiUrl: "https://api.example.test", publicationId: "paper", fetch: (async (url, init) => {
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    const path = new URL(String(url)).pathname;
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ path, method: init?.method || "GET", body });
+    const data = init?.method === "GET" ? { article_id: "story", version: 9, publication_status: "published", narration: { status: "held" }, visual: { status: "assigned", provider: "news_visual_desk", policy_governed: true }, assets: [{ source_file_id: "private-source", public_file_id: "existing-copy", status: "held", attempts: 6, last_progress_at: "2026-10-19T23:00:00Z" }] } : { status: "queued" };
+    return Response.json({ success: true, data });
+  }) as typeof fetch });
+  const status = await client.processing("story");
+  await client.retryProcessing(status.article_id, status.version, status.assets[0].source_file_id);
+  await client.narrateRevision("story", 12);
+  expect(calls).toEqual([
+    { path: "/v1/blog/publications/paper/articles/story/processing", method: "GET", body: undefined },
+    { path: "/v1/blog/publications/paper/articles/story/processing", method: "POST", body: { expected_version: 9, asset_source_file_id: "private-source" } },
+    { path: "/v1/blog/publications/paper/articles/story/collaboration/narrate", method: "POST", body: { expected_generation: 12 } },
+  ]);
+});

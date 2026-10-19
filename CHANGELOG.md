@@ -1,3 +1,8 @@
+## 0.0.70
+
+- Expose typed processing versions and media holds so clients can inspect and retry the exact server state. Add an explicit revision-bound private narration method for publication policies that require audio before release.
+- Bound API requests to 30 seconds and asset transfers to 90 seconds without blind automatic retries. Submission/generation SLAs and full publication-adapter adoption remain separate rollout work.
+
 ## 0.0.69
 
 - Keep server-authorized review text visible immediately, but defer private image requests until the browser cookie exchange succeeds. This prevents an early unauthorized image request from leaving review photographs unavailable.
