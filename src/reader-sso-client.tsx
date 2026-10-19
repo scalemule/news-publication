@@ -108,14 +108,30 @@ function browserEnvironment(flags: { enabled: boolean; hasSession: boolean; supp
  * against it. The server sets the negative-cache cookie on every silent negative,
  * so this can never loop.
  */
-export function ReaderSsoBoot({ enabled = true, hasSession, suppressed, startPath = "/api/news/ledvery-start", privatePaths, idleDelayMs = 1500 }: {
+export function ReaderSsoBoot({ enabled = true, hasSession: hasSessionCookie, suppressed, startPath = "/api/news/ledvery-start", sessionPath = "/api/news/session", privatePaths, idleDelayMs = 1500 }: {
   enabled?: boolean;
+  /** A reader session cookie is present (it may have been revoked elsewhere). */
   hasSession: boolean;
   suppressed: boolean;
   startPath?: string;
+  /** Private, no-store endpoint that validates the cookie and clears it when stale. */
+  sessionPath?: string;
   privatePaths?: RegExp[];
   idleDelayMs?: number;
 }) {
+  // A cookie is not a session: one revoked by another app's sign-out must not
+  // suppress the silent check (release review R5). Ask the server once.
+  const [staleCookie, setStaleCookie] = useState(false);
+  useEffect(() => {
+    if (!enabled || !hasSessionCookie || staleCookie) return;
+    let cancelled = false;
+    fetch(sessionPath, { credentials: "same-origin", cache: "no-store" })
+      .then((response) => response.json())
+      .then((body: { authenticated?: boolean }) => { if (!cancelled && body?.authenticated !== true) setStaleCookie(true); })
+      .catch(() => { /* unknown: keep treating the reader as signed in */ });
+    return () => { cancelled = true; };
+  }, [enabled, hasSessionCookie, staleCookie, sessionPath]);
+  const hasSession = hasSessionCookie && !staleCookie;
   useEffect(() => {
     if (silentSignInDecision(browserEnvironment({ enabled, hasSession, suppressed, privatePaths })).attempt !== true) return;
     let cancelled = false;
@@ -222,8 +238,8 @@ async function postJson<T>(endpoint: string, body: unknown, timeoutMs = 30000): 
     credentials: "same-origin",
     signal: AbortSignal.timeout(timeoutMs),
   });
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(data.error || "Please try again.");
+  const data = (await response.json().catch(() => ({}))) as T & { error?: string; mfa_required?: boolean };
+  if (!response.ok) throw Object.assign(new Error(data.error || "Please try again."), { mfaRequired: data.mfa_required === true });
   return data;
 }
 
@@ -335,6 +351,8 @@ export function AccountLinkForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [code, setCode] = useState("");
   return (
     <form
       className={classNames.form}
@@ -343,13 +361,18 @@ export function AccountLinkForm({
         event.preventDefault();
         setBusy(true);
         setError("");
-        postJson<LinkResult>(endpoint, { challenge_id: challengeId, password, next, subscribe })
+        postJson<LinkResult>(endpoint, { challenge_id: challengeId, password, next, subscribe, ...(mfaRequired && code ? { mfa_code: code } : {}) })
           .then((result) => {
             setPassword("");
+            setCode("");
             if (onLinked) onLinked(result);
             else window.location.assign(result.location || "/account");
           })
           .catch((e: unknown) => {
+            // The challenge stays server-side and single-use per success; the
+            // code step keeps it and asks for the second factor.
+            if ((e as { mfaRequired?: boolean })?.mfaRequired) setMfaRequired(true);
+            setCode("");
             setError(e instanceof Error ? e.message : "Please try again.");
             setBusy(false);
           });
@@ -364,7 +387,13 @@ export function AccountLinkForm({
         Reader account password
         <input type="password" autoComplete="current-password" required minLength={1} maxLength={1024} value={password} onChange={(e) => setPassword(e.target.value)} />
       </label>
-      <button className={classNames.button} disabled={busy || !password}>{busy ? "Connecting…" : "Connect and sign in"}</button>
+      {mfaRequired && (
+        <label>
+          Authentication code
+          <input type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={32} value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+      )}
+      <button className={classNames.button} disabled={busy || !password || (mfaRequired && !code)}>{busy ? "Connecting…" : "Connect and sign in"}</button>
       {onCancel && <button type="button" className={classNames.secondary} disabled={busy} onClick={onCancel}>Start over</button>}
       {error && <p role="alert" className={classNames.error}>{error}</p>}
     </form>

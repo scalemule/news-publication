@@ -18,6 +18,7 @@ import {
   sealPendingSession,
   sealReaderFlow,
   sessionSummary,
+  sessionSummaryWithCookies,
   setCookieHeader,
   signOut,
   startSignIn,
@@ -155,14 +156,32 @@ describe("startSignIn", () => {
     expect(result.ok).toBe(true);
     expect(h.calls[0].path).toContain("upstream=scalemule_consumer");
   });
-  it("silent start is suppressed by a session, a sign-out or the negative cache without touching the gateway", async () => {
-    for (const [cookie, reason] of [[names.session, "session"], [names.signedOut, "suppressed"], [names.ssoChecked, "suppressed"]] as const) {
+  it("silent start is suppressed by a sign-out or the negative cache without touching the gateway", async () => {
+    for (const cookie of [names.signedOut, names.ssoChecked]) {
       const h = harness();
       const result = await startSignIn(h.config, { mode: "silent", next: "/news/x", cookies: jar({ [cookie]: "1" }) });
-      expect(result).toMatchObject({ ok: false, reason, redirect: "/news/x", cookies: [] });
+      expect(result).toMatchObject({ ok: false, reason: "suppressed", redirect: "/news/x", cookies: [] });
       expect(h.calls).toEqual([]);
       expect(h.events).toEqual([]);
     }
+  });
+  it("silent start is suppressed only by a session that still validates", async () => {
+    const h = harness();
+    const result = await startSignIn(h.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.session]: "new-token" }) });
+    expect(result).toMatchObject({ ok: false, reason: "session", cookies: [] });
+    expect(h.calls.map((c) => c.path)).toEqual(["/v1/auth/me"]);
+  });
+  it("a session cookie revoked elsewhere is cleared and no longer suppresses the silent check (review R5)", async () => {
+    const h = harness();
+    const result = await startSignIn(h.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.session]: "revoked-token-abcdef" }) });
+    expect(result.ok).toBe(true);
+    expect(h.calls.map((c) => c.path.split("?")[0])).toEqual(["/v1/auth/me", "/v1/auth/oauth/ledvery/authorize"]);
+    expect(result.cookies.filter((c) => c.name === names.session)).toEqual([{ name: names.session, value: "", maxAge: 0 }]);
+    // An explicit sign-out still wins over a stale cookie, and the stale cookie is still cleared.
+    const out = harness();
+    const suppressed = await startSignIn(out.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.session]: "revoked-token-abcdef", [names.signedOut]: "1" }) });
+    expect(suppressed).toMatchObject({ ok: false, reason: "suppressed" });
+    expect(suppressed.cookies.map((c) => c.name)).toContain(names.session);
   });
   it("silent start requests prompt=none, never subscribes and keeps the suppression cookies", async () => {
     const h = harness();
@@ -310,6 +329,21 @@ describe("linkAccount", () => {
     const wrong = harness({ link: { status: 401, body: { success: false, error: { code: "INVALID_CREDENTIALS" } } } });
     expect(await linkAccount(wrong.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) })).toMatchObject({ ok: false, status: 400 });
   });
+  it("asks for and forwards the MFA code an existing protected account requires (review R6)", async () => {
+    const mfa = harness({ link: { status: 401, body: { success: false, error: { code: "MFA_REQUIRED" } } } });
+    expect(await linkAccount(mfa.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) })).toMatchObject({ ok: false, status: 401, mfaRequired: true });
+    const h = harness();
+    const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: " 123456 ", cookies: jar({}) });
+    expect(result.ok).toBe(true);
+    expect(h.calls[0].body).toEqual({ challenge_id: "ch_1", password: "pw", mfa_code: "123456" });
+    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "12 34<script>", cookies: jar({}) })).toMatchObject({ ok: false, status: 400, mfaRequired: true });
+    for (const code of ["MFA_SETUP_REQUIRED", "MFA_METHOD_UNSUPPORTED", "IDENTITY_ALREADY_BOUND"]) {
+      const x = harness({ link: { status: 409, body: { success: false, error: { code } } } });
+      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) });
+      expect(r).toMatchObject({ ok: false, status: 409 });
+      expect(r.ok === false && r.mfaRequired).toBeFalsy();
+    }
+  });
 });
 
 describe("signOut and session", () => {
@@ -360,5 +394,19 @@ describe("silent flows never carry newsletter consent", () => {
     expect(open(interactive, key, 2000)?.subscribe).toBe(true);
     const legacy = seal({ state: "s", subscribe: true, returnTo: "/news" }, key, 1000);
     expect(open(legacy, key, 2000)?.subscribe).toBe(true);
+  });
+});
+
+describe("sessionSummaryWithCookies", () => {
+  it("clears a stale session cookie and leaves a valid one alone (review R5)", async () => {
+    const h = harness();
+    expect(await sessionSummaryWithCookies(h.config, jar({ [names.session]: "revoked-token-abcdef" }))).toEqual({
+      summary: { authenticated: false },
+      cookies: [{ name: names.session, value: "", maxAge: 0 }, { name: names.pending, value: "", maxAge: 0 }],
+    });
+    const ok = await sessionSummaryWithCookies(h.config, jar({ [names.session]: "new-token" }));
+    expect(ok.summary.authenticated).toBe(true);
+    expect(ok.cookies).toEqual([]);
+    expect((await sessionSummaryWithCookies(h.config, jar({}))).cookies).toEqual([]);
   });
 });

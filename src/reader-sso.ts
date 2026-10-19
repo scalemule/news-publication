@@ -100,7 +100,7 @@ export function cookieReader(header: string | null | undefined): CookieReader {
 // are advisory. Silent negatives are checks, not failures.
 // ---------------------------------------------------------------------------
 export type ReaderSsoFailure =
-  | "cancelled" | "provider_error" | "state" | "exchange" | "unverified" | "session" | "unavailable" | "link_invalid" | "disabled";
+  | "cancelled" | "provider_error" | "state" | "exchange" | "unverified" | "session" | "unavailable" | "link_invalid" | "disabled" | "mfa_required";
 export type ReaderSsoCheckOutcome =
   | (typeof SILENT_NEGATIVE_ERRORS)[number] | "error" | "link_required" | "suppressed" | "switch_offered" | "switch_declined";
 
@@ -351,12 +351,23 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   if (provider === "email" && !c.emailSignIn) {
     return { ok: false, status: 404, error: "Email sign-in is not available on this publication yet.", reason: "provider", redirect, cookies: [] };
   }
+  // A session cookie only counts if it still validates: a session revoked
+  // elsewhere (back-channel logout, another device) leaves its host-only cookie
+  // behind, and that stale cookie must not suppress sign-in (release review R5).
+  const staleSession: CookieInstruction[] = [];
+  if (input.cookies(c.names.session)) {
+    const current = await currentUser(c, input.cookies(c.names.session));
+    if (current && current.email_verified) {
+      if (mode === "silent") return { ok: false, status: 204, error: "", reason: "session", redirect, cookies: [] };
+    } else {
+      staleSession.push(clear(c.names.session), clear(c.names.pending));
+    }
+  }
   if (mode === "silent") {
-    // ADR 4.4: only without a usable local session, never after an explicit sign-out,
-    // and at most once per negative-cache window. Nothing is mutated on these paths.
-    if (input.cookies(c.names.session)) return { ok: false, status: 204, error: "", reason: "session", redirect, cookies: [] };
+    // ADR 4.4: never after an explicit sign-out, and at most once per
+    // negative-cache window.
     if (input.cookies(c.names.signedOut) || input.cookies(c.names.ssoChecked)) {
-      return { ok: false, status: 204, error: "", reason: "suppressed", redirect, cookies: [] };
+      return { ok: false, status: 204, error: "", reason: "suppressed", redirect, cookies: staleSession };
     }
   }
   const tx = c.random();
@@ -374,6 +385,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     if (typeof value.url !== "string" || typeof value.state !== "string" || !value.state) throw new Error("authorize");
     const url = authorizeUrl(value.url, value.state, callback, mode, c.issuerOrigin);
     const cookies: CookieInstruction[] = [
+      ...staleSession,
       { name: c.names.flow, value: sealReaderFlow({ state: value.state, subscribe: input.subscribe === true && mode === "interactive", returnTo: next, mode, provider, tx }, c.key, c.now()), maxAge: READER_SSO_FLOW_SECONDS },
     ];
     // An explicit sign-in bypasses the negative cache and ends the signed-out suppression.
@@ -384,7 +396,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     if (mode === "silent") {
       // A failed start still counts as a check so the browser does not retry every page.
       emit(c, { name: "reader_sso_check", properties: { outcome: "error", mode, transaction: tx } });
-      return { ok: false, status: 503, error: "", reason: "unavailable", redirect, cookies: [{ name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS }] };
+      return { ok: false, status: 503, error: "", reason: "unavailable", redirect, cookies: [...staleSession, { name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS }] };
     }
     emit(c, { name: "reader_signin_failed", properties: { reason: "unavailable", mode, transaction: tx } });
     return { ok: false, status: 503, error: "Ledvery sign-in is temporarily unavailable. Please try again shortly or use your existing reader account.", reason: "unavailable", redirect, cookies: [] };
@@ -536,11 +548,27 @@ async function establish(
 // Linking (409 LINK_REQUIRED): the reader proves the existing local account with
 // its password; the platform binds the Ledvery identity and issues the session.
 // ---------------------------------------------------------------------------
-export type LinkAccountInput = { challenge_id: unknown; password: unknown; cookies: CookieReader; next?: string; subscribe?: boolean };
+export type LinkAccountInput = { challenge_id: unknown; password: unknown; mfa_code?: unknown; cookies: CookieReader; next?: string; subscribe?: boolean };
 export type LinkAccountResult =
   | { ok: true; switch: false; cookies: CookieInstruction[]; token: string; expiresAt: Date; user: SessionUser; location: string }
   | { ok: true; switch: true; cookies: CookieInstruction[]; location: string }
-  | { ok: false; status: number; error: string; cookies: CookieInstruction[] };
+  | { ok: false; status: number; error: string; cookies: CookieInstruction[]; mfaRequired?: boolean };
+
+/** Platform answers to an ownership proof that are not a plain "wrong details". */
+export function linkFailureMessage(code: string): { error: string; mfaRequired?: boolean } | null {
+  switch (code) {
+    case "MFA_REQUIRED":
+      return { error: "Enter the code from your authenticator app (or a backup code) to finish connecting your account.", mfaRequired: true };
+    case "MFA_SETUP_REQUIRED":
+      return { error: "Your existing account requires two-step verification. Set it up from your account page, then try again." };
+    case "MFA_METHOD_UNSUPPORTED":
+      return { error: "Your account's verification method can't be used here. Sign in with your password first, then connect from your account page." };
+    case "IDENTITY_ALREADY_BOUND":
+      return { error: "That account already signs in with a different identity. Sign in the way you did before." };
+    default:
+      return null;
+  }
+}
 
 export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInput): Promise<LinkAccountResult> {
   const c = resolve(config);
@@ -551,9 +579,18 @@ export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInp
     return { ok: false, status: 400, error: "Enter the password of your existing reader account.", cookies: [] };
   }
   const next = c.returnPath(input.next ?? "", "interactive");
+  const mfaCode = typeof input.mfa_code === "string" ? input.mfa_code.trim() : "";
+  if (mfaCode && (mfaCode.length > 32 || !/^[A-Za-z0-9-]+$/.test(mfaCode))) {
+    return { ok: false, status: 400, error: "Enter the code exactly as your authenticator app shows it.", cookies: [], mfaRequired: true };
+  }
   try {
-    const response = await c.request("/v1/auth/oauth/ledvery/link", { method: "POST", body: { challenge_id: challengeId, password } });
+    const response = await c.request("/v1/auth/oauth/ledvery/link", { method: "POST", body: { challenge_id: challengeId, password, ...(mfaCode ? { mfa_code: mfaCode } : {}) } });
     if (failed(response)) {
+      const specific = linkFailureMessage(errorCode(response));
+      if (specific) {
+        emit(c, { name: "reader_signin_failed", properties: { reason: specific.mfaRequired ? "mfa_required" : "link_invalid", mode: "interactive" } });
+        return { ok: false, status: specific.mfaRequired ? 401 : 409, cookies: [], ...specific };
+      }
       // Neutral wording: never confirm whether the address or the password was the problem.
       emit(c, { name: "reader_signin_failed", properties: { reason: response.status >= 500 ? "unavailable" : "link_invalid", mode: "interactive" } });
       return response.status >= 500
@@ -657,6 +694,18 @@ export async function sessionSummary(config: ReaderSsoConfig, cookies: CookieRea
   const user = await currentUser(c, cookies(c.names.session));
   if (!user || !user.email_verified) return { authenticated: false };
   return { authenticated: true, full_name: user.full_name, locale: user.locale, time_zone: user.time_zone };
+}
+
+/**
+ * Session summary plus the cookies to clear when a present session cookie no
+ * longer validates (revoked elsewhere). The site's session route applies them
+ * so a stale cookie stops suppressing sign-in (release review R5).
+ */
+export async function sessionSummaryWithCookies(config: ReaderSsoConfig, cookies: CookieReader): Promise<{ summary: SessionSummary; cookies: CookieInstruction[] }> {
+  const c = resolve(config);
+  const present = cookies(c.names.session);
+  const summary = await sessionSummary(config, cookies);
+  return { summary, cookies: present && !summary.authenticated ? [clear(c.names.session), clear(c.names.pending)] : [] };
 }
 
 /** Flags the layout passes to `ReaderSsoBoot`; the cookies themselves are HttpOnly. */
