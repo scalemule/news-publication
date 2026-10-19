@@ -1,3 +1,9 @@
+## 0.0.69
+
+- Keep server-authorized review text visible immediately, but defer private image requests until the browser cookie exchange succeeds. This prevents an early unauthorized image request from leaving review photographs unavailable.
+- Respect a publication-supplied caption formatter for generated review visuals; do not automatically append internal production labels.
+- The standard workflow still requires capability discovery and separate explicit editorial release; full publication-adapter rollout remains separate.
+
 ## 0.0.68
 
 - Add the server/CLI `article-workflow` client for idempotent draft creation, revision-fenced edits, managed private photo intake, explicit media approval and processing status/retry. It resumes matching staged assets and stops on subsequent editorial changes.

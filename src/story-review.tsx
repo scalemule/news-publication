@@ -1,6 +1,6 @@
 "use client";
 import { articlePresentation, articleFormatLabel, type ArticleFormat, type ArticlePresentation } from "./article-presentation";
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
@@ -103,6 +103,7 @@ export type StoryReviewData = {
   decision?: string | null;
 };
 type Review = StoryReviewData;
+const ReviewMediaSession = createContext(false);
 const human = (s: string) => s.toLowerCase().replaceAll("_", " ");
 export function StoryReview({
   sessionId,
@@ -115,6 +116,7 @@ export function StoryReview({
   feedbackEmail,
   initialReview,
   onReviewLoaded,
+  formatImageCaption = (value) => value || "",
 }: {
   sessionId: string;
   publicationName: string;
@@ -129,8 +131,10 @@ export function StoryReview({
   /** Only a server-validated private capability may supply this snapshot. Never cache publicly. */
   initialReview?: StoryReviewData;
   onReviewLoaded?: (review: StoryReviewData) => void;
+  formatImageCaption?: (value?: string | null) => string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
+  const [mediaSessionReady, setMediaSessionReady] = useState(false);
   const [review, setReview] = useState<Review | null>(initialReview ?? null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -262,6 +266,7 @@ export function StoryReview({
       setReview(null);
     } else {
       setVerification(false);
+      setMediaSessionReady(true);
       setReview(data);
 
     }
@@ -315,6 +320,7 @@ export function StoryReview({
             setReview(null);
           } else {
             setVerification(false);
+            setMediaSessionReady(true);
             setReview(data);
 
           }
@@ -470,9 +476,10 @@ export function StoryReview({
   ));
   const generated = review?.generated_visual;
   const hero = sourceHero?.length ? sourceHero : generated && /^https:\/\//.test(generated.url)
-    ? <figure><img src={generated.url} alt={generated.alt || review?.revision.document.title || "Article illustration"} /><figcaption>{generated.caption} {generated.label}</figcaption></figure> : null;
+    ? <figure><img src={generated.url} alt={formatImageCaption(generated.alt) || review?.revision.document.title || "Article illustration"} />{formatImageCaption(generated.caption) && <figcaption>{formatImageCaption(generated.caption)}</figcaption>}</figure> : null;
   const heroBeforeHeadline = presentation.layout.headline_position === "after_hero";
   return (
+    <ReviewMediaSession.Provider value={mediaSessionReady}>
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
       <div className="sm-review-private">
@@ -1568,6 +1575,7 @@ export function StoryReview({
       </main>
       {publicationFooter}
     </div>
+    </ReviewMediaSession.Provider>
   );
 }
 function PrivatePhoto({
@@ -1585,9 +1593,11 @@ function PrivatePhoto({
   disabled?: boolean;
   isInline?: boolean;
 }) {
+  const sessionReady = useContext(ReviewMediaSession);
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState(false);
   useEffect(() => {
+    if (!sessionReady) return;
     let active = true,
       object = "";
     void fetch(`${base}/media/${encodeURIComponent(media.file_id)}`, {
@@ -1610,7 +1620,7 @@ function PrivatePhoto({
       active = false;
       if (object) URL.revokeObjectURL(object);
     };
-  }, [base, media.file_id]);
+  }, [base, media.file_id, sessionReady]);
 
   const captionInfo = formatArtworkCaption(media as any);
 
@@ -1636,7 +1646,7 @@ function PrivatePhoto({
           />
         )
       ) : (
-        <p>Media unavailable.</p>
+        <p>{sessionReady ? "Media unavailable." : "Loading photograph…"}</p>
       )}
       <figcaption className="sm-review-photo-details">
         <div className="sm-review-caption-text">
