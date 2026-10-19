@@ -128,6 +128,16 @@
       "import": "./dist/pets-auth-server.js",
       "require": "./dist/pets-auth-server.cjs"
     },
+    "./reader-sso": {
+      "types": "./dist/reader-sso.d.ts",
+      "import": "./dist/reader-sso.js",
+      "require": "./dist/reader-sso.cjs"
+    },
+    "./reader-sso-client": {
+      "types": "./dist/reader-sso-client.d.ts",
+      "import": "./dist/reader-sso-client.js",
+      "require": "./dist/reader-sso-client.cjs"
+    },
     "./pets.css": "./pets.css",
     "./pets-interactions": {
       "types": "./dist/pets-interactions.d.ts",

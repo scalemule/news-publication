@@ -9,6 +9,7 @@ const targeted = new Set([
   "theme-toggle.js", "theme-toggle.cjs",
   "toys-forms.js", "toys-forms.cjs",
   "toys-interactions.js", "toys-interactions.cjs",
+  "reader-sso-client.js", "reader-sso-client.cjs",
 ]);
 
 for (const name of readdirSync("dist")) {

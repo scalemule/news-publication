@@ -10,6 +10,8 @@ export default defineConfig({
     "pets-publication": "src/pets-publication.tsx",
     "pets-server": "src/pets-server.ts",
     "pets-auth-server": "src/pets-auth-server.ts",
+    "reader-sso": "src/reader-sso.ts",
+    "reader-sso-client": "src/reader-sso-client.tsx",
     toys: "src/toys.ts",
     "toys-view": "src/toys-view.tsx",
     "toys-forms": "src/toys-forms.tsx",
