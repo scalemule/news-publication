@@ -1,6 +1,6 @@
 "use client";
 import { articlePresentation, articleFormatLabel, type ArticleFormat, type ArticlePresentation } from "./article-presentation";
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
@@ -103,6 +103,7 @@ export type StoryReviewData = {
   decision?: string | null;
 };
 type Review = StoryReviewData;
+const ReviewMediaSession = createContext(false);
 const human = (s: string) => s.toLowerCase().replaceAll("_", " ");
 export function StoryReview({
   sessionId,
@@ -131,6 +132,7 @@ export function StoryReview({
   onReviewLoaded?: (review: StoryReviewData) => void;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
+  const [mediaSessionReady, setMediaSessionReady] = useState(false);
   const [review, setReview] = useState<Review | null>(initialReview ?? null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -262,6 +264,7 @@ export function StoryReview({
       setReview(null);
     } else {
       setVerification(false);
+      setMediaSessionReady(true);
       setReview(data);
 
     }
@@ -315,6 +318,7 @@ export function StoryReview({
             setReview(null);
           } else {
             setVerification(false);
+            setMediaSessionReady(true);
             setReview(data);
 
           }
@@ -473,6 +477,7 @@ export function StoryReview({
     ? <figure><img src={generated.url} alt={generated.alt || review?.revision.document.title || "Article illustration"} /><figcaption>{generated.caption} {generated.label}</figcaption></figure> : null;
   const heroBeforeHeadline = presentation.layout.headline_position === "after_hero";
   return (
+    <ReviewMediaSession.Provider value={mediaSessionReady}>
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
       <div className="sm-review-private">
@@ -1568,6 +1573,7 @@ export function StoryReview({
       </main>
       {publicationFooter}
     </div>
+    </ReviewMediaSession.Provider>
   );
 }
 function PrivatePhoto({
@@ -1585,9 +1591,11 @@ function PrivatePhoto({
   disabled?: boolean;
   isInline?: boolean;
 }) {
+  const sessionReady = useContext(ReviewMediaSession);
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState(false);
   useEffect(() => {
+    if (!sessionReady) return;
     let active = true,
       object = "";
     void fetch(`${base}/media/${encodeURIComponent(media.file_id)}`, {
@@ -1610,7 +1618,7 @@ function PrivatePhoto({
       active = false;
       if (object) URL.revokeObjectURL(object);
     };
-  }, [base, media.file_id]);
+  }, [base, media.file_id, sessionReady]);
 
   const captionInfo = formatArtworkCaption(media as any);
 
@@ -1636,7 +1644,7 @@ function PrivatePhoto({
           />
         )
       ) : (
-        <p>Media unavailable.</p>
+        <p>{sessionReady ? "Media unavailable." : "Loading photograph…"}</p>
       )}
       <figcaption className="sm-review-photo-details">
         <div className="sm-review-caption-text">

@@ -108,6 +108,27 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("family review", () => {
+  it("shows initial text but waits for the private cookie exchange before requesting photographs", async () => {
+    const review = { ...initial, revision: { ...initial.revision, document: { ...sampleDocument, media: [photo] } } };
+    let authorize!: () => void;
+    const fetcher = vi.fn(async (url: unknown) => {
+      if (String(url).endsWith("/session")) {
+        await new Promise<void>(resolve => { authorize = resolve; });
+        return { ok: true, json: async () => ({ success: true, data: { review } }) };
+      }
+      if (String(url).includes("/media/")) return { ok: true, blob: async () => new Blob(["private photo"], { type: "image/jpeg" }) };
+      throw new Error("Unexpected request");
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<StoryReview sessionId="private-session" publicationName="Test publication" initialReview={review} />);
+    expect(screen.getByRole("heading", { name: sampleDocument.title })).toBeTruthy();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(fetcher.mock.calls[0][0]).toContain("/session");
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    authorize();
+    expect(await screen.findByRole("img", { name: photo.alt })).toBeTruthy();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/media/"))).toHaveLength(1);
+  });
   it("renders a server-authorized article before the invitation exchange completes", async () => {
     let complete!: (value: unknown) => void;
     const fetcher = vi.fn(() => new Promise(resolve => { complete = resolve; }));
