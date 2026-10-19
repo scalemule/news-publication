@@ -1,3 +1,9 @@
+## 0.0.67
+
+- Reader SSO through Ledvery (`reader-sso`, `reader-sso-client`; ADR-2026-10-19-ledvery-consumer-sso). Shared start/callback/link/switch/sign-out helpers with a byte-compatible flow cookie, Google and email (`upstream=scalemule_consumer`) sign-in, silent `prompt=none` checks with a 5-minute negative cache and a signed-out suppression cookie, account-switch precedence (an existing session is never replaced silently), LINK_REQUIRED account linking with password proof, Ledvery end-session on sign-out, and server-recorded `reader_signin_*` / `reader_sso_check` events.
+- `ReaderSsoBoot` (top-level silent check after load and idle; skips bots, prerender, focused forms, private paths), `ReaderGreeting` (time-of-day greeting in the reader's time zone, client island, no-store), `LedveryButton` provider prop, `AccountLinkForm`, `AccountSwitchPrompt`.
+- Silent checks never carry newsletter consent, whatever the flow cookie claims.
+
 ## 0.0.62
 
 - ToyRound: shared community toy exchange (`toys`, `toys-view`, `toys-forms`, `toys-interactions`, `toys-plugin`, `toys-publication`, `toys-server`, `toys.css`) on the Knowledge `toy-exchange` collection kind. Free giveaways and direct swaps only; every listing is editor-reviewed; adult, email- and phone-verified members; atomic reservation; public-place daytime appointments in the place's timezone; private two-party threads with scam warnings; block, report, feedback, account deletion.

@@ -100,7 +100,8 @@ describe("flow sealing", () => {
   it("round-trips mode, provider and transaction id", () => {
     const cookie = flowCookie({ state: "st-1", subscribe: true, returnTo: "/news/story?x=1", mode: "silent", provider: undefined, tx: "deadbeef" });
     const flow = openReaderFlow(cookie, KEY, NOW);
-    expect(flow).toEqual({ digest: createHash("sha256").update("st-1").digest("hex"), subscribe: true, expires: NOW + 600_000, returnTo: "/news/story?x=1", mode: "silent", provider: undefined, tx: "deadbeef" });
+    // A silent flow never carries newsletter consent, even if the sealed cookie says so.
+    expect(flow).toEqual({ digest: createHash("sha256").update("st-1").digest("hex"), subscribe: false, expires: NOW + 600_000, returnTo: "/news/story?x=1", mode: "silent", provider: undefined, tx: "deadbeef" });
     expect(openReaderFlow(cookie, KEY, NOW + 600_001)).toBeNull();
     expect(openReaderFlow(cookie, "other-key", NOW)).toBeNull();
     expect(openReaderFlow(cookie + ".x", KEY, NOW)).toBeNull();
@@ -346,5 +347,18 @@ describe("signOut and session", () => {
   it("exports a server-sourced events fragment with every event name", () => {
     expect(Object.keys(READER_SSO_EVENTS).sort()).toEqual(["reader_account_linked", "reader_signed_out", "reader_signin_completed", "reader_signin_failed", "reader_signin_started", "reader_sso_check"]);
     expect(Object.values(READER_SSO_EVENTS).every((d) => d.source === "server")).toBe(true);
+  });
+});
+
+describe("silent flows never carry newsletter consent", () => {
+  it("drops subscribe from a silent flow even when the sealed cookie claims it", async () => {
+    const { sealReaderFlow: seal, openReaderFlow: open } = await import("./reader-sso");
+    const key = "unit-test-key";
+    const silent = seal({ state: "s", subscribe: true, returnTo: "/news", mode: "silent" }, key, 1000);
+    expect(open(silent, key, 2000)?.subscribe).toBe(false);
+    const interactive = seal({ state: "s", subscribe: true, returnTo: "/news", mode: "interactive" }, key, 1000);
+    expect(open(interactive, key, 2000)?.subscribe).toBe(true);
+    const legacy = seal({ state: "s", subscribe: true, returnTo: "/news" }, key, 1000);
+    expect(open(legacy, key, 2000)?.subscribe).toBe(true);
   });
 });

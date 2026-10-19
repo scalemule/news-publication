@@ -270,7 +270,9 @@ export function openReaderFlow(
   if (returnTo && returnPath(returnTo, mode) !== returnTo) return null;
   const provider = raw.provider === "google" || raw.provider === "email" ? raw.provider : undefined;
   const tx = typeof raw.tx === "string" && /^[a-f0-9]{1,64}$/.test(raw.tx) ? raw.tx : undefined;
-  return { digest: raw.digest, subscribe: raw.subscribe, expires: raw.expires, returnTo, mode, provider, tx };
+  // Newsletter consent is interactive-only: a silent check never subscribes,
+  // whatever a (signed) flow cookie claims.
+  return { digest: raw.digest, subscribe: raw.subscribe && mode === "interactive", expires: raw.expires, returnTo, mode, provider, tx };
 }
 
 /** A verified session the reader has not yet chosen over their current one. */
