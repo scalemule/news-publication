@@ -809,3 +809,8 @@
     padding: 20px 16px max(20px, env(safe-area-inset-bottom));
   }
 }
+
+/* The same finite layout vocabulary is used by public and private readers. */
+.sm-review-article[data-wide-body="true"] { max-width: 900px; }
+.sm-review-article[data-hero-aspect="portrait"] .sm-review-hero img { aspect-ratio: 4 / 5; object-fit: contain; max-height: 80vh; }
+.sm-review-article[data-hero-aspect="square"] .sm-review-hero img { aspect-ratio: 1; object-fit: contain; }

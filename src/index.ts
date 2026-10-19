@@ -259,3 +259,6 @@ export type {
 export * from "./sponsorships";
 export * from "./measurement-consent";
 export * from "./sponsorship-report";
+
+export { articlePresentation, articleHeroRatio, articleFormatLabel } from "./article-presentation";
+export type { ArticleFormat, ArticleLayout, ArticlePresentation } from "./article-presentation";

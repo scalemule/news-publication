@@ -1,3 +1,9 @@
+## 0.0.68
+
+- Add the server/CLI `article-workflow` client for idempotent draft creation, revision-fenced edits, managed private photo intake, explicit media approval and processing status/retry. It resumes matching staged assets and stops on subsequent editorial changes.
+- Share safe versioned article presentation definitions and support an authorized initial review snapshot, preserving exact invited revisions after publication.
+- This patch requires capability discovery from the Blog workflow release. It does not provide an atomic article-and-binary transaction, arbitrary custom renderers or automatic editorial approval. Publication adapters must adopt the private bootstrap, stable identity route and layout renderer separately.
+
 ## 0.0.62
 
 - ToyRound: shared community toy exchange (`toys`, `toys-view`, `toys-forms`, `toys-interactions`, `toys-plugin`, `toys-publication`, `toys-server`, `toys.css`) on the Knowledge `toy-exchange` collection kind. Free giveaways and direct swaps only; every listing is editor-reviewed; adult, email- and phone-verified members; atomic reservation; public-place daytime appointments in the place's timezone; private two-party threads with scam warnings; block, report, feedback, account deletion.
