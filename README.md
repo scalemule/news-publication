@@ -301,3 +301,7 @@ users by email or forward one application’s reader token/API key to another.
 Provision and verify each RP before enabling sign-in or contribution flags.
 
 The publisher-supplied `PawMark` preserves the approved SVG paths. Hosts may set `--paw-logo-ink` and `--paw-logo-heart` on their `.paw` scope; the defaults follow the accessible page foreground and coral accent.
+
+### Homepage image identity
+
+`NewsItem.visual_identity` is a versioned public identity from the Blog feed. `composeEdition` allocates covers across the entire bounded inventory, gives the selected lead priority, and holds repeated covers as `null` without dropping stories or mutating inputs. Never re-add duplicate images as fallback. Legacy Photo rendition URLs are normalized by tenant/asset ID; server-side Photo identity detects copies under different IDs and ordinary resize/re-encoding/crop variants. Do not fetch or decode images in page components. Preserve existing caption/credit policy. See platform `docs/HOMEPAGE-PHOTO-IDENTITY.md` for storage, rights, concurrency and rollout tests.

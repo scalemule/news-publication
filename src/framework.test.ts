@@ -152,6 +152,39 @@ describe("front page", () => {
     expect(edition.secondary.map(s => s.slug)).toEqual(["story-3", "story-4", "story-5"]);
   });
 
+  it("holds repeated covers in every slot without mutating inventory or refilling images", () => {
+    const key = "ab".repeat(32);
+    const stories = Array.from({ length: 16 }, (_, n) => story({
+      id: String(n), slug: `story-${n}`, title: `Story ${n}`, section: n % 2 ? "Sports" : "Civic life",
+      cover_image_url: `https://cdn.example.com/copy-${n}.webp`,
+      visual_identity: { version: 1, key },
+    }));
+    const edition = composeEdition(stories, { lead_slug: "story-9" });
+    expect(edition.lead?.id).toBe("9");
+    const all = edition.navigation.flatMap(section => section.items);
+    expect(all.filter(item => item.cover_image_url).map(item => item.id)).toEqual(["9"]);
+    expect([...edition.secondary, ...edition.compact, ...edition.sections.flatMap(s => s.items)]
+      .every(item => item.cover_image_url === null)).toBe(true);
+    expect(stories.every(item => item.cover_image_url !== null)).toBe(true);
+    const short = composeEdition(stories.slice(0, 2));
+    expect(short.secondary).toHaveLength(1);
+    expect(short.secondary[0].cover_image_url).toBeNull();
+  });
+
+  it("recognizes renditions of one legacy Photo without conflating different assets", () => {
+    const app = "019471a0-0021-7000-8000-001020304050";
+    const photo = "019471a0-0031-7000-8000-001020304050";
+    const root = `https://cdn-public.scalemule.com/${app}/anonymous/photos/${photo}/`;
+    const edition = composeEdition([
+      story({ id: "1", slug: "a", title: "A", cover_image_url: `${root}w1600.webp` }),
+      story({ id: "2", slug: "b", title: "B", cover_image_url: `${root}w400.webp` }),
+      story({ id: "3", slug: "c", title: "C", cover_image_url: `${root.replace(photo, app)}w400.webp` }),
+    ]);
+    const all = edition.navigation.flatMap(section => section.items);
+    expect(all.find(item => item.id === "2")?.cover_image_url).toBeNull();
+    expect(all.find(item => item.id === "3")?.cover_image_url).toBeTruthy();
+  });
+
   it("keeps a complete sentence and refuses a cut-off brief", () => {
     expect(briefSummary(story({ id: "1", slug: "a", title: "A", excerpt: "Город открыл парк. Дальше ещё." }))).toBe("Город открыл парк.");
     expect(briefSummary(story({ id: "1", slug: "a", title: "A", excerpt: "Incomplete sentence…" }))).toBe("");

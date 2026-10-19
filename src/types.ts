@@ -109,6 +109,8 @@ export type NewsItem = {
   title: string;
   excerpt: string | null;
   cover_image_url: string | null;
+  /** Versioned canonical pixel identity supplied by the publication owner. */
+  visual_identity?: { version: number; key: string } | null;
   published_at: string;
   updated_at: string;
   reading_time_minutes: number;
