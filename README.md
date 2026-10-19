@@ -246,6 +246,26 @@ Inventory is unavailable until a verified operational placement is active. `plac
 
 The consent banner now offers a choice in every geography where optional measurement requires one. `measurementConsent` is the server gate for current, explicitly allowed categories and GPC/DNT. Positive permission is local: unsigned URL parameters and a binary network hub cannot grant all categories. Rendering sponsorship recognition does not require tracking consent; measuring it requires both performance and advertising permission.
 
+## Reader sign-in through Ledvery
+
+The `reader-sso` (server) and `reader-sso-client` entry points generalize the
+publications' Google sign-in into one Ledvery consumer flow with silent sign-in,
+explicit email sign-in, account linking, precedence between two accounts,
+RP-initiated sign-out and server-recorded telemetry. A site supplies its cookie
+prefix, canonical origin, Ledvery client id and a request adapter that performs
+gateway calls with the site's own API key; the package never sees a credential
+other than that key and the browser only ever sees host-only HttpOnly cookies.
+
+`startSignIn`, `completeSignIn`, `linkAccount`, `switchAccount`, `signOut` and
+`sessionSummary` return cookie instructions and destinations; the site applies
+them with `applyCookies` and answers with private, no-store headers. Merge
+`READER_SSO_EVENTS` into the site's analytics registry and allow
+`READER_SSO_PROPERTY_KEYS` in its property sanitizer. `ReaderSsoBoot` performs at
+most one silent attempt per page load and never on private paths, for bots,
+while typing, in frames or in prerendered documents; the server's negative cache
+makes a loop impossible. `ReaderGreeting` is a client island that renders only a
+first name, in the reader's own time zone and locale, after loading.
+
 ## Community pet sections
 
 The `pets`, `pets-view`, `pets-forms`, `pets-interactions`, `pets-server`,

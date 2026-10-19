@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.70",
+  "version": "0.0.71",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -127,6 +127,16 @@
       "types": "./dist/pets-auth-server.d.ts",
       "import": "./dist/pets-auth-server.js",
       "require": "./dist/pets-auth-server.cjs"
+    },
+    "./reader-sso": {
+      "types": "./dist/reader-sso.d.ts",
+      "import": "./dist/reader-sso.js",
+      "require": "./dist/reader-sso.cjs"
+    },
+    "./reader-sso-client": {
+      "types": "./dist/reader-sso-client.d.ts",
+      "import": "./dist/reader-sso-client.js",
+      "require": "./dist/reader-sso-client.cjs"
     },
     "./pets.css": "./pets.css",
     "./pets-interactions": {
