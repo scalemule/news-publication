@@ -1,4 +1,4 @@
-import type { ArticleFormat } from "./article-presentation";
+import type { ArticleFormat, ArticleLayout } from "./article-presentation";
 export type ArticleDocument = {
   title: string;
   subtitle?: string;
@@ -28,6 +28,51 @@ export type AssetMetadata = {
   where_taken: string;
   rights_confirmed: boolean;
   private_preview_only?: boolean;
+};
+export type ArticleProcessing = {
+  article_id: string;
+  version: number;
+  publication_status: string;
+  narration: {
+    status: string;
+    attempts?: number | null;
+    error_code?: string | null;
+    last_progress_at?: string | null;
+  };
+  visual: { status: string; provider: string; policy_governed: boolean };
+  assets: {
+    source_file_id: string;
+    public_file_id: string;
+    status: string;
+    attempts: number;
+    error_code?: string | null;
+    last_progress_at: string;
+  }[];
+};
+export type ArticleWorkflowOptions = {
+  workflow_version: number;
+  formats: ArticleFormat[];
+  layouts: {
+    definition: ArticleLayout;
+    visual_requirements: {
+      hero_aspect: string;
+      mobile_aspect: string;
+      share_aspect: string;
+    };
+  }[];
+  sections: string[];
+  language: string;
+  narration?: {
+    provider: string;
+    model: string;
+    voice: string;
+    required_before_publish: boolean;
+  } | null;
+  capabilities: {
+    managed_private_asset_upload: boolean;
+    inline_media_body?: boolean;
+    automatic_public_narration?: boolean;
+  };
 };
 export type ArticleOperation = {
   article_id: string;
@@ -113,6 +158,7 @@ export class PublicationArticleClient {
           : form
             ? (body as FormData)
             : JSON.stringify(body),
+      signal: AbortSignal.timeout(form ? 90_000 : 30_000),
       cache: "no-store",
       redirect: "error",
     });
@@ -125,12 +171,7 @@ export class PublicationArticleClient {
     return value.data;
   }
   options(articleId?: string) {
-    return this.request<{
-      workflow_version: number;
-      formats: string[];
-      layouts: unknown[];
-      capabilities: { managed_private_asset_upload: boolean };
-    }>(
+    return this.request<ArticleWorkflowOptions>(
       `/article-workflow/options${articleId ? `?article_id=${encodeURIComponent(articleId)}` : ""}`,
     );
   }
@@ -140,10 +181,21 @@ export class PublicationArticleClient {
     );
   }
   processing(articleId: string) {
+    return this.request<ArticleProcessing>(
+      `/articles/${encodeURIComponent(articleId)}/processing`,
+    );
+  }
+  /** Existing private narration path for a saved revision and a before-publication audio policy. */
+  narrateRevision(articleId: string, expectedGeneration: number) {
     return this.request<{
-      narration: { status: string; error_code?: string };
-      visual: { status: string };
-    }>(`/articles/${encodeURIComponent(articleId)}/processing`);
+      status: string;
+      audio_id?: string | null;
+      job_id?: string | null;
+    }>(
+      `/articles/${encodeURIComponent(articleId)}/collaboration/narrate`,
+      "POST",
+      { expected_generation: expectedGeneration },
+    );
   }
   retryProcessing(
     articleId: string,
