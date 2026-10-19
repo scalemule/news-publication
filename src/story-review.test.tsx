@@ -108,6 +108,57 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("family review", () => {
+  it("renders descriptive generated-visual captions without automatically appending production labels", () => {
+    render(<StoryReview sessionId="private-session" publicationName="Test publication"
+      initialReview={{ ...initial, generated_visual: { url: "https://cdn-public.scalemule.com/visual.webp", alt: "AI-generated illustration", caption: "Downtown · AI-generated illustration", label: "AI-assisted editorial illustration" } }}
+      formatImageCaption={text => (text || "").replace(/AI-(generated|assisted)( editorial)? illustration/g, "").replace(/ · $/, "")} />);
+    expect(screen.getByRole("img").getAttribute("alt")).toBe(sampleDocument.title);
+    expect(screen.getByText("Downtown")).toBeTruthy();
+    expect(screen.queryByText(/AI-assisted editorial illustration/)).toBeNull();
+  });
+  it("shows initial text but waits for the private cookie exchange before requesting photographs", async () => {
+    const review = { ...initial, revision: { ...initial.revision, document: { ...sampleDocument, media: [photo] } } };
+    let authorize!: () => void;
+    const fetcher = vi.fn(async (url: unknown) => {
+      if (String(url).endsWith("/session")) {
+        await new Promise<void>(resolve => { authorize = resolve; });
+        return { ok: true, json: async () => ({ success: true, data: { review } }) };
+      }
+      if (String(url).includes("/media/")) return { ok: true, blob: async () => new Blob(["private photo"], { type: "image/jpeg" }) };
+      throw new Error("Unexpected request");
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<StoryReview sessionId="private-session" publicationName="Test publication" initialReview={review} />);
+    expect(screen.getByRole("heading", { name: sampleDocument.title })).toBeTruthy();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(fetcher.mock.calls[0][0]).toContain("/session");
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    authorize();
+    expect(await screen.findByRole("img", { name: photo.alt })).toBeTruthy();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/media/"))).toHaveLength(1);
+  });
+  it("renders a server-authorized article before the invitation exchange completes", async () => {
+    let complete!: (value: unknown) => void;
+    const fetcher = vi.fn(() => new Promise(resolve => { complete = resolve; }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<StoryReview sessionId="private-session" publicationName="Test publication" initialReview={initial} />);
+    expect(screen.getByRole("heading", { name: initial.revision.document.title })).toBeTruthy();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(fetcher.mock.calls[0][0]).toBe("/api/news/review/private-session/session");
+    complete({ ok: true, json: async () => ({ success: true, data: { review: initial } }) });
+    await waitFor(() => expect(JSON.parse((fetcher.mock.calls[0][1] as RequestInit).body as string).include_review).toBe(true));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the exchange snapshot without a second article request", async () => {
+    const loaded = vi.fn();
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ success: true, data: { review: initial } }) }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<StoryReview sessionId="private-session" publicationName="Test publication" onReviewLoaded={loaded} />);
+    await screen.findByRole("heading", { name: initial.revision.document.title });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(loaded).toHaveBeenCalledWith(initial);
+  });
   it("requests a replacement for the exact photo without changing or approving the current revision", async () => {
     const fetcher = setup(initial.review_policy, false, true);
     fireEvent.click(await screen.findByRole("button", { name: "Change photo" }));
@@ -774,3 +825,9 @@ describe("structured inline editorial media & review parity", () => {
   });
 });
 
+
+it('preserves the invited revision after another version is published',async()=>{
+ render(<StoryReview sessionId="session" publicationName="Test publication" initialReview={{...initial,article_published:true}} />);
+ expect(screen.getByText(/preserves the version you were invited to review/)).toBeTruthy();
+ expect(screen.queryByText('Private preview · Not published')).toBeNull();
+});

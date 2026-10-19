@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import { articlePresentation, articleFormatLabel, type ArticleFormat, type ArticlePresentation } from "./article-presentation";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
 import { proseDiff } from "./story-diff";
@@ -28,6 +29,8 @@ export type Media = {
   rights_status?: string;
 };
 export type Document = {
+  format?: ArticleFormat;
+  layout?: { id: string; version: number };
   title: string;
   subtitle: string;
   content_markdown: string;
@@ -64,7 +67,7 @@ type Revision = {
   document: Document;
   content_html: string;
 };
-type Review = {
+export type StoryReviewData = {
   session_id?: string;
   identity_required?: boolean;
   participant?: boolean;
@@ -91,9 +94,16 @@ type Review = {
   }[];
   review_policy: string;
   published: boolean;
+  article_published?: boolean;
+  presentation?: ArticlePresentation;
+  generated_visual?: {url:string;alt?:string;caption?:string;label?:string};
+  permalink_path?: string;
+  public_article?: { id: string; path: string } | null;
   celebration_type?: string | null;
   decision?: string | null;
 };
+type Review = StoryReviewData;
+const ReviewMediaSession = createContext(false);
 const human = (s: string) => s.toLowerCase().replaceAll("_", " ");
 export function StoryReview({
   sessionId,
@@ -104,6 +114,9 @@ export function StoryReview({
   readerAccountUrl,
   renderSignIn,
   feedbackEmail,
+  initialReview,
+  onReviewLoaded,
+  formatImageCaption = (value) => value || "",
 }: {
   sessionId: string;
   publicationName: string;
@@ -115,9 +128,14 @@ export function StoryReview({
   readerAccountUrl?: string;
   renderSignIn?: (returnTo: string) => React.ReactNode;
   feedbackEmail?: string;
+  /** Only a server-validated private capability may supply this snapshot. Never cache publicly. */
+  initialReview?: StoryReviewData;
+  onReviewLoaded?: (review: StoryReviewData) => void;
+  formatImageCaption?: (value?: string | null) => string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
-  const [review, setReview] = useState<Review | null>(null),
+  const [mediaSessionReady, setMediaSessionReady] = useState(false);
+  const [review, setReview] = useState<Review | null>(initialReview ?? null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -163,6 +181,9 @@ export function StoryReview({
   const responseRef = useRef<HTMLElement>(null);
   const thanksRef = useRef<HTMLElement>(null);
   const [moreQuestions, setMoreQuestions] = useState(false);
+  useEffect(() => {
+    if (review) onReviewLoaded?.(review);
+  }, [review, onReviewLoaded]);
 
   const [replacementPhoto, setReplacementPhoto] = useState<Media | null>(null);
   const photoToReplace: Media | null = pendingPhoto.photo?.replacement || replacementPhoto;
@@ -245,6 +266,7 @@ export function StoryReview({
       setReview(null);
     } else {
       setVerification(false);
+      setMediaSessionReady(true);
       setReview(data);
 
     }
@@ -276,8 +298,8 @@ export function StoryReview({
         const token = new URL(window.location.href).searchParams.get("key") || (/^[a-f0-9]{64}$/.test(window.location.hash.slice(1)) ? window.location.hash.slice(1) : undefined);
         // Keep a complete copyable invitation in the address bar. A legacy
         // fragment invitation (or an existing cookie-only visit) upgrades here.
-        let exchange: { share_url?: string; can_share?: boolean } = {};
-        try { exchange = await request("/session", token ? { token } : {}); }
+        let exchange: { share_url?: string; can_share?: boolean; review?: Review | { verification_required: true } } = {};
+        try { exchange = await request("/session", { ...(token ? { token } : {}), include_review: true }); }
         catch (e) { if (token) throw e; /* Older publication proxies can still open their existing cookie session. */ }
         const address = exchange.share_url || (token ? `/review/${encodeURIComponent(sessionId)}?key=${encodeURIComponent(token)}` : undefined);
         if (address) {
@@ -289,13 +311,16 @@ export function StoryReview({
             if (active) { setShareUrl(canonical.href); setCanShare(exchange.can_share === true); }
           }
         }
-        const data = await request();
+        // New proxies return the already-authorized snapshot with the exchange.
+        // Keep older publication proxies compatible without another orchestration API.
+        const data = exchange.review ?? await request();
         if (active) {
           if (data.verification_required) {
             setVerification(true);
             setReview(null);
           } else {
             setVerification(false);
+            setMediaSessionReady(true);
             setReview(data);
 
           }
@@ -442,18 +467,31 @@ export function StoryReview({
   const questionsEmail = review ? reviewEmailLink(feedbackEmail, review.revision.document.title, questionText) : undefined;
   const signInReturn = shareUrl ? new URL(shareUrl).pathname + new URL(shareUrl).search + `&respond=${encodeURIComponent(requestedPanel)}` : "";
   const emailAlternative = emailLink && <p className="sm-review-email-alternative">Prefer email? <a href={emailLink}>Email the newsroom</a>. Your email app will open; send your message there.</p>;
+  const presentation = articlePresentation(review?.presentation);
+  const formatLabel = articleFormatLabel(presentation.format);
+  const sourceHero = review?.revision.document.media.filter(m => m.position === "hero").map(m => (
+    <PrivatePhoto key={m.file_id} media={m} base={base}
+      onChange={can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
+      onSuggestCorrection={can("REQUEST_CHANGES") ? () => openCorrection(m) : undefined} disabled={busy} />
+  ));
+  const generated = review?.generated_visual;
+  const hero = sourceHero?.length ? sourceHero : generated && /^https:\/\//.test(generated.url)
+    ? <figure><img src={generated.url} alt={formatImageCaption(generated.alt) || review?.revision.document.title || "Article illustration"} />{formatImageCaption(generated.caption) && <figcaption>{formatImageCaption(generated.caption)}</figcaption>}</figure> : null;
+  const heroBeforeHeadline = presentation.layout.headline_position === "after_hero";
   return (
+    <ReviewMediaSession.Provider value={mediaSessionReady}>
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
       <div className="sm-review-private">
         <strong>
-          {review?.published
+          {review?.article_published || review?.published
             ? "Private review"
             : "Private preview · Not published"}
         </strong>
         <span>
           {review?.published
             ? "This revision has been published. This review link remains private."
+            : review?.article_published ? "The article is published. This private link preserves the version you were invited to review."
             : `Prepared by ${publicationName} for ${celebration ? "family " : ""}review.`}
         </span>
       </div>
@@ -616,9 +654,12 @@ export function StoryReview({
               </p>
             </section>
           )}
-          <article className="sm-review-article">
+          <article className="sm-review-article" data-article-layout={presentation.layout.renderer}
+            data-wide-body={presentation.layout.wide_body} data-hero-aspect={presentation.layout.hero_aspect}>
+            {heroBeforeHeadline && <div className="sm-review-hero">{hero}</div>}
             <p className="sm-review-category">
               <span>{review.revision.document.section}</span>
+              {formatLabel && <span>{formatLabel}</span>}
               {celebration && (
                 <span>{human(review.celebration_type || "")}</span>
               )}
@@ -626,18 +667,7 @@ export function StoryReview({
             <h1>{review.revision.document.title}</h1>
             <p className="sm-review-dek">{review.revision.document.subtitle}</p>
             <EditorialNotices editorial={review.revision.editorial} />
-            {review.revision.document.media
-              .filter((m) => m.position === "hero")
-              .map((m) => (
-                <PrivatePhoto
-                  key={m.file_id}
-                  media={m}
-                  base={base}
-                  onChange={can("UPLOAD_MEDIA") ? () => openMedia(m) : undefined}
-                  onSuggestCorrection={can("REQUEST_CHANGES") ? () => openCorrection(m) : undefined}
-                  disabled={busy}
-                />
-              ))}
+            {!heroBeforeHeadline && <div className="sm-review-hero">{hero}</div>}
             {celebration &&
               !review.revision.document.media.some(
                 (m) => m.position === "hero",
@@ -1545,6 +1575,7 @@ export function StoryReview({
       </main>
       {publicationFooter}
     </div>
+    </ReviewMediaSession.Provider>
   );
 }
 function PrivatePhoto({
@@ -1562,9 +1593,11 @@ function PrivatePhoto({
   disabled?: boolean;
   isInline?: boolean;
 }) {
+  const sessionReady = useContext(ReviewMediaSession);
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState(false);
   useEffect(() => {
+    if (!sessionReady) return;
     let active = true,
       object = "";
     void fetch(`${base}/media/${encodeURIComponent(media.file_id)}`, {
@@ -1587,7 +1620,7 @@ function PrivatePhoto({
       active = false;
       if (object) URL.revokeObjectURL(object);
     };
-  }, [base, media.file_id]);
+  }, [base, media.file_id, sessionReady]);
 
   const captionInfo = formatArtworkCaption(media as any);
 
@@ -1613,7 +1646,7 @@ function PrivatePhoto({
           />
         )
       ) : (
-        <p>Media unavailable.</p>
+        <p>{sessionReady ? "Media unavailable." : "Loading photograph…"}</p>
       )}
       <figcaption className="sm-review-photo-details">
         <div className="sm-review-caption-text">

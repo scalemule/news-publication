@@ -261,3 +261,6 @@ export * from "./measurement-consent";
 export * from "./sponsorship-report";
 export { READER_SSO_EVENTS, READER_SSO_PROPERTY_KEYS } from "./reader-sso-events";
 export type { ReaderSsoEventName, ReaderSsoEventDefinition } from "./reader-sso-events";
+
+export { articlePresentation, articleHeroRatio, articleFormatLabel } from "./article-presentation";
+export type { ArticleFormat, ArticleLayout, ArticlePresentation } from "./article-presentation";

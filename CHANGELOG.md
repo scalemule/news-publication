@@ -1,8 +1,20 @@
-## 0.0.68
+## 0.0.70
 
 - Reader SSO through Ledvery (`reader-sso`, `reader-sso-client`; ADR-2026-10-19-ledvery-consumer-sso). Shared start/callback/link/switch/sign-out helpers with a byte-compatible flow cookie, Google and email (`upstream=scalemule_consumer`) sign-in, silent `prompt=none` checks with a 5-minute negative cache and a signed-out suppression cookie, account-switch precedence (an existing session is never replaced silently), LINK_REQUIRED account linking with password proof, Ledvery end-session on sign-out, and server-recorded `reader_signin_*` / `reader_sso_check` events.
 - `ReaderSsoBoot` (top-level silent check after load and idle; skips bots, prerender, focused forms, private paths), `ReaderGreeting` (time-of-day greeting in the reader's time zone, client island, no-store), `LedveryButton` provider prop, `AccountLinkForm`, `AccountSwitchPrompt`.
 - Silent checks never carry newsletter consent, whatever the flow cookie claims.
+
+## 0.0.69
+
+- Keep server-authorized review text visible immediately, but defer private image requests until the browser cookie exchange succeeds. This prevents an early unauthorized image request from leaving review photographs unavailable.
+- Respect a publication-supplied caption formatter for generated review visuals; do not automatically append internal production labels.
+- The standard workflow still requires capability discovery and separate explicit editorial release; full publication-adapter rollout remains separate.
+
+## 0.0.68
+
+- Add the server/CLI `article-workflow` client for idempotent draft creation, revision-fenced edits, managed private photo intake, explicit media approval and processing status/retry. It resumes matching staged assets and stops on subsequent editorial changes.
+- Share safe versioned article presentation definitions and support an authorized initial review snapshot, preserving exact invited revisions after publication.
+- This patch requires capability discovery from the Blog workflow release. It does not provide an atomic article-and-binary transaction, arbitrary custom renderers or automatic editorial approval. Publication adapters must adopt the private bootstrap, stable identity route and layout renderer separately.
 
 ## 0.0.62
 

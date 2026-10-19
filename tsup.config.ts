@@ -20,6 +20,7 @@ export default defineConfig({
     "toys-publication": "src/toys-publication.tsx",
     "toys-server": "src/toys-server.ts",
     index: "src/index.ts",
+    "article-workflow-client": "src/article-workflow-client.ts",
     "sponsorship-view": "src/sponsorship-view.tsx",
     "community-maps-server": "src/community-maps-server.ts",
     "community-maps-view": "src/community-maps-view.tsx",

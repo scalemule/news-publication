@@ -325,3 +325,15 @@ The publisher-supplied `PawMark` preserves the approved SVG paths. Hosts may set
 ### Homepage image identity
 
 `NewsItem.visual_identity` is a versioned public identity from the Blog feed. `composeEdition` allocates covers across the entire bounded inventory, gives the selected lead priority, and holds repeated covers as `null` without dropping stories or mutating inputs. Never re-add duplicate images as fallback. Legacy Photo rendition URLs are normalized by tenant/asset ID; server-side Photo identity detects copies under different IDs and ordinary resize/re-encoding/crop variants. Do not fetch or decode images in page components. Preserve existing caption/credit policy. See platform `docs/HOMEPAGE-PHOTO-IDENTITY.md` for storage, rights, concurrency and rollout tests.
+
+### Standard article submission
+
+Server tools and authorized agents use `PublicationArticleClient` from
+`@scalemule/news-publication/article-workflow`. Discover `options()` first;
+require `workflow_version: 1`. Use `submitArticle()` for a private draft plus
+managed photo staging, or `get()` and `save()` for a generation-fenced edit.
+Keep the operation key when resuming. Editorial approval and release remain
+explicit commands; acceptance does not certify scan, image or audio completion.
+The platform contract and a complete example live in
+`docs/news-platform/ARTICLE-WORKFLOW-V1.md` in the ScaleMule meta-repo.
+Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
