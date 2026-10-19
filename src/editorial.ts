@@ -110,43 +110,75 @@ export function editorialSections(items: NewsItem[]): EditorialSection[] {
   return Array.from(groups, ([name, articles]) => ({ ...sectionDefinition(name), items: articles }));
 }
 
-/** Published inventory only. Selection never duplicates or fabricates a story. */
+/** Stable public identity from Blog, with a conservative legacy URL fallback. */
+function coverIdentity(item: NewsItem): string | null {
+  if (!item.cover_image_url?.trim()) return null;
+  const identity = item.visual_identity;
+  if (identity?.version === 1 && /^[a-f0-9]{64}$/u.test(identity.key)) return `pixels:${identity.key}`;
+  try {
+    const url = new URL(item.cover_image_url.trim());
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (url.hostname === "cdn-public.scalemule.com") {
+      const match = url.pathname.match(/^\/([a-f0-9-]{36})\/anonymous\/photos\/([a-f0-9-]{36})\//iu);
+      if (match) return `photo:${match[1].toLowerCase()}:${match[2].toLowerCase()}`;
+    }
+    if (["api.scalemule.com", "gw.scalemule.com"].includes(url.hostname)) {
+      const match = url.pathname.match(/^\/v1\/photos\/public\/([a-f0-9-]{36})(?:\/|$)/iu);
+      if (match) return `photo-public:${match[1].toLowerCase()}`;
+    }
+    url.hash = "";
+    url.searchParams.sort();
+    return `url:${url.toString()}`;
+  } catch { return null; }
+}
+
+/** Published inventory only. All image-bearing slots share one allocation. */
 export function composeEdition(items: NewsItem[], selection: HomepageSelection = {}, now = Date.now()) {
   const seen = new Set<string>();
-  const inventory = items.filter(item => {
+  let inventory = items.slice(0, 200).filter(item => {
     if (!item.id || !item.slug || seen.has(item.id)) return false;
     seen.add(item.id);
     return true;
   });
   const pins = !selection.pinned_until || Date.parse(selection.pinned_until) > now ? selection : {};
-  const lead = inventory.find(item => item.slug === pins.lead_slug) ?? inventory[0];
-  const remaining = inventory.filter(item => item !== lead);
+  const selectedLead = inventory.find(item => item.slug === pins.lead_slug) ?? inventory[0];
+  const rest = inventory.filter(item => item !== selectedLead);
   const requested = new Set(pins.secondary_slugs ?? []);
   const ordered = [
-    ...(pins.secondary_slugs ?? []).flatMap(slug => remaining.find(item => item.slug === slug) ?? []),
-    ...remaining.filter(item => !requested.has(item.slug)),
+    ...(pins.secondary_slugs ?? []).flatMap(slug => rest.find(item => item.slug === slug) ?? []),
+    ...rest.filter(item => !requested.has(item.slug)),
   ];
-  const uniqueOrdered = Array.from(new Map(ordered.map(item => [item.id, item])).values());
+  const originalOrder = Array.from(new Map(ordered.map(item => [item.id, item])).values());
   const seenImages = new Set<string>();
-  if (lead?.cover_image_url?.trim()) {
-    seenImages.add(lead.cover_image_url.trim());
-  }
-  const secondary: NewsItem[] = [];
-  const deferredWithDuplicateImage: NewsItem[] = [];
-  for (const item of uniqueOrdered) {
-    if (secondary.length >= 3) break;
-    const img = item.cover_image_url?.trim();
-    if (img && seenImages.has(img)) {
-      deferredWithDuplicateImage.push(item);
+  const duplicateImages = new Set<string>();
+  const display = new Map<string, NewsItem>();
+  for (const item of [selectedLead, ...originalOrder]) {
+    if (!item) continue;
+    const key = coverIdentity(item);
+    if (key && seenImages.has(key)) {
+      duplicateImages.add(item.id);
+      display.set(item.id, { ...item, cover_image_url: null });
     } else {
-      secondary.push(item);
-      if (img) seenImages.add(img);
+      display.set(item.id, item);
+      if (key) seenImages.add(key);
     }
   }
-  while (secondary.length < 3 && deferredWithDuplicateImage.length > 0) {
-    secondary.push(deferredWithDuplicateImage.shift()!);
+  inventory = inventory.map(item => display.get(item.id)!);
+  const lead = selectedLead ? display.get(selectedLead.id) : undefined;
+  let remaining = rest.map(item => display.get(item.id)!);
+  const uniqueOrdered = originalOrder.map(item => display.get(item.id)!);
+  const secondary: NewsItem[] = [];
+  const deferred: NewsItem[] = [];
+  for (const item of uniqueOrdered) {
+    if (secondary.length >= 3) break;
+    if (duplicateImages.has(item.id)) deferred.push(item);
+    else secondary.push(item);
   }
-  for (const item of secondary) remaining.splice(remaining.indexOf(item), 1);
+  // A small inventory may still use the story, with its duplicate cover held.
+  // It must never put the repeated image back merely to fill a card.
+  while (secondary.length < 3 && deferred.length > 0) secondary.push(deferred.shift()!);
+  const secondaryIds = new Set(secondary.map(item => item.id));
+  remaining = remaining.filter(item => !secondaryIds.has(item.id));
   const eligible = remaining.filter(item => {
     const age = now - Date.parse(item.published_at);
     return item.excerpt?.trim() && age >= 0 && age <= 7 * 86400000;
