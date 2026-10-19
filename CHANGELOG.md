@@ -1,6 +1,7 @@
 ## 0.0.69
 
 - Keep server-authorized review text visible immediately, but defer private image requests until the browser cookie exchange succeeds. This prevents an early unauthorized image request from leaving review photographs unavailable.
+- Respect a publication-supplied caption formatter for generated review visuals; do not automatically append internal production labels.
 - The standard workflow still requires capability discovery and separate explicit editorial release; full publication-adapter rollout remains separate.
 
 ## 0.0.68

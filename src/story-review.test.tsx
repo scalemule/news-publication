@@ -108,6 +108,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("family review", () => {
+  it("renders descriptive generated-visual captions without automatically appending production labels", () => {
+    render(<StoryReview sessionId="private-session" publicationName="Test publication"
+      initialReview={{ ...initial, generated_visual: { url: "https://cdn-public.scalemule.com/visual.webp", alt: "AI-generated illustration", caption: "Downtown · AI-generated illustration", label: "AI-assisted editorial illustration" } }}
+      formatImageCaption={text => (text || "").replace(/AI-(generated|assisted)( editorial)? illustration/g, "").replace(/ · $/, "")} />);
+    expect(screen.getByRole("img").getAttribute("alt")).toBe(sampleDocument.title);
+    expect(screen.getByText("Downtown")).toBeTruthy();
+    expect(screen.queryByText(/AI-assisted editorial illustration/)).toBeNull();
+  });
   it("shows initial text but waits for the private cookie exchange before requesting photographs", async () => {
     const review = { ...initial, revision: { ...initial.revision, document: { ...sampleDocument, media: [photo] } } };
     let authorize!: () => void;

@@ -116,6 +116,7 @@ export function StoryReview({
   feedbackEmail,
   initialReview,
   onReviewLoaded,
+  formatImageCaption = (value) => value || "",
 }: {
   sessionId: string;
   publicationName: string;
@@ -130,6 +131,7 @@ export function StoryReview({
   /** Only a server-validated private capability may supply this snapshot. Never cache publicly. */
   initialReview?: StoryReviewData;
   onReviewLoaded?: (review: StoryReviewData) => void;
+  formatImageCaption?: (value?: string | null) => string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
   const [mediaSessionReady, setMediaSessionReady] = useState(false);
@@ -474,7 +476,7 @@ export function StoryReview({
   ));
   const generated = review?.generated_visual;
   const hero = sourceHero?.length ? sourceHero : generated && /^https:\/\//.test(generated.url)
-    ? <figure><img src={generated.url} alt={generated.alt || review?.revision.document.title || "Article illustration"} /><figcaption>{generated.caption} {generated.label}</figcaption></figure> : null;
+    ? <figure><img src={generated.url} alt={formatImageCaption(generated.alt) || review?.revision.document.title || "Article illustration"} />{formatImageCaption(generated.caption) && <figcaption>{formatImageCaption(generated.caption)}</figcaption>}</figure> : null;
   const heroBeforeHeadline = presentation.layout.headline_position === "after_hero";
   return (
     <ReviewMediaSession.Provider value={mediaSessionReady}>
