@@ -341,7 +341,7 @@ Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
 ### Replace a published article photo from a local file
 
 ```sh
-npx --yes --package @scalemule/news-publication@0.0.78 scalemule-article replace-photo \
+npx --yes --package @scalemule/news-publication@0.0.80 scalemule-article replace-photo \
   --url "$ARTICLE_URL" --file ./venue-exterior.jpg \
   --metadata ./photo.json --operation-key venue-exterior-v1
 ```
