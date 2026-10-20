@@ -1,3 +1,8 @@
+## 0.0.72
+
+- Add an explicit narration-only profile reference to processing retries for legacy missing-preset holds. Keep article/editorial profiles immutable; the API validates the selected publication/language and refuses replacement of existing paid work.
+- Expose profile versions and actual Audio/job references for diagnosis. Automatic generation latency and publication-adapter rollout remain separate acceptance work.
+
 ## 0.0.71
 
 - Reader SSO through Ledvery (`reader-sso`, `reader-sso-client`; ADR-2026-10-19-ledvery-consumer-sso). Shared start/callback/link/switch/sign-out helpers with a byte-compatible flow cookie, Google and email (`upstream=scalemule_consumer`) sign-in, silent `prompt=none` checks with a 5-minute negative cache and a signed-out suppression cookie, account-switch precedence (an existing session is never replaced silently), LINK_REQUIRED account linking with password proof, Ledvery end-session on sign-out, and server-recorded `reader_signin_*` / `reader_sso_check` events.
