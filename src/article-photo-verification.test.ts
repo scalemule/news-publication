@@ -6,6 +6,10 @@ describe("actual public article photo verification",()=>{
     expect(articlePhotoHtmlMatches(`<img src="${lead}" alt="София 李 🙂"><meta content='${social}' property='og:image'>`,lead,social)).toBe(true);
     expect(articlePhotoHtmlMatches(`<img srcset="/_next/image?url=${encodeURIComponent(lead)}&w=1440&q=75"><meta name="og:image" content="${social}">`,lead,social)).toBe(true);
   });
+  it("accepts another measured responsive rendition of the selected Photo",()=>{
+    const responsive="https://cdn.example.test/real-measured-responsive.webp";
+    expect(articlePhotoHtmlMatches(`<img src="${responsive}"><meta property="og:image" content="${social}">`,[lead,responsive],social)).toBe(true);
+  });
   it("does not certify an old visible image when new URLs appear only in serialized data",()=>{
     expect(articlePhotoHtmlMatches(`<img src="https://cdn.example.test/old.jpg"><script>{"lead":"${lead}","og":"${social}"}</script>`,lead,social)).toBe(false);
   });

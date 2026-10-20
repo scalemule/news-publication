@@ -135,10 +135,27 @@ try {
           let failure;
           try {
             const images = [checkpoint?.payload?.cover_image_url, checkpoint?.payload?.og_image_url];
+            const leads = new Set([images[0],...(checkpoint?.payload?.cover_image?.variants??[]).map(v=>v.url)].filter(Boolean));
             while (!visible) {
               const response = await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))});
               const html = await response.text();
-              visible = response.ok && images.every(Boolean) && articlePhotoHtmlMatches(html,images[0],images[1]);
+              visible = response.ok && images.every(Boolean) && articlePhotoHtmlMatches(html,[...leads],images[1]);
+              if (!visible) {
+                // Sites may select another measured responsive rendition of the
+                // same Photo. Read that evidence; never infer a CDN path or ID.
+                await Promise.all(['image/webp','image/jpeg','image/avif'].map(async accept=>{
+                  const api=(values['api-url']??'https://api.scalemule.com').replace(/\/$/,'');
+                  const r=await fetch(api+'/v1/photos/public/'+encodeURIComponent(result.file_id)+'/manifest?preset=hero',{headers:{accept},redirect:'error',signal:AbortSignal.timeout(Math.min(5000,remaining()))});
+                  const value=await r.json();
+                  if(!r.ok || !value.success || value.data?.file_id!==result.file_id) return;
+                  for(const v of Object.values(value.data.variant_metadata??{})) {
+                    if(!Number.isInteger(v.width)||v.width<1||!Number.isInteger(v.height)||v.height<1) continue;
+                    const u=new URL(v.url);
+                    if(u.protocol==='https:'&&!u.username&&!u.password&&!u.search&&!u.hash) leads.add(v.url);
+                  }
+                }));
+                visible = response.ok && images.every(Boolean) && articlePhotoHtmlMatches(html,[...leads],images[1]);
+              }
               if (!visible) await new Promise(resolve=>setTimeout(resolve,Math.min(500,remaining())));
             }
           } catch(error) { failure = error.message; }
