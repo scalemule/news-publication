@@ -130,12 +130,16 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
     });
     if (!requirements.length || requirements.length > 48) throw Error("Publication Photo policy exceeds operation limits");
     const outputs: {role:string;file_id:string;url:string;width:number;height:number;format:string}[] = [];
+    const preparations = new Map<string,Promise<any>>();
     let next = 0;
     await Promise.all(Array.from({length:Math.min(4,requirements.length)},async () => {
       while (next < requirements.length) {
         const {role,spec:r} = requirements[next++];
         if (!Number.isInteger(r.width) || r.width < 1 || r.width > 12000 || !["cover","contain","scaledown"].includes(r.fit) || !["jpeg","webp","avif"].includes(r.format) || !Number.isInteger(r.quality) || r.quality < 1 || r.quality > 100 || (r.height != null && (!Number.isInteger(r.height) || r.height < 1 || r.height > 12000))) throw Error("Invalid publication Photo policy");
         const key = `w${r.width}_h${r.height ?? 0}_${r.fit}_q${r.quality}_${r.format}`;
+        let preparation = preparations.get(key);
+        if (!preparation) {
+          preparation = (async()=>{
         const path = `/v1/photos/public/${state!.fileId}/manifest?rendition=${key}`;
         let receipt = await request(path);
         if (!measured(receipt,state!.fileId!)) {
@@ -145,6 +149,11 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
           if (!ok) throw Error("Photo could not prepare a required rendition");
           while (!measured(receipt,state!.fileId!)) { receipt = await request(path); if (!measured(receipt,state!.fileId!)) await sleep(); }
         }
+        return receipt;
+          })();
+          preparations.set(key,preparation);
+        }
+        const receipt = await preparation;
         outputs.push({role,file_id:state!.fileId!,url:receipt.url,width:receipt.width,height:receipt.height,format:r.format});
       }
     }));

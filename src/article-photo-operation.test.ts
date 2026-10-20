@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PublicationArticleClient, type ArticlePhotoInput, type PhotoOperationCheckpoint } from "./article-workflow-client";
 
-function fixture(flags: { lostAttach?: boolean; lostComplete?: boolean; scan?: string; concurrent?: boolean; collaboration?: boolean; prepare?: boolean } = {}) {
+function fixture(flags: { lostAttach?: boolean; lostComplete?: boolean; scan?: string; concurrent?: boolean; collaboration?: boolean; prepare?: boolean; sharedRole?: boolean } = {}) {
   let post: any = {id:"story",slug:"local-story",title:"София 李 🙂",content_markdown:"Verified original reporting.",content_html:"<p>Verified original reporting.</p>",version:4,status:"published",visibility:"public",published_at:"2026-10-19T10:00:00Z",author_user_id:"author",audio_file_id:"existing-audio",metadata:{section:"Local",unrelated:{keep:true}}};
   const calls: {path:string;method:string;body?:any}[] = []; let filename = ""; const prepared=new Set<string>();
   let checkpoint: PhotoOperationCheckpoint | undefined;
@@ -38,7 +38,7 @@ function fixture(flags: { lostAttach?: boolean; lostComplete?: boolean; scan?: s
     else if(path.endsWith("/photos/register")) data={id:"photo"};
     else if(path.endsWith("/policies/article/editor")) data={roles:{
       lead:{renditions:[{width:1200,fit:"scaledown",quality:82,format:"webp"},{width:1200,fit:"scaledown",quality:82,format:"jpeg"}]},
-      thumbnail:{renditions:[{width:120,fit:"scaledown",quality:82,format:"webp"}]},
+      thumbnail:{renditions:[{width:flags.sharedRole?1200:120,fit:"scaledown",quality:82,format:"webp"}]},
       social:{renditions:[{width:1200,height:630,fit:"cover",quality:88,format:"jpeg"}]},
     }};
     else if(path.endsWith("/manifest") && url.searchParams.has("preset")) data={file_id:"file",width:1600,height:900,ready:false};
@@ -87,6 +87,11 @@ describe("repeatable local article photo operation",()=>{
     expect(await f.client.uploadAndReplacePublishedCover(f.input)).toMatchObject({state:"verified"});
     expect(f.calls.filter(c=>c.path.endsWith("/transform"))).toHaveLength(4);
     expect(f.calls.find(c=>c.path.endsWith("/media"))!.body.cover_image.width).toBe(1198);
+  });
+  it("prepares one shared pixel output when publication roles request the same rendition",async()=>{
+    const f=fixture({prepare:true,sharedRole:true});
+    await f.client.uploadAndReplacePublishedCover(f.input);
+    expect(f.calls.filter(c=>c.path.endsWith("/transform"))).toHaveLength(3);
   });
   it("rejects animation and invalid provenance before any HTTP or upload",async()=>{
     const f=fixture();
