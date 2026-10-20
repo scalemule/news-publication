@@ -36,6 +36,9 @@ export type ArticleProcessing = {
   narration: {
     status: string;
     attempts?: number | null;
+    audio_id?: string | null;
+    job_id?: string | null;
+    profile_override_version?: number | null;
     error_code?: string | null;
     last_progress_at?: string | null;
   };
@@ -51,6 +54,7 @@ export type ArticleProcessing = {
 };
 export type ArticleWorkflowOptions = {
   workflow_version: number;
+  profile_version: number;
   formats: ArticleFormat[];
   layouts: {
     definition: ArticleLayout;
@@ -201,6 +205,7 @@ export class PublicationArticleClient {
     articleId: string,
     expectedVersion: number,
     assetSourceFileId?: string,
+    narrationProfileVersion?: number,
   ) {
     return this.request(
       `/articles/${encodeURIComponent(articleId)}/processing`,
@@ -208,6 +213,7 @@ export class PublicationArticleClient {
       {
         expected_version: expectedVersion,
         asset_source_file_id: assetSourceFileId,
+        narration_profile_version: narrationProfileVersion,
       },
     );
   }
