@@ -338,6 +338,45 @@ The platform contract and a complete example live in
 `docs/news-platform/ARTICLE-WORKFLOW-V1.md` in the ScaleMule meta-repo.
 Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
 
+### Replace a published article photo from a local file
+
+```sh
+npx --yes --package @scalemule/news-publication@0.0.80 scalemule-article replace-photo \
+  --url "$ARTICLE_URL" --file ./venue-exterior.jpg \
+  --metadata ./photo.json --operation-key venue-exterior-v1
+```
+
+Use the normal authorized member's `SCALEMULE_API_KEY` and
+`SCALEMULE_ACCESS_TOKEN`. The caller needs developer-level asset access and
+publication approval rights. Supply caption, credit, factual alt, confirmed rights,
+explicit `aiGenerated` and `label` (null for an ordinary photo) in `photo.json`.
+The URL resolves the authorized publication and article; no UUID search or
+publication build is needed. This does not find a photo or establish rights.
+
+`uploadAndReplacePublishedCover` implements the same operation for applications.
+It transfers bytes through managed Storage, preserves private capture evidence,
+waits for a clean scan, registers Photo, prepares the publication's lead,
+thumbnail and social renditions, reads measured delivery receipts and performs
+one article-version-fenced media write. It verifies unchanged text/audio and,
+when given `--url`, checks the selected lead and social URLs in the public HTML.
+It requires the deployed content-first document and member Photo endpoints.
+
+A private atomic checkpoint lives under `~/.scalemule/newsroom/operations`
+(or `--state PATH`). Keep it: it contains a temporary upload credential until
+completion. Reuse the same file, metadata and operation key after interruption.
+A completed replay verifies the same attachment without uploading or writing
+again. A concurrent article change stops instead of overwriting the editor.
+The default per-run deadline is 30 seconds, adjustable with `--timeout-ms` up to
+120 seconds; timeouts name the blocked stage and preserve progress. Exit 2 means
+API attachment succeeded but public HTML visibility is still pending. A timeout
+is not a success receipt. This is local resumability, not a distributed
+exactly-once service or a guaranteed image-processing SLA.
+
+This published-cover convenience lane stops before upload for collaboration
+articles. Their immutable revision, approval and release gates still apply.
+Animated GIF/APNG/WebP and videos use the Video workflow; this lane accepts
+still JPEG, PNG and WebP up to 25 MiB.
+
 ### Replace an existing, prepared cover
 
 For a legacy published article and an already public, scanned Photo asset,

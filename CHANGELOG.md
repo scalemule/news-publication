@@ -1,3 +1,8 @@
+## 0.0.80
+
+- Add one resumable local-file article photo operation and `replace-photo --url`: normal managed upload, privacy/scan, measured publication renditions, version-fenced attachment and public HTML verification. Persist a private checkpoint, stop at a bounded deadline, reconcile lost acknowledgements and avoid new uploads/writes on completed replay.
+- Read editorial source without optional Audio latency. Preserve text/audio and reject concurrent edits. Collaboration-managed stories retain their existing revision/review release gates; photo sourcing, distributed operation receipts and a universal processing SLA remain outside this convenience lane.
+
 ## 0.0.79
 
 - Preserve the typing guard when a reader writes inside the newsroom widget’s nested Shadow DOM. The silent check follows the focused control rather than treating its host as an idle page.
