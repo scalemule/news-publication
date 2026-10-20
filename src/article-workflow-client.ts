@@ -1,4 +1,6 @@
 import type { ArticleFormat, ArticleLayout } from "./article-presentation";
+import { runArticlePhoto, type ArticlePhotoInput } from "./article-photo-operation";
+export { ArticlePhotoOperationError, type ArticlePhotoInput, type PhotoOperationCheckpoint } from "./article-photo-operation";
 export type ArticleDocument = {
   title: string;
   subtitle?: string;
@@ -107,6 +109,7 @@ export type ArticleWorkflowOptions = {
     inline_media_body?: boolean;
     automatic_public_narration?: boolean;
     prioritized_narration_processing?: boolean;
+    content_first_editor_document?: boolean;
   };
 };
 export type ArticleOperation = {
@@ -168,6 +171,7 @@ export class PublicationArticleClient {
     method = "GET",
     body?: unknown,
     extra?: HeadersInit,
+    signal?: AbortSignal,
   ): Promise<T> {
     const headers = new Headers(extra);
     headers.set("accept", "application/json");
@@ -193,7 +197,7 @@ export class PublicationArticleClient {
           : form
             ? (body as FormData)
             : JSON.stringify(body),
-      signal: AbortSignal.timeout(form ? 90_000 : 30_000),
+      signal: signal ?? AbortSignal.timeout(form ? 90_000 : 30_000),
       cache: "no-store",
       redirect: "error",
     });
@@ -229,10 +233,13 @@ export class PublicationArticleClient {
       `/articles/${encodeURIComponent(articleId)}/collaboration`,
     );
   }
-  processing(articleId: string) {
+  processing(articleId: string, signal?: AbortSignal) {
     return this.request<ArticleProcessing>(
-      `/articles/${encodeURIComponent(articleId)}/processing`,
+      `/articles/${encodeURIComponent(articleId)}/processing`, undefined, undefined, undefined, signal,
     );
+  }
+  uploadAndReplacePublishedCover(input: ArticlePhotoInput) {
+    return runArticlePhoto({ publicationId:this.config.publicationId, apiUrl:this.config.apiUrl, fetch:this.config.fetch ?? fetch, request:this.request.bind(this) },input);
   }
   /** Replace a legacy publication cover using ready, measured public Photo renditions.
    * This never enrolls a story, publishes text, creates narration or retries a conflict.

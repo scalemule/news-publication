@@ -1,3 +1,8 @@
+## 0.0.78
+
+- Add one resumable local-file article photo operation and `replace-photo --url`: normal managed upload, privacy/scan, measured publication renditions, version-fenced attachment and public HTML verification. Persist a private checkpoint, stop at a bounded deadline, reconcile lost acknowledgements and avoid new uploads/writes on completed replay.
+- Read editorial source without optional Audio latency. Preserve text/audio and reject concurrent edits. Collaboration-managed stories retain their existing revision/review release gates; photo sourcing, distributed operation receipts and a universal processing SLA remain outside this convenience lane.
+
 ## 0.0.77
 
 - Revalidate reader greetings after logout, account changes and focus, with bounded requests and stale-response protection. Background checks preserve the session idle limit.
