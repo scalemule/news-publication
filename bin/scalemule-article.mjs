@@ -7,6 +7,8 @@ import { parseArgs } from 'node:util';
 import { PublicationArticleClient, articlePhotoHtmlMatches,articleEditHtmlMatches } from '../dist/article-workflow-client.js';
 
 const help = `Usage:
+  scalemule-article submit --publication ID --manifest article.json --operation-key KEY [--asset hero=/path/photo.jpg]
+  scalemule-article status --publication ID --submission ID
   scalemule-article inspect --publication ID --article ID
   scalemule-article replace-cover --publication ID --article ID --file-id ID --expected-version N --metadata photo.json
   scalemule-article replace-photo --url ARTICLE_URL --file PHOTO --metadata photo.json --operation-key KEY
@@ -54,7 +56,7 @@ that every website/CDN cache already displays the new image.
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true, strict: true,
-    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','patch','expected-generation','enable-review-policy'].map(k => [k, { type: 'string' }]).concat([['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
+    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
   });
   if (values.help || !positionals.length) {
     console.log(help);
@@ -64,7 +66,7 @@ try {
     const budget = Number(values['timeout-ms'] ?? (command==='edit'?10000:30000));
     if (!Number.isFinite(budget) || budget < 100 || budget > 120000) throw Error('--timeout-ms must be between 100 and 120000');
     const remaining = () => { const ms = Math.floor(budget - (performance.now()-commandStarted)); if (ms < 1) throw Error('Operation deadline reached; resume the same operation'); return ms; };
-    if (extra.length || !['inspect', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use inspect, edit, replace-cover or replace-photo; see --help');
+    if (extra.length || !['submit','status','inspect', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use submit, status, inspect, edit, replace-cover or replace-photo; see --help');
     if (values.url) {
       if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN || values['application-id']) throw Error('URL resolution requires normal publication member/API-key credentials');
       const url = new URL(values.url);
@@ -83,7 +85,7 @@ try {
       if ((values.publication && values.publication !== pub.id) || (values.article && values.article !== resolved.article.id)) throw Error('Article URL and supplied IDs disagree');
       values.publication = pub.id; values.article = resolved.article.id;
     }
-    for (const key of ['publication', 'article']) if (!values[key]) throw Error(`Missing --${key}`);
+    for (const key of (['submit','status'].includes(command)?['publication']:['publication','article'])) if (!values[key]) throw Error(`Missing --${key}`);
     if (!process.env.SCALEMULE_ACCESS_TOKEN) throw Error('SCALEMULE_ACCESS_TOKEN is required; use normal member or platform admin authorization');
     if (!values['application-id'] && !process.env.SCALEMULE_API_KEY) throw Error('Member calls also require SCALEMULE_API_KEY');
     const client = new PublicationArticleClient({
@@ -94,7 +96,21 @@ try {
       accessToken: process.env.SCALEMULE_ACCESS_TOKEN,
     });
     const started = performance.now();
-    if (command === 'inspect') {
+    if(command==='submit'){
+      for(const key of ['manifest','operation-key'])if(!values[key])throw Error('Missing --'+key);
+      const manifest=JSON.parse(await readFile(values.manifest,'utf8'));
+      const assets=[];
+      for(const entry of values.asset??[]){
+        const split=entry.indexOf('=');if(split<1)throw Error('--asset must be slot=/path/to/photo');
+        const slot=entry.slice(0,split),path=entry.slice(split+1);
+        assets.push({slot,filename:basename(path),file:new Blob([await readFile(path)])});
+      }
+      const receipt=await client.submit(manifest,values['operation-key'],assets,AbortSignal.timeout(remaining()));
+      console.log(JSON.stringify({...receipt,elapsed_ms:Math.round(performance.now()-started)},null,2));
+    }else if(command==='status'){
+      if(!values.submission)throw Error('Missing --submission');
+      console.log(JSON.stringify(await client.submission(values.submission,AbortSignal.timeout(remaining())),null,2));
+    }else if (command === 'inspect') {
       const [options, processing, collaboration] = await Promise.all([
         client.options(values.article), client.processing(values.article),
         client.get(values.article).then(current => ({ enabled: true, generation: current.generation, status: current.status })).catch(error => {

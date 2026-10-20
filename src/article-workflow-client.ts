@@ -28,13 +28,13 @@ export type ArticleMedia = {
   position: "hero" | "inline" | "gallery" | "attachment";
 };
 export type AssetMetadata = {
-  caption: string;
-  credit: string;
-  alt: string;
-  creator: string;
-  who_is_pictured: string;
-  when_taken: string;
-  where_taken: string;
+  caption?: string;
+  credit?: string;
+  alt?: string;
+  creator?: string;
+  who_is_pictured?: string;
+  when_taken?: string;
+  where_taken?: string;
   rights_confirmed: boolean;
   private_preview_only?: boolean;
 };
@@ -118,6 +118,8 @@ export type ArticleWorkflowOptions = {
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
     versioned_editorial_fields?: boolean;
+    managed_submission_version?: number;
+    multipart_submission?: boolean;
   };
 };
 export type ArticleOperation = {
@@ -140,6 +142,24 @@ type Record = {
     state: string;
     payload: Partial<AssetMetadata> & { file_id?: string; sha256?: string };
   }[];
+};
+export type ArticleSubmissionManifest = {
+  article: { operation: "create"; author_profile_id: string; document: ArticleDocument; review_policy?: string; celebration_type?: string }
+    | { operation: "save"; article_id: string; expected_generation: number; document: ArticleDocument; reason: string };
+  intent?: "draft" | "review" | "publish";
+  approve_media?: boolean;
+  sensitivity_review?: { policy_version: string; rule_ids: string[]; reason: string };
+  assets?: { slot: string; position: "hero" | "gallery" | "attachment"; metadata: AssetMetadata }[];
+};
+export type ArticleSubmissionReceipt = {
+  submission_id: string; article_id: string | null; revision_id: string | null;
+  status: "intake" | "queued" | "scanning" | "narrating" | "awaiting_review" | "held" | "complete" | "published";
+  error_code: string | null; status_path: string; permalink_path: string | null;
+  processing: ArticleProcessing | null;
+  progress: { intent: string; assets: { [slot: string]: { state: string; contribution_id?: string; file_id?: string } } };
+  accepted_is_not_published: true;
+  public_ready: boolean;
+  next_action: string;
 };
 export class ArticleWorkflowError extends Error {
   constructor(
@@ -445,171 +465,35 @@ export class PublicationArticleClient {
   /** One agent operation over existing owners. Stops at conflicts/unknown upload acknowledgement;
    * replay the same operation key to inspect/reuse staged contributions before another transfer.
    * Editorial approval and release are always separate explicit operations. */
-  async submitArticle(input: {
-    operationKey: string;
-    authorProfileId: string;
-    document: ArticleDocument;
-    reviewPolicy?: string;
-    assets?: {
-      file: Blob;
-      filename: string;
-      metadata: AssetMetadata;
-      position: ArticleMedia["position"];
-    }[];
+  /** One server-owned submission. No client-side Photo/TTS orchestration and no
+   * fallback to a different workflow. A 202 receipt is acceptance, not readiness.
+   * Replay the identical manifest/files/key after an uncertain acknowledgement.
+   */
+  submit(manifest: ArticleSubmissionManifest, operationKey: string,
+    files: { slot: string; file: Blob; filename: string }[] = [], signal?: AbortSignal) {
+    if (!operationKey) throw new Error("A stable operation key is required");
+    const slots = new Set(files.map(f => f.slot));
+    if (slots.size !== files.length || files.length !== (manifest.assets?.length ?? 0)
+      || manifest.assets?.some(a => !slots.has(a.slot))) throw new Error("Supply one file for each declared asset slot");
+    if (!files.length) return this.request<ArticleSubmissionReceipt>("/submissions", "POST", manifest, { "Idempotency-Key": operationKey }, signal);
+    const form = new FormData(); form.append("manifest", JSON.stringify(manifest));
+    for (const asset of files) form.append(asset.slot, asset.file, asset.filename);
+    return this.request<ArticleSubmissionReceipt>("/submissions", "POST", form, { "Idempotency-Key": operationKey }, signal);
+  }
+  submission(submissionId: string, signal?: AbortSignal) {
+    return this.request<ArticleSubmissionReceipt>("/submissions/"+encodeURIComponent(submissionId),"GET",undefined,undefined,signal);
+  }
+  submitArticle(input: {
+    operationKey: string; authorProfileId: string; document: ArticleDocument;
+    reviewPolicy?: string; intent?: "draft" | "review" | "publish";
+    assets?: { file: Blob; filename: string; metadata: AssetMetadata; position: "hero" | "gallery" | "attachment" }[];
     approveMedia?: boolean;
   }) {
-    if (input.document.media?.length)
-      throw new Error(
-        "Pass file assets separately when creating an article package",
-      );
-    const capabilities = await this.options();
-    if (capabilities.workflow_version !== 1)
-      throw new Error("Unsupported article workflow version");
-    if (
-      input.assets?.length &&
-      !capabilities.capabilities.managed_private_asset_upload
-    )
-      throw new Error("Managed article upload is not deployed");
-    const created = await this.create(
-      input.operationKey,
-      input.authorProfileId,
-      input.document,
-      input.reviewPolicy,
-    );
-    try {
-      const selected: ArticleMedia[] = [];
-      for (const asset of input.assets ?? []) {
-        let current = await this.get(created.article_id);
-        const digest = Array.from(
-          new Uint8Array(
-            await crypto.subtle.digest(
-              "SHA-256",
-              await asset.file.arrayBuffer(),
-            ),
-          ),
-        )
-          .map((v) => v.toString(16).padStart(2, "0"))
-          .join("");
-        const existing = current.contributions.find(
-          (c) =>
-            c.kind === "MEDIA" &&
-            c.state !== "REJECTED" &&
-            c.state !== "WITHDRAWN" &&
-            c.payload.sha256 === digest &&
-            Object.entries(asset.metadata).every(
-              ([k, v]) => c.payload[k as keyof AssetMetadata] === v,
-            ),
-        );
-        const staged = existing?.payload.file_id
-          ? { contribution_id: existing.id, file_id: existing.payload.file_id }
-          : await this.upload(
-              created.article_id,
-              current.generation,
-              asset.file,
-              asset.filename,
-              asset.metadata,
-            );
-        // Typed Photo registration and its versioned rendition policy use the
-        // same normal caller authorization; no direct S3 or invented Photo ID.
-        await this.registerPhoto(staged.file_id);
-        if (input.approveMedia) {
-          if (
-            !asset.metadata.rights_confirmed ||
-            asset.metadata.private_preview_only
-          )
-            throw new Error("Publication requires confirmed image rights");
-          if (existing?.state !== "APPROVED") {
-            current = await this.get(created.article_id);
-            await this.command(created.article_id, current.generation, {
-              action: "RESOLVE",
-              contribution_id: staged.contribution_id,
-              state: "APPROVED",
-            });
-          }
-          selected.push({
-            kind: "image",
-            contribution_id: staged.contribution_id,
-            file_id: staged.file_id,
-            caption: asset.metadata.caption,
-            credit: asset.metadata.credit,
-            alt: asset.metadata.alt,
-            position: asset.position,
-          });
-        }
-      }
-      if (selected.length) {
-        const current = await this.get(created.article_id);
-        const document = { ...input.document, media: selected };
-        const saved = current.revisions.find(
-          (r) => r.id === current.current_revision_id,
-        )?.document;
-        // Let the server perform semantic no-op detection and optimistic concurrency.
-        if (!saved) throw new Error("Current immutable revision is missing");
-        if (sameDocument(saved, document))
-          return {
-            ...created,
-            revision_id: current.current_revision_id,
-            generation: current.generation,
-            editorial_status: current.status,
-            replayed: true,
-          };
-        if (
-          !sameDocument(
-            { ...saved, media: [] },
-            { ...input.document, media: [] },
-          ) ||
-          saved.media?.length
-        )
-          throw new ArticleWorkflowError(
-            "The article was edited after this package began; load its current revision before changing it",
-            409,
-            created.article_id,
-          );
-        return await this.save(
-          `${input.operationKey}:assets`,
-          created.article_id,
-          current.generation,
-          document,
-          "MEDIA_UPDATE",
-        );
-      }
-      return created;
-    } catch (error) {
-      if (error instanceof ArticleWorkflowError) {
-        error.articleId = created.article_id;
-        throw error;
-      }
-      throw new ArticleWorkflowError(
-        error instanceof Error ? error.message : "Article package interrupted",
-        0,
-        created.article_id,
-      );
-    }
+    if (input.document.media?.length) throw new Error("Pass file assets separately when creating an article package");
+    // Slot names are stable for identical file order and survive an HTTP retry.
+    const assets=(input.assets ?? []).map((a,i)=>({...a,slot:"asset_"+String.fromCharCode(97+i)}));
+    return this.submit({ article:{ operation:"create",author_profile_id:input.authorProfileId,document:input.document,review_policy:input.reviewPolicy },
+      intent:input.intent ?? "draft",approve_media:input.approveMedia,
+      assets:assets.map(a=>({slot:a.slot,position:a.position,metadata:a.metadata})) },input.operationKey,assets);
   }
-}
-
-function sameDocument(a: ArticleDocument, b: ArticleDocument): boolean {
-  const sorted=(v:any):any=>Array.isArray(v)?v.map(sorted):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sorted(v[k])])):v;
-  const canonical = (d: ArticleDocument) => [
-    d.title,
-    d.subtitle || "",
-    d.content_markdown,
-    d.excerpt ?? null,
-    sorted(d.cards ?? null),
-    sorted(d.citations ?? null),
-    d.section,
-    d.community || "",
-    d.format || null,
-    d.layout ? [d.layout.id, d.layout.version] : null,
-    (d.media || []).map((m) => [
-      m.kind || "image",
-      m.contribution_id,
-      m.file_id,
-      m.caption,
-      m.credit,
-      m.alt,
-      m.position,
-    ]),
-  ];
-  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
