@@ -1,3 +1,8 @@
+## 0.0.73
+
+- Expose explicit legacy article onboarding through the existing approver-authorized collaboration enable API. Reads never silently enroll articles; callers choose review policy and resolve missing managed media identities first. Existing scheduled releases are cancelled by enrollment, as the server contract requires.
+- Full legacy adoption and publication-adapter rollout remain explicit operational steps.
+
 ## 0.0.72
 
 - Add an explicit narration-only profile reference to processing retries for legacy missing-preset holds. Keep article/editorial profiles immutable; the API validates the selected publication/language and refuses replacement of existing paid work.

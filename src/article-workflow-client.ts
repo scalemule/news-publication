@@ -179,6 +179,20 @@ export class PublicationArticleClient {
       `/article-workflow/options${articleId ? `?article_id=${encodeURIComponent(articleId)}` : ""}`,
     );
   }
+  /** Explicit approver-authorized onboarding for a legacy article; never called by get().
+   * Existing schedules are cancelled by the server; public content remains unchanged.
+   * Missing immutable media identities must be resolved through newsroom media controls.
+   */
+  enableCollaboration(
+    articleId: string,
+    reviewPolicy: "NONE" | "FACT_CHECK" | "CONTRIBUTOR_REVIEW" | "SUBJECT_APPROVAL_REQUIRED" | "SUBJECT_APPROVAL_PLUS_EDITOR",
+  ) {
+    return this.request<{ post_id: string; existing?: boolean; current_revision_id?: string }>(
+      `/articles/${encodeURIComponent(articleId)}/collaboration/enable`,
+      "POST",
+      { review_policy: reviewPolicy },
+    );
+  }
   get(articleId: string) {
     return this.request<Record>(
       `/articles/${encodeURIComponent(articleId)}/collaboration`,
