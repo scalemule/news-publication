@@ -61,8 +61,10 @@ function fixture(flags: {
         }
         else if (path.endsWith("/status"))
             data = { scan: { status: flags.scan ?? "clean" }, urls: { cdn_url: "https://cdn.example.test/scanned-original.jpg" } };
-        else if (path.endsWith("/photos/register"))
+        else if (path.endsWith("/photos/register")) {
+            expect(body.role).toBe("lead");
             data = { id: "photo" };
+        }
         else if (path.endsWith("/policies/article/editor"))
             data = { roles: {
                     lead: { renditions: [{ width: 1200, fit: "scaledown", quality: 82, format: "webp" }, { width: 1200, fit: "scaledown", quality: 82, format: "jpeg" }] },

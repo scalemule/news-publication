@@ -179,7 +179,7 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
         }
         await progress("photo");
         if (!state.registered) {
-            await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", publication_id: t.publicationId });
+            await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", role: "lead", publication_id: t.publicationId });
             state.registered = true;
             await progress("renditions");
         }
