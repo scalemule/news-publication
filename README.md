@@ -347,7 +347,8 @@ npx --yes --package @scalemule/news-publication@0.0.78 scalemule-article replace
 ```
 
 Use the normal authorized member's `SCALEMULE_API_KEY` and
-`SCALEMULE_ACCESS_TOKEN`. Supply caption, credit, factual alt, confirmed rights,
+`SCALEMULE_ACCESS_TOKEN`. The caller needs developer-level asset access and
+publication approval rights. Supply caption, credit, factual alt, confirmed rights,
 explicit `aiGenerated` and `label` (null for an ordinary photo) in `photo.json`.
 The URL resolves the authorized publication and article; no UUID search or
 publication build is needed. This does not find a photo or establish rights.

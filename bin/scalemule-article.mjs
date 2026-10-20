@@ -16,6 +16,7 @@ Platform admins may use their normal access token with --application-id ID.
 Optional --api-url URL defaults to https://api.scalemule.com.
 
 replace-photo accepts a local file and uses normal member/API-key credentials.
+It requires developer-level asset access and publication approval rights.
 It resolves the publication from its authorized API inventory, saves a private
 upload checkpoint, resumes the same multipart part, waits for scan and measured
 publication renditions, then attaches with the original article version fence.
