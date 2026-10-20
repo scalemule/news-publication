@@ -360,7 +360,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   // behind, and that stale cookie must not suppress sign-in (release review R5).
   const staleSession: CookieInstruction[] = [];
   if (input.cookies(c.names.session)) {
-    const current = await currentUser(c, input.cookies(c.names.session));
+    const current = await currentUser(c, input.cookies(c.names.session), mode === "silent" ? "passive" : "active");
     if (current && current.email_verified) {
       if (mode === "silent" && (!current.needsSsoUpgrade || keepsLocal(input.cookies(c.names.ssoChecked), input.cookies(c.names.session)))) return { ok: false, status: 204, error: "", reason: "session", redirect, cookies: [] };
     } else {
@@ -412,9 +412,9 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
 // ---------------------------------------------------------------------------
 export type SessionUser = { id: string; email_verified: boolean; full_name: string; locale?: string; time_zone?: string; needsSsoUpgrade?: true };
 
-async function currentUser(c: Resolved, token: string | undefined): Promise<SessionUser | null> {
+async function currentUser(c: Resolved, token: string | undefined, activity: "active" | "passive" = "active"): Promise<SessionUser | null> {
   if (!token || !SESSION_TOKEN.test(token)) return null;
-  const response = await c.request("/v1/auth/me", { method: "GET", token });
+  const response = await c.request(activity === "passive" ? "/v1/auth/me?passive=true" : "/v1/auth/me", { method: "GET", token });
   if (failed(response)) return null;
   const me = payload(response);
   if (typeof me.id !== "string" || !me.id) return null;
@@ -706,7 +706,7 @@ export type SessionSummary = { authenticated: false } | { authenticated: true; f
 
 export async function sessionSummary(config: ReaderSsoConfig, cookies: CookieReader): Promise<SessionSummary> {
   const c = resolve(config);
-  const user = await currentUser(c, cookies(c.names.session));
+  const user = await currentUser(c, cookies(c.names.session), "passive");
   if (!user || !user.email_verified) return { authenticated: false };
   return { authenticated: true, full_name: user.full_name, locale: user.locale, time_zone: user.time_zone, ...(user.needsSsoUpgrade && !keepsLocal(cookies(c.names.ssoChecked), cookies(c.names.session)) ? { session_upgrade_required: true as const } : {}) };
 }
