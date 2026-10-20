@@ -131,11 +131,19 @@ try {
           onProgress:event=>console.error(JSON.stringify(event)),
         });
         if (values.url) {
-          const response = await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))});
-          const html = await response.text();
-          const images = [checkpoint?.payload?.cover_image_url, checkpoint?.payload?.og_image_url];
-          if (!response.ok || images.some(image => !image || (!html.includes(image) && !html.includes(encodeURIComponent(image))))) {
-            console.error(JSON.stringify({...result,state:'attached_public_verification_pending',stage:'public_page',message:'The API attachment is verified; the public page has not returned the selected image. Resume this same operation.'}));
+          let visible = false;
+          let failure;
+          try {
+            const images = [checkpoint?.payload?.cover_image_url, checkpoint?.payload?.og_image_url];
+            while (!visible) {
+              const response = await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))});
+              const html = await response.text();
+              visible = response.ok && images.every(image => image && (html.includes(image) || html.includes(encodeURIComponent(image))));
+              if (!visible) await new Promise(resolve=>setTimeout(resolve,Math.min(500,remaining())));
+            }
+          } catch(error) { failure = error.message; }
+          if (!visible) {
+            console.error(JSON.stringify({...result,state:'attached_public_verification_pending',stage:'public_page',message:'The API attachment is verified; public HTML visibility remains pending. Resume this same operation.',reason:failure}));
             process.exitCode = 2;
           } else console.log(JSON.stringify({...result,public_page_verified:true,total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
         } else console.log(JSON.stringify(result,null,2));
