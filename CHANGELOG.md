@@ -1,3 +1,8 @@
+## 0.0.78
+
+- Start silent reader recognition after usable DOM and an idle delay, so slow page assets cannot postpone SSO indefinitely. Resume eligible hidden/prerendered pages on activation; recheck typing, bot, session and negative-cache guards before the single attempt.
+- Wider rollout, controlled email verification and real Safari/iOS acceptance remain separate gates.
+
 ## 0.0.77
 
 - Revalidate reader greetings after logout, account changes and focus, with bounded requests and stale-response protection. Background checks preserve the session idle limit.

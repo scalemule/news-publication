@@ -4,6 +4,7 @@
  * component talks to the publication's own same-origin routes, which carry the
  * HttpOnly reader cookies. See ./reader-sso.ts for the server contract.
  */
+import { mountReaderSsoScheduler } from "./reader-sso-scheduler";
 import { useEffect, useId, useState } from "react";
 
 export type ReaderSsoProvider = "google" | "email";
@@ -103,7 +104,7 @@ function browserEnvironment(flags: { enabled: boolean; hasSession: boolean; supp
 }
 
 /**
- * Renders nothing. Once per page load, after `load` and an idle period, performs a
+ * Renders nothing. Once per page load, after the DOM is usable and an idle period, performs a
  * top-level navigation to the silent sign-in start route when nothing argues
  * against it. The server sets the negative-cache cookie on every silent negative,
  * so this can never loop.
@@ -137,29 +138,18 @@ export function ReaderSsoBoot({ enabled = true, hasSession: hasSessionCookie, su
   }, [enabled, hasSessionCookie, staleCookie, sessionPath]);
   const hasSession = hasSessionCookie && !staleCookie;
   useEffect(() => {
-    if (silentSignInDecision(browserEnvironment({ enabled, hasSession, suppressed, privatePaths })).attempt !== true) return;
-    let cancelled = false;
-    let idle: number | undefined;
-    const go = () => {
-      if (cancelled) return;
-      // Re-check at the moment of navigation: the reader may have started typing.
-      const env = browserEnvironment({ enabled, hasSession, suppressed, privatePaths });
-      if (silentSignInDecision(env).attempt !== true) return;
-      writeAttempt(env.now);
-      window.location.assign(silentSignInUrl(startPath, env.pathname, env.search));
-    };
-    const whenIdle = () => {
-      const w = window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number };
-      if (typeof w.requestIdleCallback === "function") idle = w.requestIdleCallback(() => { idle = window.setTimeout(go, idleDelayMs); }, { timeout: 4000 });
-      else idle = window.setTimeout(go, idleDelayMs);
-    };
-    if (document.readyState === "complete") whenIdle();
-    else window.addEventListener("load", whenIdle, { once: true });
-    return () => {
-      cancelled = true;
-      window.removeEventListener("load", whenIdle);
-      if (idle !== undefined) window.clearTimeout(idle);
-    };
+    const flags = { enabled, hasSession, suppressed, privatePaths };
+    return mountReaderSsoScheduler({
+      document,
+      timers: window,
+      idleDelayMs,
+      eligible: () => silentSignInDecision(browserEnvironment(flags)).attempt === true,
+      attempt: () => {
+        const env = browserEnvironment(flags);
+        writeAttempt(env.now);
+        window.location.assign(silentSignInUrl(startPath, env.pathname, env.search));
+      },
+    });
   }, [enabled, hasSession, suppressed, startPath, privatePaths, idleDelayMs]);
   return null;
 }
