@@ -67,9 +67,15 @@ export function silentSignInUrl(startPath: string, pathname: string, search: str
 }
 
 export function isFormField(element: Element | null): boolean {
-  if (!element) return false;
-  const tag = element.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (element as HTMLElement).isContentEditable === true;
+  // The newsroom widget uses Shadow DOM: its host is the document's active
+  // element, while the actual focused text field lives inside the shadow root.
+  let focused = element;
+  while (focused?.shadowRoot?.activeElement && focused.shadowRoot.activeElement !== focused) {
+    focused = focused.shadowRoot.activeElement;
+  }
+  if (!focused) return false;
+  const tag = focused.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (focused as HTMLElement).isContentEditable === true;
 }
 
 const ATTEMPT_KEY = "reader-sso-attempt-v1";
