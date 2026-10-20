@@ -1,3 +1,8 @@
+## 0.0.81
+
+- Add one checkpointed `edit` command and `editArticle` client for prose, excerpt, cards and citations in the existing immutable revision API. Preserve omitted fields/media, reconcile lost acknowledgements, reject concurrent edits, and keep explicit onboarding/review/release gates.
+- Verify rendered prose and actual card components after an explicit release; expose pending visibility and review holds without claiming completion. Default deadline is 10 seconds. This does not replace canonical entity management, photo/media intake, human review, publication adapter rollout or TTS capacity work.
+
 ## 0.0.80
 
 - Add one resumable local-file article photo operation and `replace-photo --url`: normal managed upload, privacy/scan, measured publication renditions, version-fenced attachment and public HTML verification. Persist a private checkpoint, stop at a bounded deadline, reconcile lost acknowledgements and avoid new uploads/writes on completed replay.
