@@ -205,6 +205,10 @@ export function greetingText(profile: GreetingProfile, now = new Date(), fallbac
 
 export type SessionSummaryResponse = { authenticated: boolean; full_name?: string; locale?: string; time_zone?: string };
 
+export const READER_GREETING_POLL_MS = 30_000;
+export const READER_GREETING_TIMEOUT_MS = 8_000;
+export const READER_IDENTITY_CHANGED_EVENT = "scalemule:reader-identity-changed";
+
 export function ReaderGreeting({ endpoint = "/api/news/session", className, fallback = "Welcome back", as: Tag = "span" }: {
   endpoint?: string;
   className?: string;
@@ -214,15 +218,60 @@ export function ReaderGreeting({ endpoint = "/api/news/session", className, fall
   const [text, setText] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    const controller = new AbortController();
-    fetch(endpoint, { credentials: "same-origin", cache: "no-store", signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((summary: SessionSummaryResponse | null) => {
-        if (!alive || !summary || summary.authenticated !== true) return;
-        setText(greetingText(summary, new Date(), fallback));
-      })
-      .catch(() => { /* no greeting is the correct fallback */ });
-    return () => { alive = false; controller.abort(); };
+    let generation = 0;
+    let authenticated = false;
+    let controller: AbortController | undefined;
+    let deadline: number | undefined;
+    const refresh = (clear = false) => {
+      if (!alive) return;
+      if (clear) { authenticated = false; setText(null); }
+      const current = ++generation;
+      controller?.abort();
+      if (deadline !== undefined) window.clearTimeout(deadline);
+      if (document.visibilityState === "hidden") return;
+      const request = new AbortController();
+      controller = request;
+      const timeout = window.setTimeout(() => {
+        if (!alive || current !== generation) return;
+        generation++;
+        authenticated = false;
+        setText(null);
+        request.abort();
+      }, READER_GREETING_TIMEOUT_MS);
+      deadline = timeout;
+      fetch(endpoint, { credentials: "same-origin", cache: "no-store", signal: request.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((summary: SessionSummaryResponse | null) => {
+          if (!alive || current !== generation) return;
+          authenticated = summary?.authenticated === true;
+          setText(authenticated && summary ? greetingText(summary, new Date(), fallback) : null);
+        })
+        .catch(() => {
+          if (!alive || current !== generation) return;
+          authenticated = false;
+          setText(null);
+        })
+        .finally(() => window.clearTimeout(timeout));
+    };
+    const recheck = () => refresh(true);
+    const timer = window.setInterval(() => {
+      // Anonymous pages need only their initial check and user-focus events.
+      if (authenticated) refresh();
+    }, READER_GREETING_POLL_MS);
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    document.addEventListener(READER_IDENTITY_CHANGED_EVENT, recheck);
+    refresh(true);
+    return () => {
+      alive = false;
+      generation++;
+      controller?.abort();
+      if (deadline !== undefined) window.clearTimeout(deadline);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+      document.removeEventListener(READER_IDENTITY_CHANGED_EVENT, recheck);
+    };
   }, [endpoint, fallback]);
   if (text === null) return null;
   return <Tag className={className} data-reader-greeting="">{text}</Tag>;

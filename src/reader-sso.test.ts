@@ -61,7 +61,7 @@ function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: 
       }
       if (path.startsWith("/v1/auth/oauth/ledvery/callback")) return options.exchange ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later, user: {}, is_new_user: true } } };
       if (path === "/v1/auth/oauth/ledvery/link") return options.link ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later } } };
-      if (path === "/v1/auth/me") {
+      if (path.startsWith("/v1/auth/me")) {
         const user = init.token ? users[init.token] : undefined;
         return user ? { status: 200, body: { data: user } } : { status: 401, body: { success: false, error: { code: "UNAUTHORIZED" } } };
       }
@@ -169,7 +169,7 @@ describe("startSignIn", () => {
     const h = harness();
     const result = await startSignIn(h.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.session]: "new-token" }) });
     expect(result).toMatchObject({ ok: false, reason: "session", cookies: [] });
-    expect(h.calls.map((c) => c.path)).toEqual(["/v1/auth/me"]);
+    expect(h.calls.map((c) => c.path)).toEqual(["/v1/auth/me?passive=true"]);
   });
   it("a session cookie revoked elsewhere is cleared and no longer suppresses the silent check (review R5)", async () => {
     const h = harness();
@@ -368,6 +368,7 @@ describe("signOut and session", () => {
     const h = harness();
     expect(await sessionSummary(h.config, jar({}))).toEqual({ authenticated: false });
     expect(await sessionSummary(h.config, jar({ [names.session]: "new-token" }))).toEqual({ authenticated: true, full_name: "Alice Иванова", locale: "bg-BG", time_zone: "Europe/Sofia" });
+    expect(h.calls.filter(call => call.path.startsWith("/v1/auth/me")).every(call => call.path === "/v1/auth/me?passive=true")).toBe(true);
     expect(readerSsoBootFlags(jar({ [names.session]: "x" }), names)).toEqual({ hasSession: true, suppressed: false });
     expect(readerSsoBootFlags(jar({ [names.ssoChecked]: "1" }), names)).toEqual({ hasSession: false, suppressed: true });
     expect(readerSsoBootFlags(jar({}), names)).toEqual({ hasSession: false, suppressed: false });

@@ -1,3 +1,8 @@
+## 0.0.77
+
+- Revalidate reader greetings after logout, account changes and focus, with bounded requests and stale-response protection. Background checks preserve the session idle limit.
+- Cross-publication browser acceptance, email ownership proof and wider rollout remain release gates.
+
 ## 0.0.76
 
 - Add `replacePublishedCover` and the `scalemule-article` executable for inspecting an article and changing a legacy published cover from an already ready public Photo asset. Read measured hero/social manifests; require rights, provenance and an explicit article version; never republish text, restart narration or overwrite a conflict.
