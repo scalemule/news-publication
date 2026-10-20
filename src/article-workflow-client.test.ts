@@ -192,3 +192,17 @@ it("uses returned processing fences for explicit retries and revision narration 
     { path: "/v1/blog/publications/paper/articles/story/processing", method: "POST", body: { expected_version: 9, narration_profile_version: 8 } },
   ]);
 });
+
+it("enrolls legacy articles only through an explicit approved workflow choice", async () => {
+  const calls: { method: string; path: string; body: unknown }[] = [];
+  const client = new PublicationArticleClient({ apiUrl: "https://api.example.test", publicationId: "paper", fetch: (async(url, init) => {
+    calls.push({method:init?.method || "GET",path:new URL(String(url)).pathname,body:init?.body ? JSON.parse(String(init.body)) : undefined});
+    return Response.json({success:true,data:{post_id:"legacy",existing:true}});
+  }) as typeof fetch });
+  await client.get("legacy");
+  await client.enableCollaboration("legacy","SUBJECT_APPROVAL_PLUS_EDITOR");
+  expect(calls).toEqual([
+    {method:"GET",path:"/v1/blog/publications/paper/articles/legacy/collaboration",body:undefined},
+    {method:"POST",path:"/v1/blog/publications/paper/articles/legacy/collaboration/enable",body:{review_policy:"SUBJECT_APPROVAL_PLUS_EDITOR"}},
+  ]);
+});
