@@ -1,3 +1,9 @@
+## 0.0.74
+
+- Renew existing Ledvery reader sessions once to bind cross-app logout, retiring the old credential before replacing it.
+- Preserve the current account during silent conflicts and remember an explicit keep choice only for its validated session.
+- Bound names on Unicode code points. Browser acceptance and passwordless ownership proof remain separate rollout work.
+
 ## 0.0.73
 
 - Expose explicit legacy article onboarding through the existing approver-authorized collaboration enable API. Reads never silently enroll articles; callers choose review policy and resolve missing managed media identities first. Existing scheduled releases are cancelled by enrollment, as the server contract requires.

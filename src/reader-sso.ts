@@ -60,6 +60,10 @@ export function readerSsoCookieNames(prefix: string): ReaderSsoCookieNames {
 export type CookieInstruction = { name: string; value: string; maxAge?: number; expires?: Date };
 export const readerSsoCookieOptions = { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
 const clear = (name: string): CookieInstruction => ({ name, value: "", maxAge: 0 });
+// An explicit choice to retain a legacy local account applies only to that
+// validated credential. It is a preference, never an authentication grant.
+const keepLocalValue = (token: string) => "keep:" + createHash("sha256").update(token).digest("hex");
+const keepsLocal = (checked: string | undefined, token: string | undefined) => Boolean(token && checked === keepLocalValue(token));
 
 /** Apply instructions to a Next.js `cookies()` jar (or anything with the same `set`). */
 export function applyCookies(
@@ -358,7 +362,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   if (input.cookies(c.names.session)) {
     const current = await currentUser(c, input.cookies(c.names.session));
     if (current && current.email_verified) {
-      if (mode === "silent") return { ok: false, status: 204, error: "", reason: "session", redirect, cookies: [] };
+      if (mode === "silent" && (!current.needsSsoUpgrade || keepsLocal(input.cookies(c.names.ssoChecked), input.cookies(c.names.session)))) return { ok: false, status: 204, error: "", reason: "session", redirect, cookies: [] };
     } else {
       staleSession.push(clear(c.names.session), clear(c.names.pending));
     }
@@ -366,7 +370,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   if (mode === "silent") {
     // ADR 4.4: never after an explicit sign-out, and at most once per
     // negative-cache window.
-    if (input.cookies(c.names.signedOut) || input.cookies(c.names.ssoChecked)) {
+    if (input.cookies(c.names.signedOut) || input.cookies(c.names.ssoChecked) === "1") {
       return { ok: false, status: 204, error: "", reason: "suppressed", redirect, cookies: staleSession };
     }
   }
@@ -406,7 +410,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
 // ---------------------------------------------------------------------------
 // Callback
 // ---------------------------------------------------------------------------
-export type SessionUser = { id: string; email_verified: boolean; full_name: string; locale?: string; time_zone?: string };
+export type SessionUser = { id: string; email_verified: boolean; full_name: string; locale?: string; time_zone?: string; needsSsoUpgrade?: true };
 
 async function currentUser(c: Resolved, token: string | undefined): Promise<SessionUser | null> {
   if (!token || !SESSION_TOKEN.test(token)) return null;
@@ -417,9 +421,10 @@ async function currentUser(c: Resolved, token: string | undefined): Promise<Sess
   return {
     id: me.id,
     email_verified: me.email_verified === true,
-    full_name: typeof me.full_name === "string" ? me.full_name.trim().slice(0, 150) : "",
+    full_name: typeof me.full_name === "string" ? Array.from(me.full_name.trim()).slice(0, 150).join("") : "",
     locale: typeof me.locale === "string" && me.locale.length <= 35 ? me.locale : undefined,
     time_zone: typeof me.time_zone === "string" && me.time_zone.length <= 64 ? me.time_zone : undefined,
+    ...(me.sso_session_bound === false ? { needsSsoUpgrade: true as const } : {}),
   };
 }
 
@@ -526,7 +531,7 @@ async function establish(
   const { session, flow, method, cookies } = args;
   // Confirm the issued session belongs to this application's verified reader.
   const user = await currentUser(c, session.token);
-  if (!user || !user.email_verified) throw new Error("unverified");
+  if (!user || !user.email_verified || user.needsSsoUpgrade) throw new Error("unverified");
   const current = await currentUser(c, args.input.cookies(c.names.session));
   const decision = precedence(current, user);
   if (decision === "switch") {
@@ -537,7 +542,12 @@ async function establish(
     });
     if (flow.mode === "silent") cookies.push(args.negativeCache);
     emit(c, { name: "reader_sso_check", properties: { outcome: "switch_offered", mode: flow.mode, transaction: flow.tx } });
-    return { kind: "redirect", location: `${c.accountPath}?switch=1`, cookies, outcome: "switch_offered", flow };
+    return { kind: "redirect", location: flow.mode === "silent" ? flow.returnTo || "/" : `${c.accountPath}?switch=1`, cookies, outcome: "switch_offered", flow };
+  }
+  const previousToken = args.input.cookies(c.names.session);
+  if (current && previousToken && previousToken !== session.token) {
+    const retired = await c.request("/v1/auth/logout", { method: "POST", body: { session_token: previousToken }, token: previousToken });
+    if (failed(retired) || (retired.body as { success?: unknown } | null)?.success !== true) throw new Error("session retirement failed");
   }
   cookies.push({ name: c.names.session, value: session.token, expires: session.expiresAt }, clear(c.names.signedOut), clear(c.names.ssoChecked), clear(c.names.pending));
   emit(c, { name: "reader_signin_completed", properties: { method, mode: flow.mode, is_new: session.isNew ? "true" : "false", transaction: flow.tx } });
@@ -637,6 +647,11 @@ export async function switchAccount(config: ReaderSsoConfig, input: { choice: un
     try { await c.request("/v1/auth/logout", { method: "POST", body: { session_token: token }, token }); } catch { /* best effort */ }
   };
   if (input.choice === "stay") {
+    const token = input.cookies(c.names.session);
+    const current = await currentUser(c, token);
+    if (token && current?.email_verified && current.needsSsoUpgrade) {
+      cookies.push({ name: c.names.ssoChecked, value: keepLocalValue(token), maxAge: 90 * 86400 });
+    }
     await logout(pending.token);
     emit(c, { name: "reader_sso_check", properties: { outcome: "switch_declined", mode: pending.mode, transaction: pending.tx } });
     return { ok: true, choice: "stay", cookies, location: pending.returnTo || c.accountPath };
@@ -687,13 +702,13 @@ export async function signOut(config: ReaderSsoConfig, input: { cookies: CookieR
 // Session summary for the greeting (ADR section 7): display profile only, no
 // email, served private/no-store by the site route.
 // ---------------------------------------------------------------------------
-export type SessionSummary = { authenticated: false } | { authenticated: true; full_name: string; locale?: string; time_zone?: string };
+export type SessionSummary = { authenticated: false } | { authenticated: true; full_name: string; locale?: string; time_zone?: string; session_upgrade_required?: true };
 
 export async function sessionSummary(config: ReaderSsoConfig, cookies: CookieReader): Promise<SessionSummary> {
   const c = resolve(config);
   const user = await currentUser(c, cookies(c.names.session));
   if (!user || !user.email_verified) return { authenticated: false };
-  return { authenticated: true, full_name: user.full_name, locale: user.locale, time_zone: user.time_zone };
+  return { authenticated: true, full_name: user.full_name, locale: user.locale, time_zone: user.time_zone, ...(user.needsSsoUpgrade && !keepsLocal(cookies(c.names.ssoChecked), cookies(c.names.session)) ? { session_upgrade_required: true as const } : {}) };
 }
 
 /**
@@ -712,6 +727,6 @@ export async function sessionSummaryWithCookies(config: ReaderSsoConfig, cookies
 export function readerSsoBootFlags(cookies: CookieReader, names: ReaderSsoCookieNames): { hasSession: boolean; suppressed: boolean } {
   return {
     hasSession: Boolean(cookies(names.session)),
-    suppressed: Boolean(cookies(names.signedOut) || cookies(names.ssoChecked) || cookies(names.pending)),
+    suppressed: Boolean(cookies(names.signedOut) || cookies(names.ssoChecked) === "1" || cookies(names.pending)),
   };
 }
