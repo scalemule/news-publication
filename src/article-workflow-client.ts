@@ -29,6 +29,35 @@ export type AssetMetadata = {
   rights_confirmed: boolean;
   private_preview_only?: boolean;
 };
+export type PublishedCoverReplacement = {
+  articleId: string;
+  expectedVersion: number;
+  /** A real, already public Photo/Storage ID, never an invented ID or URL. */
+  fileId: string;
+  rightsConfirmed: boolean;
+  caption: string;
+  credit: string;
+  alt: string;
+  aiGenerated: boolean;
+  label: string | null;
+  focalPoint?: { x: number; y: number };
+  /** Metadata lookup key only; no rendition URL or dimensions are inferred. */
+  socialRenditionKey?: string;
+};
+type PublicPhotoManifest = {
+  file_id: string;
+  photo_id: string;
+  ready: boolean;
+  variant_metadata: { [key: string]: { url: string; width: number; height: number; format: string } };
+};
+type PublicRendition = {
+  file_id: string;
+  photo_id: string;
+  ready: boolean;
+  url?: string;
+  width?: number;
+  height?: number;
+};
 export type ArticleProcessing = {
   article_id: string;
   version: number;
@@ -203,6 +232,79 @@ export class PublicationArticleClient {
   processing(articleId: string) {
     return this.request<ArticleProcessing>(
       `/articles/${encodeURIComponent(articleId)}/processing`,
+    );
+  }
+  /** Replace a legacy publication cover using ready, measured public Photo renditions.
+   * This never enrolls a story, publishes text, creates narration or retries a conflict.
+   * Collaboration-managed stories retain their server-enforced immutable revision workflow.
+   */
+  async replacePublishedCover(input: PublishedCoverReplacement) {
+    if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1)
+      throw new Error("Use the current public-projection version from processing()");
+    if (input.rightsConfirmed !== true || !input.alt.trim())
+      throw new Error("Confirm publication rights and supply factual image alt text");
+    if (input.aiGenerated && !input.label?.trim())
+      throw new Error("Generated art requires its internal provenance label");
+    const focal = input.focalPoint ?? { x: 0.5, y: 0.5 };
+    if (![focal.x, focal.y].every(v => Number.isFinite(v) && v >= 0 && v <= 1))
+      throw new Error("Focal point must be within the image");
+    const photo = `/v1/photos/public/${encodeURIComponent(input.fileId)}/manifest`;
+    const socialKey = input.socialRenditionKey ?? "w1200_h630_cover_q85_jpeg";
+    const socialPath = `${photo}?rendition=${encodeURIComponent(socialKey)}`;
+    const [current, hero, initialSocial] = await Promise.all([
+      this.processing(input.articleId),
+      this.request<PublicPhotoManifest>(`${photo}?preset=hero`),
+      this.request<PublicRendition>(socialPath),
+    ]);
+    if (current.publication_status !== "published" || current.version !== input.expectedVersion)
+      throw new ArticleWorkflowError("Article is not published or its version changed; reload before updating its cover", 409, input.articleId);
+    let social = initialSocial;
+    if (hero.ready && [hero.file_id, hero.photo_id].includes(input.fileId) && !social.ready && social.file_id === hero.file_id) {
+      // Materialize through Photo's normal guarded public transform. Its measured
+      // manifest, never this requested size or a guessed URL, authorizes attachment.
+      const spec = /^w(\d+)_h(\d+)_(cover|contain|fill|scaledown)_q(\d+)_(jpeg|webp|avif)$/.exec(socialKey);
+      if (spec && Number(spec[1]) > 0 && Number(spec[1]) <= 12000 && Number(spec[2]) > 0 && Number(spec[2]) <= 12000 && Number(spec[4]) > 0 && Number(spec[4]) <= 100) {
+        const query = new URLSearchParams({ width: spec[1], height: spec[2], fit: spec[3], quality: spec[4], format: spec[5] });
+        const url = new URL(this.config.apiUrl.replace(/\/$/, "") + `/v1/photos/public/${encodeURIComponent(input.fileId)}/transform?${query}`);
+        const response = await (this.config.fetch ?? fetch)(url, { method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(30_000) });
+        const accepted = (response.ok && response.headers.get("content-type")?.startsWith("image/")) || [302, 303, 307, 308].includes(response.status);
+        await response.body?.cancel();
+        if (accepted) social = await this.request<PublicRendition>(socialPath);
+      }
+    }
+    const dimension = (v: unknown): v is number => Number.isInteger(v) && Number(v) > 0 && Number(v) <= 12000;
+    const publicUrl = (raw: string) => {
+      try {
+        const url = new URL(raw);
+        return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
+      } catch { return false; }
+    };
+    const variants = Object.values(hero.variant_metadata ?? {});
+    if (!hero.ready || !social.ready || !hero.file_id ||
+        ![hero.file_id, hero.photo_id].includes(input.fileId) || social.file_id !== hero.file_id ||
+        !variants.length || variants.length > 20 || variants.some(v =>
+          !dimension(v.width) || !dimension(v.height) || !publicUrl(v.url) || !["jpeg", "webp", "avif"].includes(v.format)) ||
+        !dimension(social.width) || !dimension(social.height) || !social.url || !publicUrl(social.url))
+      throw new ArticleWorkflowError("Public Photo renditions are not ready with measured dimensions; inspect Photo processing, keep the existing cover and resume with the same asset", 409, input.articleId);
+    // Choose a real rendition; never infer an object's address or crop dimensions.
+    const ordered = [...variants].sort((a, b) => a.width - b.width);
+    const master = [...ordered].reverse().find(v => v.width <= 1600) ?? ordered[0];
+    return this.request<{ post_id: string; version: number; cover_image_url: string; og_image_url: string }>(
+      `/articles/${encodeURIComponent(input.articleId)}/media`, "PUT", {
+        expected_version: input.expectedVersion,
+        cover_image_url: master.url,
+        og_image_url: social.url,
+        cover_image: {
+          file_id: hero.file_id, master_url: master.url, width: master.width, height: master.height,
+          aspect_ratio: `${master.width}:${master.height}`, alt: input.alt,
+          caption: input.caption, attribution: input.credit, ai_generated: input.aiGenerated,
+          label: input.label, focal_point: focal, variants,
+        },
+        open_graph_image: {
+          file_id: hero.file_id, url: social.url, width: social.width, height: social.height,
+          aspect_ratio: `${social.width}:${social.height}`,
+        },
+      },
     );
   }
   /** Existing private narration path for a saved revision and a before-publication audio policy. */

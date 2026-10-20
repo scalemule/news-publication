@@ -1,8 +1,9 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.75",
+  "version": "0.0.76",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
+  "bin": { "scalemule-article": "./bin/scalemule-article.mjs" },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -197,6 +198,7 @@
     }
   },
   "files": [
+    "bin",
     "dist",
     "tokens",
     "marketplace.css",
