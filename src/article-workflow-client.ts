@@ -39,6 +39,7 @@ export type ArticleProcessing = {
     audio_id?: string | null;
     job_id?: string | null;
     profile_override_version?: number | null;
+    work_priority?: number | null;
     error_code?: string | null;
     last_progress_at?: string | null;
   };
@@ -76,6 +77,7 @@ export type ArticleWorkflowOptions = {
     managed_private_asset_upload: boolean;
     inline_media_body?: boolean;
     automatic_public_narration?: boolean;
+    prioritized_narration_processing?: boolean;
   };
 };
 export type ArticleOperation = {
@@ -213,6 +215,13 @@ export class PublicationArticleClient {
       `/articles/${encodeURIComponent(articleId)}/collaboration/narrate`,
       "POST",
       { expected_generation: expectedGeneration },
+    );
+  }
+  /** Prioritize existing active Blog processing; never resets paid work or raises TTS limits. */
+  expediteNarration(articleId: string, expectedVersion: number) {
+    return this.request(
+      `/articles/${encodeURIComponent(articleId)}/processing`,
+      "POST", { expected_version: expectedVersion, expedite: true },
     );
   }
   retryProcessing(
