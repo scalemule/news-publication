@@ -9,6 +9,7 @@ function fixture(flags: {
     prepare?: boolean;
     sharedRole?: boolean;
     batch?: boolean;
+    wrongBatchFile?: boolean;
 } = {}) {
     let post: any = { id: "story", slug: "local-story", title: "София 李 🙂", content_markdown: "Verified original reporting.", content_html: "<p>Verified original reporting.</p>", version: 4, status: "published", visibility: "public", published_at: "2026-10-19T10:00:00Z", author_user_id: "author", audio_file_id: "existing-audio", metadata: { section: "Local", unrelated: { keep: true } } };
     const calls: {
@@ -65,7 +66,11 @@ function fixture(flags: {
         else if (path.endsWith("/photos/register")) {
             expect(body.role).toBe("lead");
             expect(body.prepare_article_renditions).toBe(flags.batch===true);
-            data = { id: "photo", prepared_article_renditions: flags.batch===true };
+            const specs=[['lead',1200,0,82,'webp'],['lead',1200,0,82,'jpeg'],['thumbnail',flags.sharedRole?1200:120,0,82,'webp'],['social',1200,630,88,'jpeg']];
+            data = {id:"photo",prepared_article_renditions:flags.batch===true,source:{file_id:"file",width:1600,height:900},article_renditions:specs.map(([role,w,h,q,format])=>{
+              const key=`w${w}_h${h}_${h?'cover':'scaledown'}_q${q}_${format}`;
+              return {key,role,format,file_id:flags.wrongBatchFile?'another-file':'file',ready:true,url:`https://cdn.example.test/${key}.image`,width:w===120?120:1198,height:h?629:w===120?67:674};
+            })};
         }
         else if (path.endsWith("/policies/article/editor"))
             data = { capabilities:{batched_article_renditions:flags.batch===true}, roles: {
@@ -128,6 +133,12 @@ describe("repeatable local article photo operation", () => {
         expect(await f.client.uploadAndReplacePublishedCover(f.input)).toMatchObject({state:"verified",version:5});
         expect(f.calls.filter(c=>c.path.endsWith("/photos/register"))).toHaveLength(1);
         expect(f.calls.some(c=>c.path.endsWith("/transform"))).toBe(false);
+        expect(f.calls.some(c=>c.path.endsWith("/manifest"))).toBe(false);
+    });
+    it("refuses a batch receipt from another asset before any article write",async()=>{
+        const f=fixture({batch:true,wrongBatchFile:true});
+        await expect(f.client.uploadAndReplacePublishedCover(f.input)).rejects.toMatchObject({stage:"renditions",fileId:"file"});
+        expect(f.calls.some(c=>c.path.endsWith("/media"))).toBe(false);
     });
     it("prepares missing publication outputs through normal anonymous Photo transforms and then reads measured receipts", async () => {
         const f = fixture({ prepare: true });

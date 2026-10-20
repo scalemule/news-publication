@@ -179,15 +179,17 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
             await sleep();
         }
         await progress("photo");
-        if (!state.registered) {
-            const batch = policy.capabilities?.batched_article_renditions === true;
-            if (batch) await progress("renditions");
-            const registered = await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", role: "lead", publication_id: t.publicationId, prepare_article_renditions:batch });
-            if (batch && registered.prepared_article_renditions !== true) throw Error("Photo did not confirm the measured rendition batch; resume the same upload");
+        const batched = policy.capabilities?.batched_article_renditions === true;
+        let prepared: any;
+        if (!state.registered || batched) {
+            if (batched) await progress("renditions");
+            const registered = await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", role: "lead", publication_id: t.publicationId, prepare_article_renditions:batched });
+            if (batched && registered.prepared_article_renditions !== true) throw Error("Photo did not confirm the measured rendition batch; resume the same upload");
+            prepared = batched ? registered : undefined;
             state.registered = true;
             await progress("renditions");
         }
-        const source = await request(`/v1/photos/public/${state.fileId}/manifest?preset=hero`);
+        const source = prepared?.source ?? await request(`/v1/photos/public/${state.fileId}/manifest?preset=hero`);
         if (source.file_id !== state.fileId || !Number.isInteger(source.width) || source.width <= 0)
             throw Error("Photo source identity or measured dimensions are missing");
         const requirements = ["lead", "thumbnail", "social"].flatMap(role => {
@@ -218,7 +220,8 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
                 if (!preparation) {
                     preparation = (async () => {
                         const path = `/v1/photos/public/${state!.fileId}/manifest?rendition=${key}`;
-                        let receipt = await request(path);
+                        let receipt = batched ? prepared?.article_renditions?.find((v:any)=>v.key===key && v.role===role && v.format===r.format) : await request(path);
+                        if (batched && !measured(receipt,state!.fileId!)) throw Error("Photo batch is missing a required measured receipt; resume the same uploaded file");
                         if (!measured(receipt, state!.fileId!)) {
                             const q = new URLSearchParams({ width: String(r.width), fit: r.fit, quality: String(r.quality), format: r.format });
                             if (r.height)
