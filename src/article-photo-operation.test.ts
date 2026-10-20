@@ -187,7 +187,7 @@ describe("repeatable local article photo operation", () => {
     });
     it("never overwrites a concurrent editor or makes a second upload to resolve a conflict", async () => {
         const f = fixture({ concurrent: true });
-        await expect(f.client.uploadAndReplacePublishedCover(f.input)).rejects.toMatchObject({ stage: "attach" });
+        await expect(f.client.uploadAndReplacePublishedCover(f.input)).rejects.toMatchObject({code:"ARTICLE_CHANGED",status:409,stage:"attach"});
         expect(f.post().version).toBe(4);
         expect(f.calls.filter(c => c.path.endsWith("/media"))).toHaveLength(1);
     });

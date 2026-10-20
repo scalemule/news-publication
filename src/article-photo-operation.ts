@@ -36,7 +36,7 @@ type Transport = {
     apiUrl: string;
 };
 export class ArticlePhotoOperationError extends Error {
-    constructor(public code: string, public stage: string, message: string, public fileId?: string) { super(message); this.name = "ArticlePhotoOperationError"; }
+    constructor(public code: string, public stage: string, message: string, public fileId?: string, public status?: number) { super(message); this.name = "ArticlePhotoOperationError"; }
 }
 const digest = async (value: BufferSource) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", value))].map(v => v.toString(16).padStart(2, "0")).join("");
 const hash = (value: unknown) => digest(new TextEncoder().encode(JSON.stringify(value)));
@@ -269,6 +269,8 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
     catch (error) {
         if (error instanceof ArticlePhotoOperationError)
             throw error;
-        throw new ArticlePhotoOperationError(deadline.aborted ? "DEADLINE_EXCEEDED" : "STEP_FAILED", stage, deadline.aborted ? "Operation reached its time limit; resume the same operation and checkpoint. Success was not asserted." : error instanceof Error ? error.message : "Article photo operation failed", state?.fileId);
+        const status = typeof (error as any)?.status === "number" ? (error as any).status : undefined;
+        const code = deadline.aborted ? "DEADLINE_EXCEEDED" : status === 409 && stage === "attach" ? "ARTICLE_CHANGED" : status === 401 || status === 403 ? "PERMISSION_DENIED" : "STEP_FAILED";
+        throw new ArticlePhotoOperationError(code, stage, deadline.aborted ? "Operation reached its time limit; resume the same operation and checkpoint. Success was not asserted." : error instanceof Error ? error.message : "Article photo operation failed", state?.fileId, status);
     }
 }
