@@ -185,11 +185,13 @@ it("uses returned processing fences for explicit retries and revision narration 
   await client.retryProcessing(status.article_id, status.version, status.assets[0].source_file_id);
   await client.narrateRevision("story", 12);
   await client.retryProcessing(status.article_id, status.version, undefined, 8);
+  await client.expediteNarration(status.article_id, status.version);
   expect(calls).toEqual([
     { path: "/v1/blog/publications/paper/articles/story/processing", method: "GET", body: undefined },
     { path: "/v1/blog/publications/paper/articles/story/processing", method: "POST", body: { expected_version: 9, asset_source_file_id: "private-source" } },
     { path: "/v1/blog/publications/paper/articles/story/collaboration/narrate", method: "POST", body: { expected_generation: 12 } },
     { path: "/v1/blog/publications/paper/articles/story/processing", method: "POST", body: { expected_version: 9, narration_profile_version: 8 } },
+    { path: "/v1/blog/publications/paper/articles/story/processing", method: "POST", body: { expected_version: 9, expedite: true } },
   ]);
 });
 

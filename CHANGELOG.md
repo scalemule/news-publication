@@ -1,3 +1,8 @@
+## 0.0.75
+
+- Expose approver-authorized priority for an existing pending/queued narration intent. Discover `prioritized_narration_processing` first; expediting never resets job identity, attempts, leases, due times or replay age, and does not raise provider concurrency or budgets.
+- Audio generation capacity and all-publication adapter rollout remain separate acceptance work.
+
 ## 0.0.74
 
 - Renew existing Ledvery reader sessions once to bind cross-app logout, retiring the old credential before replacing it.
