@@ -8,6 +8,7 @@ function fixture(flags: {
     collaboration?: boolean;
     prepare?: boolean;
     sharedRole?: boolean;
+    batch?: boolean;
 } = {}) {
     let post: any = { id: "story", slug: "local-story", title: "София 李 🙂", content_markdown: "Verified original reporting.", content_html: "<p>Verified original reporting.</p>", version: 4, status: "published", visibility: "public", published_at: "2026-10-19T10:00:00Z", author_user_id: "author", audio_file_id: "existing-audio", metadata: { section: "Local", unrelated: { keep: true } } };
     const calls: {
@@ -63,10 +64,11 @@ function fixture(flags: {
             data = { scan: { status: flags.scan ?? "clean" }, urls: { cdn_url: "https://cdn.example.test/scanned-original.jpg" } };
         else if (path.endsWith("/photos/register")) {
             expect(body.role).toBe("lead");
-            data = { id: "photo" };
+            expect(body.prepare_article_renditions).toBe(flags.batch===true);
+            data = { id: "photo", prepared_article_renditions: flags.batch===true };
         }
         else if (path.endsWith("/policies/article/editor"))
-            data = { roles: {
+            data = { capabilities:{batched_article_renditions:flags.batch===true}, roles: {
                     lead: { renditions: [{ width: 1200, fit: "scaledown", quality: 82, format: "webp" }, { width: 1200, fit: "scaledown", quality: 82, format: "jpeg" }] },
                     thumbnail: { renditions: [{ width: flags.sharedRole ? 1200 : 120, fit: "scaledown", quality: 82, format: "webp" }] },
                     social: { renditions: [{ width: 1200, height: 630, fit: "cover", quality: 88, format: "jpeg" }] },
@@ -120,6 +122,12 @@ describe("repeatable local article photo operation", () => {
         expect(f.calls.filter(c => c.path.endsWith("/media"))).toHaveLength(1);
         expect(f.calls.some(c => /narrate|publish$/.test(c.path))).toBe(false);
         expect(f.checkpoint()).not.toHaveProperty("completionToken");
+    });
+    it("uses the discovered server batch before attachment and makes no individual transform request", async()=>{
+        const f=fixture({batch:true});
+        expect(await f.client.uploadAndReplacePublishedCover(f.input)).toMatchObject({state:"verified",version:5});
+        expect(f.calls.filter(c=>c.path.endsWith("/photos/register"))).toHaveLength(1);
+        expect(f.calls.some(c=>c.path.endsWith("/transform"))).toBe(false);
     });
     it("prepares missing publication outputs through normal anonymous Photo transforms and then reads measured receipts", async () => {
         const f = fixture({ prepare: true });

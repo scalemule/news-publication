@@ -111,10 +111,11 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
     });
     const postPath = `/articles/${encodeURIComponent(input.articleId)}/document`;
     try {
-        const [post, options, collaboration] = await Promise.all([
+        const [post, options, collaboration, policy] = await Promise.all([
             request(postPath), request(`/article-workflow/options?article_id=${encodeURIComponent(input.articleId)}`),
             request(`/articles/${encodeURIComponent(input.articleId)}/collaboration`).then(() => true).catch(error => { if (error.status === 404 && error.message === "Story collaboration is not enabled")
                 return false; throw error; }),
+            request(`/v1/photos/policies/article/editor?publication_id=${encodeURIComponent(t.publicationId)}`),
         ]);
         if (post.status !== "published" || post.visibility !== "public" || options.workflow_version !== 1)
             throw new ArticlePhotoOperationError("ARTICLE_NOT_PUBLIC", stage, "Select a currently published public article");
@@ -179,11 +180,14 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
         }
         await progress("photo");
         if (!state.registered) {
-            await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", role: "lead", publication_id: t.publicationId });
+            const batch = policy.capabilities?.batched_article_renditions === true;
+            if (batch) await progress("renditions");
+            const registered = await request("/v1/photos/register", "POST", { file_id: state.fileId, content_kind: "article", role: "lead", publication_id: t.publicationId, prepare_article_renditions:batch });
+            if (batch && registered.prepared_article_renditions !== true) throw Error("Photo did not confirm the measured rendition batch; resume the same upload");
             state.registered = true;
             await progress("renditions");
         }
-        const [source, policy] = await Promise.all([request(`/v1/photos/public/${state.fileId}/manifest?preset=hero`), request(`/v1/photos/policies/article/editor?publication_id=${encodeURIComponent(t.publicationId)}`)]);
+        const source = await request(`/v1/photos/public/${state.fileId}/manifest?preset=hero`);
         if (source.file_id !== state.fileId || !Number.isInteger(source.width) || source.width <= 0)
             throw Error("Photo source identity or measured dimensions are missing");
         const requirements = ["lead", "thumbnail", "social"].flatMap(role => {
