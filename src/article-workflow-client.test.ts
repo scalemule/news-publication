@@ -6,149 +6,25 @@ import {
 } from "./article-workflow-client";
 
 describe("standard agent article package", () => {
-  it("stages managed bytes, records explicit approval and resumes without another transfer or revision", async () => {
-    const file = new Blob(["Photo bytes passed only to multipart"]),
-      metadata = {
-        caption: "Community gathering",
-        credit: "Photographer",
-        alt: "People at a gathering",
-        creator: "Photographer",
-        who_is_pictured: "Residents",
-        when_taken: "2026-10-19",
-        where_taken: "Community center",
-        rights_confirmed: true,
-      };
-    const digest = Array.from(
-      new Uint8Array(
-        await crypto.subtle.digest("SHA-256", await file.arrayBuffer()),
-      ),
-    )
-      .map((v) => v.toString(16).padStart(2, "0"))
-      .join("");
-    const document: ArticleDocument = {
-      title: "A local story София 李 🙂",
-      section: "Community",
-      content_markdown: "Reported facts.",
-    };
-    let current = {
-      post_id: "article",
-      current_revision_id: "v1",
-      generation: 1,
-      status: "DRAFT",
-      revisions: [{ id: "v1", document }],
-      contributions: [] as any[],
-    };
-    let uploads = 0,
-      saves = 0;
-    const transport = vi.fn(
-      async (url: URL | RequestInfo, init?: RequestInit) => {
-        const path = new URL(String(url)).pathname;
-        let data: any;
-        if (path.endsWith("/photos/register"))
-          data = { id: "registered-photo" };
-        else if (path.endsWith("/options"))
-          data = {
-            workflow_version: 1,
-            formats: ["news"],
-            layouts: [],
-            capabilities: { managed_private_asset_upload: true },
-          };
-        else if (path.endsWith("/assets")) {
-          expect(init?.body).toBeInstanceOf(FormData);
-          expect(new Headers(init?.headers).get("If-Match")).toBe("1");
-          uploads++;
-          current.contributions = [
-            {
-              id: "contribution",
-              kind: "MEDIA",
-              state: "OPEN",
-              payload: { ...metadata, file_id: "file", sha256: digest },
-            },
-          ];
-          data = {
-            contribution_id: "contribution",
-            file_id: "file",
-            kind: "image",
-            state: "OPEN",
-          };
-        } else if (path.endsWith("/article-workflow")) {
-          const body = JSON.parse(String(init?.body));
-          expect(JSON.stringify(body)).not.toContain("Photo bytes");
-          if (body.operation === "create")
-            data = {
-              article_id: "article",
-              revision_id: "v1",
-              generation: 1,
-              editorial_status: "DRAFT",
-              permalink_path: "/news/a/article",
-              replayed: uploads > 0,
-            };
-          else {
-            saves++;
-            expect(body.expected_generation).toBe(2);
-            expect(body.document.media[0]).not.toHaveProperty("state");
-            current = {
-              ...current,
-              current_revision_id: "v2",
-              generation: 3,
-              revisions: [{ id: "v2", document: body.document }],
-            };
-            data = {
-              article_id: "article",
-              revision_id: "v2",
-              generation: 3,
-              editorial_status: "DRAFT",
-            };
-          }
-        } else if (init?.method === "POST") {
-          expect(JSON.parse(String(init.body))).toMatchObject({
-            action: "RESOLVE",
-            state: "APPROVED",
-            expected_generation: 1,
-          });
-          current.contributions[0].state = "APPROVED";
-          current.generation = 2;
-          data = {};
-        } else data = current;
-        return new Response(JSON.stringify({ success: true, data }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      },
-    );
-    const client = new PublicationArticleClient({
-      apiUrl: "https://api.example.test",
-      publicationId: "paper",
-      apiKey: "test-api-key",
-      fetch: transport as typeof fetch,
+  it("sends an article and its files in exactly one server request, including retries", async () => {
+    const transport=vi.fn(async (url:URL|RequestInfo,init?:RequestInit)=>{
+      expect(String(url)).toBe("https://api.example.org/v1/blog/publications/publication/submissions");
+      expect(init?.method).toBe("POST");expect(init?.body).toBeInstanceOf(FormData);
+      const form=init?.body as FormData;const manifest=JSON.parse(String(form.get("manifest")));
+      expect(manifest.intent).toBe("publish");expect(manifest.article.document.title).toBe("News София 李 📰");
+      expect(manifest.assets[0].slot).toBe("asset_a");expect(form.get("asset_a")).toBeInstanceOf(Blob);
+      expect(new Headers(init?.headers).get("idempotency-key")).toBe("same-operation");
+      expect(new Headers(init?.headers).has("content-type")).toBe(false);
+      return Response.json({success:true,data:{submission_id:"receipt",article_id:"article",status:"queued",accepted_is_not_published:true}});
     });
-    const input = {
-      operationKey: "community-story",
-      authorProfileId: "author",
-      document,
-      assets: [
-        {
-          file,
-          filename: "community.jpg",
-          metadata,
-          position: "hero" as const,
-        },
-      ],
-      approveMedia: true,
-    };
-    expect((await client.submitArticle(input)).generation).toBe(3);
-    expect((await client.submitArticle(input)).generation).toBe(3);
-    expect(uploads).toBe(1);
-    expect(saves).toBe(1);
-    current.revisions[0].document = {
-      ...current.revisions[0].document,
-      title: "A subsequent editor changed this headline",
-    };
-    await expect(client.submitArticle(input)).rejects.toBeInstanceOf(
-      ArticleWorkflowError,
-    );
-    expect(saves).toBe(1);
+    const client=new PublicationArticleClient({apiUrl:"https://api.example.org",publicationId:"publication",apiKey:"key",accessToken:"member",fetch:transport as typeof fetch});
+    const input={operationKey:"same-operation",authorProfileId:"author",document:{title:"News София 李 📰",section:"Community",content_markdown:"Reported facts."},intent:"publish" as const,
+      assets:[{file:new Blob(["test bytes"]),filename:"venue.png",position:"hero" as const,metadata:{caption:"Venue",credit:"Owner",alt:"Actual venue",creator:"Owner",who_is_pictured:"",when_taken:"",where_taken:"",rights_confirmed:true}}]};
+    const first=await client.submitArticle(input);const replay=await client.submitArticle(input);
+    expect(first.status).toBe("queued");expect(first.accepted_is_not_published).toBe(true);expect(replay.submission_id).toBe(first.submission_id);
+    expect(transport).toHaveBeenCalledTimes(2);
   });
+
   it("does not embed credentials in URLs or follow an API redirect", async () => {
     const transport = vi.fn(
       async (url: URL | RequestInfo, init?: RequestInit) => {
@@ -207,4 +83,14 @@ it("enrolls legacy articles only through an explicit approved workflow choice", 
     {method:"GET",path:"/v1/blog/publications/paper/articles/legacy/collaboration",body:undefined},
     {method:"POST",path:"/v1/blog/publications/paper/articles/legacy/collaboration/enable",body:{review_policy:"SUBJECT_APPROVAL_PLUS_EDITOR"}},
   ]);
+});
+
+it("updates an existing article in one JSON submission and refuses a service fallback",async()=>{
+  const transport=vi.fn(async (_url:URL|RequestInfo,init?:RequestInit)=>{
+    expect(JSON.parse(String(init?.body)).article).toMatchObject({operation:"save",article_id:"existing",expected_generation:7});
+    return Response.json({success:false,error:{message:"Managed submission is not deployed"}},{status:404});
+  });
+  const client=new PublicationArticleClient({apiUrl:"https://api.example.org",publicationId:"publication",fetch:transport as typeof fetch});
+  await expect(client.submit({article:{operation:"save",article_id:"existing",expected_generation:7,reason:"COPY_EDIT",document:{title:"Corrected",section:"Community",content_markdown:"Corrected."}},intent:"publish"},"edit-key")).rejects.toMatchObject({status:404});
+  expect(transport).toHaveBeenCalledTimes(1);
 });

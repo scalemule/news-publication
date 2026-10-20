@@ -328,15 +328,54 @@ The publisher-supplied `PawMark` preserves the approved SVG paths. Hosts may set
 
 ### Standard article submission
 
-Server tools and authorized agents use `PublicationArticleClient` from
-`@scalemule/news-publication/article-workflow`. Discover `options()` first;
-require `workflow_version: 1`. Use `submitArticle()` for a private draft plus
-managed photo staging, or `get()` and `save()` for a generation-fenced edit.
-Keep the operation key when resuming. Editorial approval and release remain
-explicit commands; acceptance does not certify scan, image or audio completion.
-The platform contract and a complete example live in
-`docs/news-platform/ARTICLE-WORKFLOW-V1.md` in the ScaleMule meta-repo.
-Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
+Submit through the server-owned API using `PublicationArticleClient` from
+`@scalemule/news-publication/article-workflow`:
+
+```ts
+const receipt = await client.submitArticle({
+  operationKey: "story-intake-v1", authorProfileId: authorId,
+  document: { title, content_markdown: body, section: "Local Business" },
+  intent: "publish",
+  assets: [{ file: photo, filename: "venue.jpg", position: "hero",
+    metadata: { alt: "Exterior of the actual venue", credit: "Photographer",
+      rights_confirmed: true } }],
+});
+```
+
+This sends **one POST** to `/v1/blog/publications/{id}/submissions`, with a
+multipart manifest and its files. JSON without files is supported by
+`client.submit(manifest, key)`. The same API accepts `article.operation: "save"`
+with the existing article ID, expected generation, complete document and revision
+reason. The server owns private Photo/Storage intake, scan checks, immutable
+media attachment, required private narration and release. Optional narration
+and missing-visual commissioning use the existing post-publication workers.
+Existing subject/editorial/sensitivity approvals still apply. `draft` is the
+safe default; `publish` requests release after the configured gates.
+
+An accepted receipt is **not** a claim that media is ready or a page has been
+verified. Read `client.submission(receipt.submission_id)` for holds, processing
+and public readiness. After a timeout, replay the identical manifest, files and
+operation key. Do not re-upload through other endpoints or create a new article.
+A foreign revision, rejected media, expired replay or unconfirmed asset intake
+stops with a retained receipt rather than silently overwriting or duplicating.
+No client-side fallback performs a separate multi-service publishing sequence.
+Discover `managed_submission_version: 1` before adopting this endpoint on an
+older server. Supported files are still JPEG/PNG/WebP photographs, not video or
+animation. Never use SQL, S3 paths, embedded binary or invented ready flags.
+
+CLI equivalents:
+
+```sh
+scalemule-article submit --publication "$PUBLICATION_ID" \
+  --manifest article.json --asset hero=./venue.jpg --operation-key story-intake-v1
+scalemule-article status --publication "$PUBLICATION_ID" --submission "$SUBMISSION_ID"
+```
+
+The manifest uses the API's snake_case fields: `article`, `intent`, and optional
+`assets: [{slot: "hero", position: "hero", metadata: {...}}]`. Each `--asset`
+matches one declared slot. Credentials are normal project/member credentials.
+The operation key is retained for 30 days. A legacy article must first have an
+explicitly selected collaboration policy; this endpoint never downgrades review.
 
 ### Edit article prose, cards and citations
 
