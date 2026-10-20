@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, mkdir, writeFile, rename, open, unlink } from 'node:fs/promises';
+import { readFile, stat, mkdir, writeFile, rename, open, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -103,6 +103,7 @@ try {
       for(const entry of values.asset??[]){
         const split=entry.indexOf('=');if(split<1)throw Error('--asset must be slot=/path/to/photo');
         const slot=entry.slice(0,split),path=entry.slice(split+1);
+        const info=await stat(path);if(!info.isFile()||info.size<1||info.size>25*1024*1024)throw Error('Photo must be a regular file between 1 byte and 25 MiB');
         assets.push({slot,filename:basename(path),file:new Blob([await readFile(path)])});
       }
       const receipt=await client.submit(manifest,values['operation-key'],assets,AbortSignal.timeout(remaining()));

@@ -118,7 +118,7 @@ export type ArticleWorkflowOptions = {
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
     versioned_editorial_fields?: boolean;
-    managed_submission_version?: number;
+    managed_submission_version?: number | null;
     multipart_submission?: boolean;
   };
 };
@@ -462,9 +462,6 @@ export class PublicationArticleClient {
       "If-Match": String(generation),
     });
   }
-  /** One agent operation over existing owners. Stops at conflicts/unknown upload acknowledgement;
-   * replay the same operation key to inspect/reuse staged contributions before another transfer.
-   * Editorial approval and release are always separate explicit operations. */
   /** One server-owned submission. No client-side Photo/TTS orchestration and no
    * fallback to a different workflow. A 202 receipt is acceptance, not readiness.
    * Replay the identical manifest/files/key after an uncertain acknowledgement.
@@ -472,6 +469,7 @@ export class PublicationArticleClient {
   submit(manifest: ArticleSubmissionManifest, operationKey: string,
     files: { slot: string; file: Blob; filename: string }[] = [], signal?: AbortSignal) {
     if (!operationKey) throw new Error("A stable operation key is required");
+    if(files.length>10 || files.some(f=>f.file.size<1||f.file.size>25*1024*1024) || files.reduce((n,f)=>n+f.file.size,0)>50*1024*1024) throw new Error("Supply up to ten photographs, at most 25 MiB each and 50 MiB total");
     const slots = new Set(files.map(f => f.slot));
     if (slots.size !== files.length || files.length !== (manifest.assets?.length ?? 0)
       || manifest.assets?.some(a => !slots.has(a.slot))) throw new Error("Supply one file for each declared asset slot");
