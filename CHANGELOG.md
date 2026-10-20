@@ -1,3 +1,8 @@
+## 0.0.76
+
+- Add `replacePublishedCover` and the `scalemule-article` executable for inspecting an article and changing a legacy published cover from an already ready public Photo asset. Read measured hero/social manifests; require rights, provenance and an explicit article version; never republish text, restart narration or overwrite a conflict.
+- New photograph sourcing/upload/scan, collaboration revision approval and website cache visibility remain separate phases. This patch does not claim a measured end-to-end photo replacement SLA or complete publication-adapter rollout.
+
 ## 0.0.75
 
 - Expose approver-authorized priority for an existing pending/queued narration intent. Discover `prioritized_narration_processing` first; expediting never resets job identity, attempts, leases, due times or replay age, and does not raise provider concurrency or budgets.

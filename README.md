@@ -337,3 +337,33 @@ explicit commands; acceptance does not certify scan, image or audio completion.
 The platform contract and a complete example live in
 `docs/news-platform/ARTICLE-WORKFLOW-V1.md` in the ScaleMule meta-repo.
 Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
+
+### Replace an existing, prepared cover
+
+For a legacy published article and an already public, scanned Photo asset,
+use `client.replacePublishedCover(...)` or the included executable:
+
+```sh
+scalemule-article inspect --publication "$PUBLICATION_ID" --article "$ARTICLE_ID"
+scalemule-article replace-cover --publication "$PUBLICATION_ID" --article "$ARTICLE_ID" \
+  --file-id "$PHOTO_FILE_ID" --expected-version "$VERSION" --metadata photo.json
+```
+
+Use normal `SCALEMULE_API_KEY` and `SCALEMULE_ACCESS_TOKEN` authorization.
+`inspect` reports the public-projection version and whether collaboration is
+enabled, without logging draft text or review capabilities. The metadata file
+records caption, credit, factual alt text, `rightsConfirmed`, `aiGenerated` and
+the internal provenance `label` (null for an ordinary photograph).
+
+The replacement reads measured hero/social manifests and makes one version-fenced
+media write. A missing social rendition gets one normal Photo transform request
+and a fresh measured metadata lookup; pending work stops without polling forever.
+It never invents dimensions or delivery URLs, uploads another copy,
+restarts narration, republishes text or silently enrolls a story. Missing or
+incomplete Photo renditions leave the existing cover unchanged; inspect and
+resume with the same asset. Collaboration-managed stories retain their exact
+revision approval/release requirements and the server rejects this legacy path.
+This helper does not source or ingest a new photograph. Use managed asset intake
+for that phase, preserving source rights and private capture information.
+Reported elapsed time covers the API operation; verify the real public page and
+homepage allocation separately before claiming the replacement is visible.
