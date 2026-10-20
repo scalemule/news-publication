@@ -151,6 +151,13 @@ describe("repeatable local article photo operation", () => {
         await f.client.uploadAndReplacePublishedCover(f.input);
         expect(f.calls.filter(c => c.path.endsWith("/transform"))).toHaveLength(3);
     });
+    it("bounds metadata before upload using Unicode character counts",async()=>{
+        const f=fixture();
+        await expect(f.client.uploadAndReplacePublishedCover({...f.input,caption:"🙂".repeat(2001)})).rejects.toThrow("caption exceeds");
+        expect(f.calls).toHaveLength(0);
+        const boundary=fixture();
+        expect(await boundary.client.uploadAndReplacePublishedCover({...boundary.input,caption:"🙂".repeat(2000)})).toMatchObject({state:"verified"});
+    });
     it("rejects animation and invalid provenance before any HTTP or upload", async () => {
         const f = fixture();
         await expect(f.client.uploadAndReplacePublishedCover({ ...f.input, file: new Blob(["GIF89a"]) })).rejects.toThrow("still JPEG");

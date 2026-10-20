@@ -85,6 +85,9 @@ export async function runArticlePhoto(t: Transport, input: ArticlePhotoInput) {
         throw Error("Supply a stable operation key, current article version, confirmed rights, factual alt and explicit provenance");
     if (typeof input.caption !== "string" || typeof input.credit !== "string" || !(input.label === null || typeof input.label === "string"))
         throw Error("Supply explicit caption, credit and provenance label");
+    for (const [name,value,limit] of [["caption",input.caption,2000],["credit",input.credit,8000],["alt",input.alt,1000],["label",input.label??"",200]] as const) {
+        if ([...value].length>limit) throw Error(`Photo ${name} exceeds ${limit} characters`);
+    }
     const focal = input.focalPoint ?? { x: 0.5, y: 0.5 };
     if (![focal.x, focal.y].every(v => Number.isFinite(v) && v >= 0 && v <= 1))
         throw Error("Focal point must be within the image");
