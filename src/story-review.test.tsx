@@ -157,7 +157,7 @@ describe("family review", () => {
     render(<StoryReview sessionId="private-session" publicationName="Test publication" onReviewLoaded={loaded} />);
     await screen.findByRole("heading", { name: initial.revision.document.title });
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(loaded).toHaveBeenCalledWith(initial);
+    await waitFor(() => expect(loaded).toHaveBeenCalledWith(initial));
   });
   it("requests a replacement for the exact photo without changing or approving the current revision", async () => {
     const fetcher = setup(initial.review_policy, false, true);

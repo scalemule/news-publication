@@ -36,9 +36,9 @@ const NOW = Date.UTC(2026, 9, 19, 15, 0, 0);
 const later = new Date(NOW + 3_600_000).toISOString();
 
 type Call = { path: string; method: string; body?: unknown; token?: string };
-type Users = Record<string, { id: string; email_verified?: boolean; full_name?: string; locale?: string; time_zone?: string }>;
+type Users = Record<string, { id: string; email_verified?: boolean; full_name?: string; locale?: string; time_zone?: string; sso_session_bound?: boolean }>;
 
-function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: ReaderSsoResponse; authorize?: ReaderSsoResponse; fail?: boolean } = {}) {
+function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: ReaderSsoResponse; authorize?: ReaderSsoResponse; logout?: ReaderSsoResponse; fail?: boolean } = {}) {
   const calls: Call[] = [];
   const events: ReaderSsoEvent[] = [];
   const users: Users = options.users ?? { "new-token": { id: "alice", email_verified: true, full_name: "Alice Иванова", locale: "bg-BG", time_zone: "Europe/Sofia" } };
@@ -65,7 +65,7 @@ function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: 
         const user = init.token ? users[init.token] : undefined;
         return user ? { status: 200, body: { data: user } } : { status: 401, body: { success: false, error: { code: "UNAUTHORIZED" } } };
       }
-      if (path === "/v1/auth/logout") return { status: 200, body: { data: { ok: true } } };
+      if (path === "/v1/auth/logout") return options.logout ?? { status: 200, body: { success: true, data: null } };
       return { status: 404, body: { success: false } };
     },
   };
@@ -271,7 +271,7 @@ describe("completeSignIn", () => {
     const h = harness({ users: { "bob-token": { id: "bob", email_verified: true, full_name: "Bob Builder" }, "new-token": { id: "alice", email_verified: true, full_name: "Alice" } } });
     const cookies = jar({ [names.session]: "bob-token", [names.flow]: flowCookie({ state: "st-1", mode: "silent", returnTo: "/news/story" }) });
     const result = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies });
-    expect(result).toMatchObject({ kind: "redirect", location: "/account?switch=1", outcome: "switch_offered" });
+    expect(result).toMatchObject({ kind: "redirect", location: "/news/story", outcome: "switch_offered" });
     expect(result.cookies.find((c) => c.name === names.session)).toBeUndefined();
     const pending = openPendingSession(result.cookies.find((c) => c.name === names.pending)!.value, KEY, NOW);
     expect(pending).toMatchObject({ token: "new-token", userId: "alice", name: "Alice", mode: "silent", returnTo: "/news/story" });
@@ -409,4 +409,77 @@ describe("sessionSummaryWithCookies", () => {
     expect(ok.cookies).toEqual([]);
     expect((await sessionSummaryWithCookies(h.config, jar({}))).cookies).toEqual([]);
   });
+});
+
+describe("upgrading established reader sessions", () => {
+  const returning = { id: "alice", email_verified: true, full_name: "Пламен", sso_session_bound: false };
+  it("allows one silent renewal for an authenticated session without its logout binding", async () => {
+    const h = harness({ users: { "old-token": returning } });
+    const result = await startSignIn(h.config, { mode: "silent", next: "/news/story", cookies: jar({ [names.session]: "old-token" }) });
+    expect(result.ok).toBe(true);
+    expect(h.calls.some(call => call.path.includes("prompt=none"))).toBe(true);
+    expect(result.cookies.some(cookie => cookie.name === names.session && cookie.maxAge === 0)).toBe(false);
+  });
+  it("keeps a bound session and makes no unnecessary authorization hop", async () => {
+    const h = harness({ users: { "old-token": { ...returning, sso_session_bound: true } } });
+    expect(await startSignIn(h.config, { mode: "silent", cookies: jar({ [names.session]: "old-token" }) })).toMatchObject({ ok: false, reason: "session" });
+    expect(h.calls).toHaveLength(1);
+  });
+  it("requests an upgrade without clearing the valid local account", async () => {
+    const h = harness({ users: { "old-token": returning } });
+    const result = await sessionSummaryWithCookies(h.config, jar({ [names.session]: "old-token" }));
+    expect(result.summary).toMatchObject({ authenticated: true, full_name: "Пламен", session_upgrade_required: true });
+    expect(result.cookies).toEqual([]);
+  });
+  it("retires the old local credential before installing its bound replacement", async () => {
+    const h = harness({ users: { "old-token": returning, "new-token": { ...returning, sso_session_bound: true } } });
+    const result = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.session]: "old-token", [names.flow]: flowCookie({ state: "st-1", mode: "silent", returnTo: "/news/story" }) }) });
+    expect(result.kind).toBe("signed-in");
+    expect(h.calls.at(-1)).toMatchObject({ path: "/v1/auth/logout", token: "old-token", body: { session_token: "old-token" } });
+    expect(result.cookies.find(cookie => cookie.name === names.session)?.value).toBe("new-token");
+  });
+  it("does not install a replacement if retirement was not confirmed", async () => {
+    const h = harness({ users: { "old-token": returning, "new-token": { ...returning, sso_session_bound: true } }, logout: { status: 500, body: { success: false } } });
+    const result = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.session]: "old-token", [names.flow]: flowCookie({ state: "st-1", mode: "silent", returnTo: "/news/story" }) }) });
+    expect(result.kind).not.toBe("signed-in");
+    expect(result.cookies.some(cookie => cookie.name === names.session)).toBe(false);
+  });
+  it("refuses a newly issued session missing its binding", async () => {
+    const h = harness({ users: { "new-token": returning } });
+    const result = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.flow]: flowCookie({ state: "st-1" }) }) });
+    expect(result.kind).not.toBe("signed-in");
+    expect(result.cookies.some(cookie => cookie.name === names.session)).toBe(false);
+  });
+  it("an explicitly requested account conflict still opens the choice screen", async () => {
+    const h = harness({ users: { "bob-token": { id: "bob", email_verified: true }, "new-token": { id: "alice", email_verified: true } } });
+    const result = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.session]: "bob-token", [names.flow]: flowCookie({ state: "st-1", mode: "interactive" }) }) });
+    expect(result).toMatchObject({ kind: "redirect", location: "/account?switch=1", outcome: "switch_offered" });
+    expect(h.calls.some(call => call.path === "/v1/auth/logout")).toBe(false);
+  });
+});
+
+it("reader profile bounds keep the last Unicode code point intact", async () => {
+  const full_name = "A".repeat(149) + "😀你好";
+  const h = harness({ users: { "new-token": { id: "reader", email_verified: true, full_name } } });
+  const result = await sessionSummary(h.config, jar({ [names.session]: "new-token" }));
+  expect(result).toMatchObject({ authenticated: true, full_name: "A".repeat(149) + "😀" });
+});
+
+
+it("retaining a legacy account suppresses renewal only for its validated credential", async () => {
+  const legacy = { id: "bob", email_verified: true, full_name: "Bob", sso_session_bound: false };
+  const h = harness({ users: { "bob-token": legacy, "other-token": legacy, "new-token": { id: "alice", email_verified: true, sso_session_bound: true } } });
+  const conflict = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.session]: "bob-token", [names.flow]: flowCookie({ state: "st-1", mode: "silent" }) }) });
+  expect(conflict).toMatchObject({ kind: "redirect", outcome: "switch_offered" });
+  const pending = conflict.cookies.find(cookie => cookie.name === names.pending)!.value;
+  const stay = await switchAccount(h.config, { choice: "stay", cookies: jar({ [names.session]: "bob-token", [names.pending]: pending }) });
+  const preference = stay.cookies.find(cookie => cookie.name === names.ssoChecked)!.value;
+  const retained = jar({ [names.session]: "bob-token", [names.ssoChecked]: preference });
+  expect((await sessionSummary(h.config, retained))).not.toHaveProperty("session_upgrade_required");
+  expect(await startSignIn(h.config, { mode: "silent", cookies: retained })).toMatchObject({ ok: false, reason: "session" });
+  expect(readerSsoBootFlags(retained, names).suppressed).toBe(false);
+  for (const token of [undefined, "revoked-token", "other-token"]) {
+    const cookies = jar({ ...(token ? { [names.session]: token } : {}), [names.ssoChecked]: preference });
+    expect((await startSignIn(h.config, { mode: "silent", cookies })).ok).toBe(true);
+  }
 });

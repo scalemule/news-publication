@@ -127,7 +127,11 @@ export function ReaderSsoBoot({ enabled = true, hasSession: hasSessionCookie, su
     let cancelled = false;
     fetch(sessionPath, { credentials: "same-origin", cache: "no-store" })
       .then((response) => response.json())
-      .then((body: { authenticated?: boolean }) => { if (!cancelled && body?.authenticated !== true) setStaleCookie(true); })
+      .then((body: { authenticated?: boolean; session_upgrade_required?: boolean }) => {
+        // Pre-SSO reader sessions need one silent renewal to acquire their
+        // logout binding. Keep the existing account if Ledvery differs.
+        if (!cancelled && (body?.authenticated !== true || body.session_upgrade_required === true)) setStaleCookie(true);
+      })
       .catch(() => { /* unknown: keep treating the reader as signed in */ });
     return () => { cancelled = true; };
   }, [enabled, hasSessionCookie, staleCookie, sessionPath]);
