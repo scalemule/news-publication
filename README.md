@@ -338,6 +338,40 @@ The platform contract and a complete example live in
 `docs/news-platform/ARTICLE-WORKFLOW-V1.md` in the ScaleMule meta-repo.
 Do not use direct SQL, S3 paths, base64 bodies or invented media readiness.
 
+### Edit article prose, cards and citations
+
+```sh
+npx --yes --package @scalemule/news-publication@0.0.81 scalemule-article edit \
+  --url "$ARTICLE_URL" --patch ./approved-edit.json --operation-key correction-v1
+```
+
+The patch may contain title, subtitle, content_markdown, excerpt, section,
+community, format, layout, cards and citations. It preserves omitted fields and
+media and saves one immutable revision. Default: save for review. Add
+`--release` only to request release through the existing policy; the command
+never issues APPROVE or downgrades review. On a legacy article, explicitly choose
+`--enable-review-policy` only as a legitimate editorial onboarding decision.
+Scheduled legacy articles stop before onboarding. Normal API-key/member grants
+remain authoritative; the deployed server must advertise
+`versioned_editorial_fields`.
+
+The 10-second default deadline bounds the operation; `--timeout-ms` may raise it
+to at most 120 seconds. Keep the same patch/key and private checkpoint
+(`--state` or `~/.scalemule/newsroom/operations`) on retries. The checkpoint
+contains the submitted document and private provenance: never publish it.
+Unknown save/release responses reconcile against the original revision; another
+current revision stops rather than being overwritten. Completed replay and no-op
+edits add no revision. `RELEASE_HELD`/exit 2 preserves the saved revision while
+review is pending. With `--url --release`, success requires the rendered
+headline, prose and actual card components; public visibility pending is also
+exit 2. A saved revision and a rendered published correction are separate states.
+
+Use the same client method, `client.editArticle`, for a caller-supplied durable
+checkpoint store. This is local resumability over the existing server save
+receipt, not a distributed transaction covering entities, syndication, media
+commissioning or human review. The notices-only `/editorial` endpoint is not
+an article-body/card editor. Routine content corrections require no backend PR.
+
 ### Replace a published article photo from a local file
 
 ```sh

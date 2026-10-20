@@ -1,11 +1,17 @@
 export { articlePhotoHtmlMatches } from "./article-photo-verification";
+export { articleEditHtmlMatches } from "./article-edit-verification";
 import type { ArticleFormat, ArticleLayout } from "./article-presentation";
 import { runArticlePhoto, type ArticlePhotoInput } from "./article-photo-operation";
+import { runArticleEdit, type ArticleEditInput } from "./article-edit-operation";
+export { ArticleEditOperationError, type ArticleEditInput, type ArticleEditCheckpoint, type ArticleEditPatch } from "./article-edit-operation";
 export { ArticlePhotoOperationError, type ArticlePhotoInput, type PhotoOperationCheckpoint } from "./article-photo-operation";
 export type ArticleDocument = {
   title: string;
   subtitle?: string;
   content_markdown: string;
+  excerpt?: string;
+  cards?: unknown[];
+  citations?: unknown[];
   section: string;
   community?: string;
   format?: ArticleFormat;
@@ -111,6 +117,7 @@ export type ArticleWorkflowOptions = {
     automatic_public_narration?: boolean;
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
+    versioned_editorial_fields?: boolean;
   };
 };
 export type ArticleOperation = {
@@ -215,6 +222,9 @@ export class PublicationArticleClient {
       `/article-workflow/options${articleId ? `?article_id=${encodeURIComponent(articleId)}` : ""}`,
     );
   }
+  publicArticle(slug:string,signal?:AbortSignal){
+    return this.request<any>('/article-content/'+encodeURIComponent(slug),undefined,undefined,undefined,signal);
+  }
   /** Explicit approver-authorized onboarding for a legacy article; never called by get().
    * Existing schedules are cancelled by the server; public content remains unchanged.
    * Missing immutable media identities must be resolved through newsroom media controls.
@@ -241,6 +251,10 @@ export class PublicationArticleClient {
   }
   uploadAndReplacePublishedCover(input: ArticlePhotoInput) {
     return runArticlePhoto({ publicationId:this.config.publicationId, apiUrl:this.config.apiUrl, fetch:this.config.fetch ?? fetch, request:this.request.bind(this) },input);
+  }
+  /** Save one exact revision; release is explicit and never manufactures approval. */
+  editArticle(input: ArticleEditInput) {
+    return runArticleEdit({publicationId:this.config.publicationId,request:this.request.bind(this)},input);
   }
   /** Replace a legacy publication cover using ready, measured public Photo renditions.
    * This never enrolls a story, publishes text, creates narration or retries a conflict.
@@ -575,10 +589,14 @@ export class PublicationArticleClient {
 }
 
 function sameDocument(a: ArticleDocument, b: ArticleDocument): boolean {
+  const sorted=(v:any):any=>Array.isArray(v)?v.map(sorted):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sorted(v[k])])):v;
   const canonical = (d: ArticleDocument) => [
     d.title,
     d.subtitle || "",
     d.content_markdown,
+    d.excerpt ?? null,
+    sorted(d.cards ?? null),
+    sorted(d.citations ?? null),
     d.section,
     d.community || "",
     d.format || null,

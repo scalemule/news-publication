@@ -4,16 +4,26 @@ import { homedir } from 'node:os';
 import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
-import { PublicationArticleClient, articlePhotoHtmlMatches } from '../dist/article-workflow-client.js';
+import { PublicationArticleClient, articlePhotoHtmlMatches,articleEditHtmlMatches } from '../dist/article-workflow-client.js';
 
 const help = `Usage:
   scalemule-article inspect --publication ID --article ID
   scalemule-article replace-cover --publication ID --article ID --file-id ID --expected-version N --metadata photo.json
   scalemule-article replace-photo --url ARTICLE_URL --file PHOTO --metadata photo.json --operation-key KEY
+  scalemule-article edit --url ARTICLE_URL --patch edit.json --operation-key KEY [--release]
 
 Credentials: SCALEMULE_API_KEY and SCALEMULE_ACCESS_TOKEN (normal authorized member).
 Platform admins may use their normal access token with --application-id ID.
 Optional --api-url URL defaults to https://api.scalemule.com.
+
+edit saves prose, excerpt, cards and citations in one immutable revision.
+Unspecified fields and media are retained. Default: save for review.
+--release explicitly requests release under the existing policy; it never issues
+APPROVE or changes a policy. Legacy onboarding requires an explicit
+--enable-review-policy value. Scheduled legacy articles stop before onboarding.
+Use --expected-generation when coordinating an edit with another editor.
+Default edit deadline: 10000 ms. Reuse the same patch/key/checkpoint on retry.
+RELEASE_HELD means the revision is saved and existing review gates remain.
 
 replace-photo accepts a local file and uses normal member/API-key credentials.
 It requires developer-level asset access and publication approval rights.
@@ -44,17 +54,17 @@ that every website/CDN cache already displays the new image.
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true, strict: true,
-    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms'].map(k => [k, { type: 'string' }]).concat([['help', { type: 'boolean' }]])),
+    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','patch','expected-generation','enable-review-policy'].map(k => [k, { type: 'string' }]).concat([['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
   });
   if (values.help || !positionals.length) {
     console.log(help);
   } else {
     const [command, ...extra] = positionals;
     const commandStarted = performance.now();
-    const budget = Number(values['timeout-ms'] ?? 30000);
+    const budget = Number(values['timeout-ms'] ?? (command==='edit'?10000:30000));
     if (!Number.isFinite(budget) || budget < 100 || budget > 120000) throw Error('--timeout-ms must be between 100 and 120000');
     const remaining = () => { const ms = Math.floor(budget - (performance.now()-commandStarted)); if (ms < 1) throw Error('Operation deadline reached; resume the same operation'); return ms; };
-    if (extra.length || !['inspect', 'replace-cover', 'replace-photo'].includes(command)) throw Error('Use inspect, replace-cover or replace-photo; see --help');
+    if (extra.length || !['inspect', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use inspect, edit, replace-cover or replace-photo; see --help');
     if (values.url) {
       if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN || values['application-id']) throw Error('URL resolution requires normal publication member/API-key credentials');
       const url = new URL(values.url);
@@ -99,6 +109,47 @@ try {
         capabilities: options.capabilities, narration: processing.narration,
         assets: processing.assets, collaboration, elapsed_ms: Math.round(performance.now() - started),
       }, null, 2));
+    } else if (command==='edit') {
+      for(const key of ['patch','operation-key'])if(!values[key])throw Error('Missing --'+key);
+      const patch=JSON.parse(await readFile(values.patch,'utf8'));
+      const key=createHash('sha256').update(JSON.stringify(['edit',values['api-url']??'https://api.scalemule.com',values.publication,values.article,values['operation-key']])).digest('hex');
+      const statePath=values.state??join(homedir(),'.scalemule','newsroom','operations',key+'.json');
+      await mkdir(dirname(statePath),{recursive:true,mode:0o700});
+      const lockPath=statePath+'.lock';let lock;
+      try{lock=await open(lockPath,'wx',0o600);}catch(error){
+        if(error.code!=='EEXIST')throw error;
+        const pid=Number(await readFile(lockPath,'utf8'));if(!Number.isSafeInteger(pid)||pid<1)throw Error('Invalid operation lock; inspect '+lockPath);
+        let alive=true;try{process.kill(pid,0);}catch(e){if(e.code==='ESRCH')alive=false;else throw e;}
+        if(alive)throw Error('This edit operation is already running');
+        await unlink(lockPath);lock=await open(lockPath,'wx',0o600);
+      }
+      await lock.writeFile(String(process.pid));await lock.close();
+      try{
+        let checkpoint;try{checkpoint=JSON.parse(await readFile(statePath,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+        const result=await client.editArticle({articleId:values.article,operationKey:values['operation-key'],patch,
+          expectedGeneration:values['expected-generation']===undefined?undefined:Number(values['expected-generation']),
+          enableReviewPolicy:values['enable-review-policy'],release:values.release,checkpoint,timeoutMs:remaining(),
+          saveCheckpoint:async state=>{const temp=statePath+'.'+process.pid+'.tmp';await writeFile(temp,JSON.stringify(state),{mode:0o600});await rename(temp,statePath);checkpoint=state;},
+        });
+        if(values.url&&values.release&&['published','already_published'].includes(result.state)){
+          let verified=false,reason;
+          try{
+            const snapshot=await client.publicArticle(checkpoint.sourceIdentity.slug,AbortSignal.timeout(remaining()));
+            const article=snapshot.article;
+            if(!article||!article.content_html||article.id!==values.article)throw Error('Published reader snapshot is missing');
+            while(!verified){
+              const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,remaining()))});
+              const html=await response.text();
+              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title)});
+              if(!verified)await new Promise(r=>setTimeout(r,Math.min(300,remaining())));
+            }
+          }catch(error){reason=error.message;}
+          if(!verified){console.error(JSON.stringify({...result,state:'published_public_verification_pending',stage:'public_page',message:'The exact revision is published; rendered prose/cards remain unverified. Resume the same edit.',reason}));process.exitCode=2;}
+          else console.log(JSON.stringify({...result,public_page_verified:true,total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
+        }else{
+        console.log(JSON.stringify({...result,total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
+        }
+      }finally{await unlink(lockPath);}
     } else if (command === 'replace-photo') {
       for (const key of ['file','metadata','operation-key']) if (!values[key]) throw Error(`Missing --${key}`);
       if (values['application-id']) throw Error('Local-photo intake uses normal publication member credentials');
@@ -182,6 +233,6 @@ try {
     }
   }
 } catch (error) {
-  console.error(JSON.stringify({ error: error.message, status: error.status, code:error.code, stage:error.stage, file_id:error.fileId }));
-  process.exitCode = 1;
+  console.error(JSON.stringify({ error: error.message, status: error.status, code:error.code, stage:error.stage, file_id:error.fileId,revision_id:error.revisionId }));
+  process.exitCode = error.code==='RELEASE_HELD'?2:1;
 }
