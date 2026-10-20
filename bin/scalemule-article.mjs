@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
-import { PublicationArticleClient } from '../dist/article-workflow-client.js';
+import { PublicationArticleClient, articlePhotoHtmlMatches } from '../dist/article-workflow-client.js';
 
 const help = `Usage:
   scalemule-article inspect --publication ID --article ID
@@ -138,7 +138,7 @@ try {
             while (!visible) {
               const response = await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))});
               const html = await response.text();
-              visible = response.ok && images.every(image => image && (html.includes(image) || html.includes(encodeURIComponent(image))));
+              visible = response.ok && images.every(Boolean) && articlePhotoHtmlMatches(html,images[0],images[1]);
               if (!visible) await new Promise(resolve=>setTimeout(resolve,Math.min(500,remaining())));
             }
           } catch(error) { failure = error.message; }

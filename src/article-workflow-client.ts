@@ -1,3 +1,4 @@
+export { articlePhotoHtmlMatches } from "./article-photo-verification";
 import type { ArticleFormat, ArticleLayout } from "./article-presentation";
 import { runArticlePhoto, type ArticlePhotoInput } from "./article-photo-operation";
 export { ArticlePhotoOperationError, type ArticlePhotoInput, type PhotoOperationCheckpoint } from "./article-photo-operation";
