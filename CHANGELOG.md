@@ -1,3 +1,8 @@
+## 0.0.79
+
+- Preserve the typing guard when a reader writes inside the newsroom widget’s nested Shadow DOM. The silent check follows the focused control rather than treating its host as an idle page.
+- Email ownership/recovery and real Safari/iOS acceptance still gate the wider rollout.
+
 ## 0.0.78
 
 - Start silent reader recognition after usable DOM and an idle delay, so slow page assets cannot postpone SSO indefinitely. Resume eligible hidden/prerendered pages on activation; recheck typing, bot, session and negative-cache guards before the single attempt.
