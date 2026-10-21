@@ -1,3 +1,7 @@
+## 0.0.86
+
+- Preserve exact revision and content checks while accepting Rust’s equivalent compact/hyphenated UUID serialization for existing media identities. Resumable edits no longer report a false conflict for legacy contributions. Changed media, captions and prose still stop release; required human approvals remain enforced.
+
 ## 0.0.81
 
 - Add one checkpointed `edit` command and `editArticle` client for prose, excerpt, cards and citations in the existing immutable revision API. Preserve omitted fields/media, reconcile lost acknowledgements, reject concurrent edits, and keep explicit onboarding/review/release gates.

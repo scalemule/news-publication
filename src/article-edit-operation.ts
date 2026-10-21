@@ -83,6 +83,19 @@ const canonical = (v: any): any =>
       : v;
 const equal = (a: unknown, b: unknown) =>
   JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+// Rust serializes UUID media identities in hyphenated lowercase form. Older
+// immutable records may contain compact UUIDs. Compare only these typed identity
+// fields semantically; prose, captions, ordering and all other fields stay exact.
+const uuidIdentity = (value: unknown) => {
+  if (typeof value !== "string" || !/^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(value)) return value;
+  return value.replaceAll("-", "").toLowerCase();
+};
+const comparableDocument = (document: any) => document && typeof document === "object"
+  ? { ...document, ...(Array.isArray(document.media) ? { media: document.media.map((media: any) => ({
+      ...media, contribution_id: uuidIdentity(media.contribution_id), file_id: uuidIdentity(media.file_id),
+    })) } : {}) }
+  : document;
+const documentsEqual = (a: unknown, b: unknown) => equal(comparableDocument(a), comparableDocument(b));
 const digest = async (v: unknown) =>
   [
     ...new Uint8Array(
@@ -288,7 +301,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
           state.revisionId,
         );
       const selected = currentRevision(record);
-      if (!selected || !equal(selected.document, state.document))
+      if (!selected || !documentsEqual(selected.document, state.document))
         throw new ArticleEditOperationError(
           "VERIFICATION_CONFLICT",
           stage,
@@ -377,7 +390,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
         record = await request(article + "/collaboration");
         if (
           record.current_revision_id !== state.revisionId ||
-          !equal(currentRevision(record)?.document, state.document)
+          !documentsEqual(currentRevision(record)?.document, state.document)
         )
           throw new ArticleEditOperationError(
             "ARTICLE_CHANGED",

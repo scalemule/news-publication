@@ -5,7 +5,7 @@ import {
   type ArticleEditInput,
 } from "./article-workflow-client";
 
-function fixture() {
+function fixture(normalizeMedia = false) {
   const original = {
     title: "Local reporting",
     subtitle: "Original dek",
@@ -107,7 +107,9 @@ function fixture() {
           {
             id: "r" + (saves + 1),
             complete_snapshot: true,
-            document: body.document,
+            document: normalizeMedia ? { ...body.document, media: body.document.media.map((media: any) => ({
+              ...media, contribution_id: media.contribution_id.replace(/^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/i, "$1-$2-$3-$4-$5").toLowerCase(),
+            })) } : body.document,
             editorial_metadata: {
               cards: body.document.cards,
               citations: body.document.citations,
@@ -432,4 +434,20 @@ describe("versioned article tags", () => {
     }
     expect(f.transport).not.toHaveBeenCalled();
   });
+});
+
+it("resumes the exact saved revision when legacy media UUID formatting is canonicalized", async () => {
+  const f = fixture(true);
+  f.original.media[0].contribution_id = "01A1237D3CE67BDE9749F5619F8E1AA4";
+  f.hold();
+  await expect(f.client.editArticle({ ...f.input(), release: true })).rejects.toMatchObject({ code: "RELEASE_HELD" });
+  expect(f.counts).toMatchObject({ saves: 1, releases: 0 });
+  const checkpoint = structuredClone(f.checkpoint!);
+  await expect(f.client.editArticle({ ...f.input(), checkpoint, release: true })).rejects.toMatchObject({ code: "RELEASE_HELD" });
+  expect(f.counts.saves).toBe(1);
+  f.record.revisions[0].document.media[0].caption = "Changed caption";
+  await expect(f.client.editArticle({ ...f.input(), checkpoint, release: true })).rejects.toMatchObject({ code: "VERIFICATION_CONFLICT" });
+  f.record.revisions[0].document.media[0].caption = f.original.media[0].caption;
+  f.record.revisions[0].document.media[0].contribution_id = "01a1237d-3ce6-7bde-9749-f5619f8e1aa5";
+  await expect(f.client.editArticle({ ...f.input(), checkpoint, release: true })).rejects.toMatchObject({ code: "VERIFICATION_CONFLICT" });
 });
