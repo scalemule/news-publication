@@ -67,3 +67,11 @@ describe("rendered editorial correction verification", () => {
     ).toBe(false);
   });
 });
+
+it("requires visible canonical tag links rather than serialized tag data", () => {
+  const expected = { title: "Community news", content_html: "<p>Reported facts.</p>", card_titles: [], tags: [{ name: "Sherry Hu", slug: "sherry-hu" }] };
+  const body = "<h1>Community news</h1><p>Reported facts.</p>";
+  expect(articleEditHtmlMatches(body + '<script>{"name":"Sherry Hu"}</script>', expected)).toBe(false);
+  expect(articleEditHtmlMatches(body + '<a href="/news?tag=sherry-hu">Sherry Hu</a>', expected)).toBe(true);
+  expect(articleEditHtmlMatches(body + '<a href="/news?tag=other">Sherry Hu</a>', expected)).toBe(false);
+});

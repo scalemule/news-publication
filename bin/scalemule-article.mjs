@@ -18,7 +18,7 @@ Credentials: SCALEMULE_API_KEY and SCALEMULE_ACCESS_TOKEN (normal authorized mem
 Platform admins may use their normal access token with --application-id ID.
 Optional --api-url URL defaults to https://api.scalemule.com.
 
-edit saves prose, excerpt, cards and citations in one immutable revision.
+edit saves prose, excerpt, cards, citations and tenant-owned tag_ids in one immutable revision.
 Unspecified fields and media are retained. Default: save for review.
 --release explicitly requests release under the existing policy; it never issues
 APPROVE or changes a policy. Legacy onboarding requires an explicit
@@ -157,11 +157,11 @@ try {
             while(!verified){
               const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,remaining()))});
               const html=await response.text();
-              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title)});
+              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
               if(!verified)await new Promise(r=>setTimeout(r,Math.min(300,remaining())));
             }
           }catch(error){reason=error.message;}
-          if(!verified){console.error(JSON.stringify({...result,state:'published_public_verification_pending',stage:'public_page',message:'The exact revision is published; rendered prose/cards remain unverified. Resume the same edit.',reason}));process.exitCode=2;}
+          if(!verified){console.error(JSON.stringify({...result,state:'published_public_verification_pending',stage:'public_page',message:'The exact revision is published; rendered prose/cards/tags remain unverified. Resume the same edit.',reason}));process.exitCode=2;}
           else console.log(JSON.stringify({...result,public_page_verified:true,total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
         }else{
         console.log(JSON.stringify({...result,total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));

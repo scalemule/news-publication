@@ -12,6 +12,7 @@ export type ArticleEditPatch = Partial<
     | "layout"
     | "cards"
     | "citations"
+    | "tag_ids"
   >
 >;
 export type ArticleEditCheckpoint = {
@@ -104,6 +105,7 @@ const patchKeys = new Set([
   "layout",
   "cards",
   "citations",
+  "tag_ids",
 ]);
 function validate(input: ArticleEditInput) {
   if (
@@ -120,7 +122,10 @@ function validate(input: ArticleEditInput) {
     );
   for (const [key, value] of Object.entries(input.patch)) {
     if (!patchKeys.has(key)) throw Error("Unsupported edit field: " + key);
-    if (["cards", "citations"].includes(key)) {
+    if (key === "tag_ids") {
+      if (!Array.isArray(value) || value.length > 32 || new Set(value).size !== value.length || value.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id) || /^0{8}-0{4}-0{4}-0{4}-0{12}$/u.test(id)))
+        throw Error("tag_ids must contain at most 32 distinct, nonempty UUIDs");
+    } else if (["cards", "citations"].includes(key)) {
       if (!Array.isArray(value)) throw Error(key + " must be an array");
     } else if (key === "layout") {
       if (
@@ -244,6 +249,8 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
         stage,
         "The server must expose versioned_editorial_fields before this edit; no article was changed",
       );
+    if (input.patch.tag_ids !== undefined && options.capabilities?.versioned_editorial_tags !== true)
+      throw new ArticleEditOperationError("CAPABILITY_UNAVAILABLE", stage, "The server must expose versioned_editorial_tags before changing tags; no article was changed");
     if (!identityMatches(source))
       throw new ArticleEditOperationError(
         "ARTICLE_IDENTITY_CHANGED",
@@ -438,6 +445,8 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
           409,
           state.revisionId,
         );
+    if (state.document?.tag_ids && !equal([...state.document.tag_ids].sort(), (after.tags ?? []).map((tag: { id: string }) => tag.id).sort()))
+      throw new ArticleEditOperationError("VERIFICATION_CONFLICT", stage, "Published tags differ from the saved revision", 409, state.revisionId);
     const normalizedCards = state.document?.cards;
     if (
       normalizedCards &&

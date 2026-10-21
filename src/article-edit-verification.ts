@@ -23,7 +23,7 @@ const plain = (value: string) => value.replace(/\s+/gu, " ").trim();
 /** Requires visible body and actual card asides; serialized page data is not delivery. */
 export function articleEditHtmlMatches(
   html: string,
-  expected: { title: string; content_html: string; card_titles: string[] },
+  expected: { title: string; content_html: string; card_titles: string[]; tags?: { name: string; slug: string }[] },
 ): boolean {
   const visible = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/giu, " ")
@@ -42,6 +42,13 @@ export function articleEditHtmlMatches(
   const all = text(visible);
   if (!paragraphs.length || !paragraphs.every((p) => all.includes(p)))
     return false;
+  if (expected.tags?.length) {
+    const links = [...visible.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/giu)];
+    if (!expected.tags.every(tag => links.some(link => {
+      try { const url = new URL(decode(link[1]), "https://publication.example"); return url.pathname === "/news" && url.searchParams.get("tag") === tag.slug && text(link[2]).replace(/^#\s*/u, "") === tag.name; }
+      catch { return false; }
+    }))) return false;
+  }
   const titles = [
     ...visible.matchAll(
       /<aside\b[^>]*class=["'][^"']*\barticle-verified-card\b[^"']*["'][^>]*>([\s\S]*?)<\/aside>/giu,

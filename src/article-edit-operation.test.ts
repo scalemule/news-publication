@@ -54,6 +54,7 @@ function fixture() {
   let checkpoint: ArticleEditCheckpoint | undefined;
   let enabled = true,
     capability = true,
+    tagCapability = true,
     hold = false,
     lostSave = false,
     lostRelease = false,
@@ -78,7 +79,7 @@ function fixture() {
     if (path.endsWith("/options"))
       return reply({
         workflow_version: 1,
-        capabilities: { versioned_editorial_fields: capability },
+        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability },
       });
     if (path.endsWith("/document")) return reply(source);
     if (path.endsWith("/enable")) {
@@ -141,6 +142,7 @@ function fixture() {
         source = {
           ...source,
           ...doc,
+          tags: doc.tag_ids?.map((id: string) => ({ id })),
           published_at: source.published_at ?? "2026-10-20T16:00:00Z",
           canonical_url:
             source.canonical_url ??
@@ -188,6 +190,7 @@ function fixture() {
   });
   return {
     client,
+    withoutTagCapability: () => { tagCapability = false; },
     input,
     original,
     transport,
@@ -404,5 +407,29 @@ describe("repeatable versioned article editing", () => {
     });
     expect(f.source.metadata.cards).toEqual([]);
     expect(f.source.excerpt).toBe("Keep this excerpt");
+  });
+});
+
+describe("versioned article tags", () => {
+  const tag = "019a0000-1111-7111-8111-111111111111";
+  it("retains tag edits in the checkpoint and verifies the released assignment", async () => {
+    const f = fixture();
+    const result = await f.client.editArticle({ ...f.input(), patch: { tag_ids: [tag] }, release: true });
+    expect(result.state).toBe("published");
+    expect(f.checkpoint?.document?.tag_ids).toEqual([tag]);
+    expect(f.source.tags).toEqual([{ id: tag }]);
+    expect(f.counts).toEqual({ saves: 1, releases: 1, enrolls: 0 });
+  });
+  it("requires the deployed tag capability before any write", async () => {
+    const f = fixture(); f.withoutTagCapability();
+    await expect(f.client.editArticle({ ...f.input(), patch: { tag_ids: [tag] } })).rejects.toMatchObject({ code: "CAPABILITY_UNAVAILABLE" });
+    expect(f.counts).toEqual({ saves: 0, releases: 0, enrolls: 0 });
+  });
+  it("rejects duplicate and invalid IDs before contacting the service", async () => {
+    const f = fixture();
+    for (const tag_ids of [[tag, tag], ["invented"], Array(33).fill(tag)]) {
+      await expect(f.client.editArticle({ ...f.input(), patch: { tag_ids } })).rejects.toThrow(/tag_ids/);
+    }
+    expect(f.transport).not.toHaveBeenCalled();
   });
 });

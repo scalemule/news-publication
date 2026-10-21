@@ -12,6 +12,7 @@ export type ArticleDocument = {
   excerpt?: string;
   cards?: unknown[];
   citations?: unknown[];
+  tag_ids?: string[];
   section: string;
   community?: string;
   format?: ArticleFormat;
@@ -118,6 +119,7 @@ export type ArticleWorkflowOptions = {
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
     versioned_editorial_fields?: boolean;
+    versioned_editorial_tags?: boolean;
     managed_submission_version?: number | null;
     multipart_submission?: boolean;
   };
