@@ -508,12 +508,15 @@
   .publication [class*="sectionCollection"] > [class*="section"]:only-child [class*="sectionFeature"],
   .publication [class*="sectionCollection"] > [class*="section"]:last-child:nth-child(odd) [class*="sectionFeature"] {
     display: block;
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .publication [class*="sectionCollection"] > [class*="section"]:only-child [class*="sectionSupporting"],
   .publication [class*="sectionCollection"] > [class*="section"]:last-child:nth-child(odd) [class*="sectionSupporting"] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-column: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
     align-content: start;
   }
