@@ -41,6 +41,8 @@ export type ReaderSsoCookieNames = {
   signedOut: string;
   /** A verified session waiting for the reader to choose between two accounts. */
   pending: string;
+  /** Linking onto an unconfirmed account: the platform's emailed-code challenge token (10 minutes). */
+  linkCode: string;
 };
 
 /** Cookie names derived from a `__Host-` prefix, e.g. `__Host-media` → `__Host-media-reader`. */
@@ -53,6 +55,7 @@ export function readerSsoCookieNames(prefix: string): ReaderSsoCookieNames {
     ssoChecked: `${prefix}-sso-checked`,
     signedOut: `${prefix}-signed-out`,
     pending: `${prefix}-sso-pending`,
+    linkCode: `${prefix}-link-code`,
   };
 }
 
@@ -580,6 +583,41 @@ export function linkFailureMessage(code: string): { error: string; mfaRequired?:
   }
 }
 
+/** The emailed-code step of linking onto an unconfirmed account. */
+function linkEmailCodeFailure(
+  code: string,
+  response: ReaderSsoResponse,
+  cookieName: string,
+): { status: number; error: string; cookies: CookieInstruction[]; mfaRequired?: boolean } | null {
+  switch (code) {
+    case "LOGIN_CHALLENGE_REQUIRED": {
+      const body = response.body as { error?: { message?: unknown } } | null;
+      let token = "";
+      try {
+        const parsed = JSON.parse(typeof body?.error?.message === "string" ? body.error.message : "{}") as { challenge_token?: unknown };
+        token = typeof parsed.challenge_token === "string" && parsed.challenge_token.length <= 256 ? parsed.challenge_token : "";
+      } catch {
+        token = "";
+      }
+      if (!token) return null;
+      return {
+        status: 401,
+        mfaRequired: true,
+        error: "We emailed a 6-digit code to your reader account's address. Enter it to finish connecting your sign-in.",
+        cookies: [{ name: cookieName, value: token, maxAge: 600 }],
+      };
+    }
+    case "LOGIN_CHALLENGE_INVALID":
+      return { status: 401, mfaRequired: true, error: "That code is incorrect or expired. Check the most recent email, or start over for a new code.", cookies: [] };
+    case "CHALLENGE_RATE_LIMITED":
+      return { status: 429, mfaRequired: true, error: "Please wait a minute before asking for another code.", cookies: [] };
+    case "LOGIN_CHALLENGE_LOCKED":
+      return { status: 429, error: "Too many incorrect codes. Reset your reader account password to continue.", cookies: [{ name: cookieName, value: "", maxAge: 0 }] };
+    default:
+      return null;
+  }
+}
+
 export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInput): Promise<LinkAccountResult> {
   const c = resolve(config);
   const challengeId = typeof input.challenge_id === "string" && CHALLENGE_ID.test(input.challenge_id) ? input.challenge_id : "";
@@ -593,9 +631,21 @@ export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInp
   if (mfaCode && (mfaCode.length > 32 || !/^[A-Za-z0-9-]+$/.test(mfaCode))) {
     return { ok: false, status: 400, error: "Enter the code exactly as your authenticator app shows it.", cookies: [], mfaRequired: true };
   }
+  // An unconfirmed local account also needs a code emailed to its address
+  // (platform ADR-2026-10-21 D2.3). Its challenge token lives in an HttpOnly
+  // cookie; the reader types the code into the same field as an MFA code.
+  const emailChallenge = input.cookies(c.names.linkCode) || "";
+  const linkBody = emailChallenge && mfaCode
+    ? { challenge_id: challengeId, password, challenge_token: emailChallenge, challenge_code: mfaCode }
+    : { challenge_id: challengeId, password, ...(mfaCode ? { mfa_code: mfaCode } : {}) };
   try {
-    const response = await c.request("/v1/auth/oauth/ledvery/link", { method: "POST", body: { challenge_id: challengeId, password, ...(mfaCode ? { mfa_code: mfaCode } : {}) } });
+    const response = await c.request("/v1/auth/oauth/ledvery/link", { method: "POST", body: linkBody });
     if (failed(response)) {
+      const emailCode = linkEmailCodeFailure(errorCode(response), response, c.names.linkCode);
+      if (emailCode) {
+        emit(c, { name: "reader_signin_failed", properties: { reason: "mfa_required", mode: "interactive" } });
+        return { ok: false, ...emailCode };
+      }
       const specific = linkFailureMessage(errorCode(response));
       if (specific) {
         emit(c, { name: "reader_signin_failed", properties: { reason: specific.mfaRequired ? "mfa_required" : "link_invalid", mode: "interactive" } });
@@ -609,7 +659,7 @@ export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInp
     }
     const session = issuedSession(response, c.now());
     const flow: ReaderSsoFlow = { digest: "", subscribe: input.subscribe === true, expires: 0, returnTo: next, mode: "interactive", provider: undefined };
-    const result = await establish(c, { session, flow, method: "link", cookies: [], input, negativeCache: { name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS } });
+    const result = await establish(c, { session, flow, method: "link", cookies: emailChallenge ? [clear(c.names.linkCode)] : [], input, negativeCache: { name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS } });
     if (result.kind === "signed-in") emit(c, { name: "reader_account_linked", properties: {} });
     return result.kind === "signed-in"
       ? { ok: true, switch: false, cookies: result.cookies, token: result.token, expiresAt: result.expiresAt, user: result.user, location: result.location }
