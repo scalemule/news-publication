@@ -122,8 +122,8 @@ describe("cache and revalidation", () => {
 describe("front page", () => {
   const now = Date.parse("2026-09-22T20:00:00.000Z");
   const items = [
-    story({ id: "1", slug: "lead", title: "Council meets", section: "Civic life" }),
-    story({ id: "2", slug: "second", title: "Plaza opens", section: "Local businesses" }),
+    story({ id: "1", slug: "lead", title: "Council meets", section: "Civic life", cover_image_url: "https://cdn.example.com/council.jpg" }),
+    story({ id: "2", slug: "second", title: "Plaza opens", section: "Local businesses", cover_image_url: "https://cdn.example.com/plaza.jpg" }),
     story({ id: "1", slug: "lead-copy", title: "Duplicate" }),
     story({ id: "3", slug: "old", title: "Old brief", published_at: "2026-08-01T00:00:00.000Z", excerpt: "This one is too old." }),
   ];
@@ -149,7 +149,8 @@ describe("front page", () => {
     const edition = composeEdition(stories);
     expect(edition.lead?.slug).toBe("story-1");
     // Story 2 should be deferred because it shares photoA with lead
-    expect(edition.secondary.map(s => s.slug)).toEqual(["story-3", "story-4", "story-5"]);
+    expect(edition.secondary.map(s => s.slug)).toEqual(["story-3", "story-4"]);
+    expect(edition.pendingImages.map(s => s.slug)).toEqual(["story-2", "story-5"]);
   });
 
   it("holds repeated covers in every slot without mutating inventory or refilling images", () => {
@@ -167,8 +168,37 @@ describe("front page", () => {
       .every(item => item.cover_image_url === null)).toBe(true);
     expect(stories.every(item => item.cover_image_url !== null)).toBe(true);
     const short = composeEdition(stories.slice(0, 2));
-    expect(short.secondary).toHaveLength(1);
-    expect(short.secondary[0].cover_image_url).toBeNull();
+    expect(short.secondary).toHaveLength(0);
+    expect(short.pendingImages.map(item => item.id)).toEqual(["1"]);
+  });
+
+  it("keeps held pinned stories out of all image placements and tracks them for repair", () => {
+    const stories = Array.from({ length: 24 }, (_, n) => story({
+      id: String(n), slug: `story-${n}`, title: `市区 Привет 😀 ${n}`,
+      section: n % 2 ? "Schools" : "Civic life",
+      cover_image_url: n % 3 === 0 ? null : `https://cdn.example.com/photo-${n}.webp`,
+    }));
+    const edition = composeEdition(stories, { lead_slug: "story-0", secondary_slugs: ["story-3", "story-5"] }, now);
+    expect(edition.lead?.id).toBe("1");
+    expect(edition.secondary[0].id).toBe("5");
+    const placed = [edition.lead!, ...edition.secondary, ...edition.compact, ...edition.sections.flatMap(s => s.items)];
+    expect(placed.length).toBe(16);
+    expect(new Set(placed.map(item => item.id)).size).toBe(placed.length);
+    expect(placed.every(item => !!item.cover_image_url)).toBe(true);
+    expect(edition.pendingImages.map(item => item.id)).toEqual(["0", "3", "6", "9", "12", "15", "18", "21"]);
+    expect(edition.navigation.flatMap(s => s.items)).toHaveLength(24);
+    expect(stories[0].cover_image_url).toBeNull();
+  });
+
+  it("reports an entirely unready inventory without fabricating a visual edition", () => {
+    const stories = [story({ id: "1", slug: "unready", title: "Awaiting photo" })];
+    const edition = composeEdition(stories, {}, now);
+    expect(edition.lead).toBeUndefined();
+    expect(edition.secondary).toEqual([]);
+    expect(edition.compact).toEqual([]);
+    expect(edition.sections).toEqual([]);
+    expect(edition.pendingImages).toEqual(stories);
+    expect(edition.briefs).toEqual(stories);
   });
 
   it("recognizes renditions of one legacy Photo without conflating different assets", () => {
