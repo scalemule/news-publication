@@ -438,7 +438,7 @@ export function AccountLinkForm({
       </label>
       {mfaRequired && (
         <label>
-          Authentication code
+          Verification code
           <input type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength={32} value={code} onChange={(e) => setCode(e.target.value)} />
         </label>
       )}

@@ -81,6 +81,7 @@ describe("reader SSO cookies", () => {
     expect(names).toEqual({
       session: "__Host-media-reader", flow: "__Host-media-ledvery", newsletter: "__Host-media-newsletter",
       ssoChecked: "__Host-media-sso-checked", signedOut: "__Host-media-signed-out", pending: "__Host-media-sso-pending",
+      linkCode: "__Host-media-link-code",
     });
     expect(readerSsoCookieNames("__Host-trivalley").session).toBe("__Host-trivalley-reader");
     expect(() => readerSsoCookieNames("media")).toThrow();
@@ -342,6 +343,33 @@ describe("linkAccount", () => {
       const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) });
       expect(r).toMatchObject({ ok: false, status: 409 });
       expect(r.ok === false && r.mfaRequired).toBeFalsy();
+    }
+  });
+});
+
+describe("linking onto an unconfirmed account", () => {
+  it("keeps the emailed-code challenge in an HttpOnly cookie and sends the typed code with it", async () => {
+    const needs = harness({ link: { status: 403, body: { success: false, error: { code: "LOGIN_CHALLENGE_REQUIRED", message: JSON.stringify({ challenge_token: "tok-1", method: "email" }) } } } });
+    const first = await linkAccount(needs.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) });
+    expect(first).toMatchObject({ ok: false, status: 401, mfaRequired: true });
+    const cookieName = needs.config.prefix + "-link-code";
+    expect(first.cookies).toEqual([{ name: cookieName, value: "tok-1", maxAge: 600 }]);
+    expect(first.ok === false && first.error).toMatch(/6-digit code/);
+
+    const h = harness();
+    const done = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: jar({ [cookieName]: "tok-1" }) });
+    expect(done.ok).toBe(true);
+    expect(h.calls[0].body).toEqual({ challenge_id: "ch_1", password: "pw", challenge_token: "tok-1", challenge_code: "123456" });
+    expect(done.cookies).toContainEqual({ name: cookieName, value: "", maxAge: 0 });
+  });
+
+  it("explains wrong, throttled and locked codes", async () => {
+    const cookieName = (c: { prefix: string }) => c.prefix + "-link-code";
+    for (const [code, status, mfa] of [["LOGIN_CHALLENGE_INVALID", 401, true], ["CHALLENGE_RATE_LIMITED", 429, true], ["LOGIN_CHALLENGE_LOCKED", 429, false]] as const) {
+      const x = harness({ link: { status: 400, body: { success: false, error: { code } } } });
+      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: jar({ [cookieName(x.config)]: "tok-1" }) });
+      expect(r).toMatchObject({ ok: false, status });
+      expect(Boolean(r.ok === false && r.mfaRequired)).toBe(mfa);
     }
   });
 });

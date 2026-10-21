@@ -1,3 +1,7 @@
+## 0.0.87
+
+- Reader SSO linking onto an **unconfirmed** reader account asks for a 6-digit code emailed to that account (platform ADR-2026-10-21 D2.3). The challenge token is kept in a new HttpOnly cookie (`<prefix>-link-code`), and the reader types the code in the existing code field. Paper routes and forms need no changes beyond the version bump.
+
 ## 0.0.86
 
 - Preserve exact revision and content checks while accepting Rust’s equivalent compact/hyphenated UUID serialization for existing media identities. Resumable edits no longer report a false conflict for legacy contributions. Changed media, captions and prose still stop release; required human approvals remain enforced.
