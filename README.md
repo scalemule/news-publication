@@ -377,7 +377,7 @@ matches one declared slot. Credentials are normal project/member credentials.
 The operation key is retained for 30 days. A legacy article must first have an
 explicitly selected collaboration policy; this endpoint never downgrades review.
 
-### Edit article prose, cards and citations
+### Edit article prose, cards, citations and tags
 
 ```sh
 npx --yes --package @scalemule/news-publication@0.0.81 scalemule-article edit \
@@ -385,7 +385,10 @@ npx --yes --package @scalemule/news-publication@0.0.81 scalemule-article edit \
 ```
 
 The patch may contain title, subtitle, content_markdown, excerpt, section,
-community, format, layout, cards and citations. It preserves omitted fields and
+community, format, layout, cards, citations and `tag_ids`. Tag edits require SDK
+0.0.85+ and the deployed `versioned_editorial_tags` capability. Supply up to 32
+existing tenant-owned tag UUIDs; an empty array clears assignments. Create or
+select tags using the ordinary Blog tags API first. It preserves omitted fields and
 media and saves one immutable revision. Default: save for review. Add
 `--release` only to request release through the existing policy; the command
 never issues APPROVE or downgrades review. On a legacy article, explicitly choose
@@ -402,7 +405,7 @@ Unknown save/release responses reconcile against the original revision; another
 current revision stops rather than being overwritten. Completed replay and no-op
 edits add no revision. `RELEASE_HELD`/exit 2 preserves the saved revision while
 review is pending. With `--url --release`, success requires the rendered
-headline, prose and actual card components; public visibility pending is also
+headline, prose, actual card components and requested canonical tag links; public visibility pending is also
 exit 2. A saved revision and a rendered published correction are separate states.
 
 Use the same client method, `client.editArticle`, for a caller-supplied durable
