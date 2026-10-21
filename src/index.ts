@@ -264,3 +264,18 @@ export type { ReaderSsoEventName, ReaderSsoEventDefinition } from "./reader-sso-
 
 export { articlePresentation, articleHeroRatio, articleFormatLabel } from "./article-presentation";
 export type { ArticleFormat, ArticleLayout, ArticlePresentation } from "./article-presentation";
+
+export {
+  ARTICLE_CONVERSION_EXPERIMENT,
+  classifyStoryInvitationCategory,
+  contextualCommunityInvitation,
+  isSponsoredStoryItem,
+  resolveArticleConversionVariant,
+  selectRelevantLocalStories,
+} from "./community-conversion";
+export type {
+  ArticleConversionVariant,
+  CommunityInvitationCategory,
+  ContextualCommunityInvitation,
+} from "./community-conversion";
+
