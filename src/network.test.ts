@@ -7,6 +7,7 @@ import {
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
+  getNetworkReaderHandoffUrl,
   isNetworkHostname,
   NETWORK_PARENT,
 } from "./network";
@@ -68,6 +69,14 @@ describe("publication network", () => {
     const url = getNetworkPublicationUrl("alamoweekly");
     expect(url).toBeTruthy();
     expect(url).toContain("https://alamoweekly.com/");
+  });
+
+  it("only builds fixed handoff URLs for deployed destinations", () => {
+    expect(getNetworkReaderHandoffUrl("sanramontimes")).toBe("https://sanramontimes.com/api/news/network-handoff");
+    expect(getNetworkReaderHandoffUrl("trivalleyweekly")).toBe("https://trivalleyweekly.com/api/news/network-handoff");
+    expect(getNetworkReaderHandoffUrl("alamoweekly")).toBeNull();
+    expect(getNetworkReaderHandoffUrl("sanramontimes.evil.test")).toBeNull();
+    expect(getNetworkReaderHandoffUrl("https://evil.test")).toBeNull();
   });
 
   it("identifies network hostnames across all 12 publications", () => {

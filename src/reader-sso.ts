@@ -6,7 +6,7 @@
  * same-origin routes. No internal platform token is involved anywhere here.
  *
  * Contract: docs/ADR-2026-10-19-ledvery-consumer-sso.md sections 3.2 (precedence),
- * 4.4 (silent sign-in), 6 (logout), 7 (greetings) and 8 (telemetry).
+ * 4.4 (OIDC check), 6 (logout), 7 (greetings) and 8 (telemetry).
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
@@ -179,6 +179,15 @@ export function localReturnPath(value: unknown): string {
   return value;
 }
 
+/**
+ * A network-bar handoff always lands on this paper's home page. The only
+ * transferable query value is the existing refusal of optional cookies.
+ * Identity, callback and return destinations never come from the link.
+ */
+export function networkHandoffReturnPath(query: URLSearchParams): string {
+  return query.getAll("sm_consent").length === 1 && query.get("sm_consent") === "0" ? "/?sm_consent=0" : "/";
+}
+
 type Resolved = Required<Pick<ReaderSsoConfig, "callbackPath" | "accountPath" | "issuerOrigin" | "returnPath" | "retryPath" | "now" | "random">> & ReaderSsoConfig & { names: ReaderSsoCookieNames };
 
 function resolve(config: ReaderSsoConfig): Resolved {
@@ -318,16 +327,27 @@ export function openPendingSession(cookie: string | undefined, key: string, now 
 
 // ---------------------------------------------------------------------------
 // Authorization URL: only the registered issuer, only /authorize, only our state
-// and callback, PKCE S256, and `prompt=none` whenever the attempt is silent so a
-// background navigation can never land a reader on an interactive page.
+// and callback, PKCE S256, and `prompt=none` for click-driven handoff so the
+// destination never lands a reader on an interactive page unexpectedly.
 // ---------------------------------------------------------------------------
-export function authorizeUrl(value: string, state: string, callback: string, mode: ReaderSsoMode, issuerOrigin = LEDVERY_ISSUER_ORIGIN): string {
+export function authorizeUrl(value: string, state: string, callback: string, mode: ReaderSsoMode, issuerOrigin = LEDVERY_ISSUER_ORIGIN, selectAccount = false, clientId?: string): string {
   const url = new URL(value);
+  const prompts = url.searchParams.getAll("prompt");
+  const expectedPrompt = mode === "silent" ? "none" : selectAccount ? "select_account" : null;
+  const exactly = (key: string, expected: string) => {
+    const values = url.searchParams.getAll(key);
+    return values.length === 1 && values[0] === expected;
+  };
+  const scope = url.searchParams.getAll("scope");
+  const nonce = url.searchParams.getAll("nonce");
   if (
-    url.protocol !== "https:" || url.origin !== new URL(issuerOrigin).origin || url.pathname !== "/authorize" || url.username || url.password ||
-    url.searchParams.get("state") !== state || url.searchParams.get("redirect_uri") !== callback ||
-    url.searchParams.get("code_challenge_method") !== "S256" || !url.searchParams.get("code_challenge") ||
-    (mode === "silent" && url.searchParams.get("prompt") !== "none")
+    url.protocol !== "https:" || url.origin !== new URL(issuerOrigin).origin || url.pathname !== "/authorize" || url.username || url.password || url.hash ||
+    !exactly("state", state) || !exactly("redirect_uri", callback) || !exactly("response_type", "code") ||
+    (clientId !== undefined && !exactly("client_id", clientId)) ||
+    scope.length !== 1 || !scope[0].split(/\s+/).includes("openid") ||
+    nonce.length !== 1 || !nonce[0] ||
+    !exactly("code_challenge_method", "S256") || url.searchParams.getAll("code_challenge").length !== 1 || !url.searchParams.get("code_challenge") ||
+    (expectedPrompt === null ? prompts.length !== 0 : prompts.length !== 1 || prompts[0] !== expectedPrompt)
   ) throw new Error("Invalid Ledvery authorization response");
   return url.toString();
 }
@@ -338,6 +358,8 @@ export function authorizeUrl(value: string, state: string, callback: string, mod
 export type StartSignInInput = {
   mode: ReaderSsoMode;
   provider?: ReaderSsoProvider;
+  /** Only an explicit Switch account control may request the account chooser. */
+  selectAccount?: boolean;
   subscribe?: boolean;
   next?: string;
   cookies: CookieReader;
@@ -371,8 +393,8 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     }
   }
   if (mode === "silent") {
-    // ADR 4.4: never after an explicit sign-out, and at most once per
-    // negative-cache window.
+    // A handoff never overrides an explicit sign-out or repeats a recent
+    // failed check.
     if (input.cookies(c.names.signedOut) || input.cookies(c.names.ssoChecked) === "1") {
       return { ok: false, status: 204, error: "", reason: "suppressed", redirect, cookies: staleSession };
     }
@@ -382,7 +404,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   const query = new URLSearchParams({ redirect_uri: callback });
   if (mode === "silent") query.set("prompt", "none");
   else {
-    query.set("prompt", "select_account");
+    if (input.selectAccount === true) query.set("prompt", "select_account");
     query.set("upstream", provider === "email" ? "scalemule_consumer" : "google");
   }
   try {
@@ -390,7 +412,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     if (failed(response)) throw new Error("authorize");
     const value = payload(response);
     if (typeof value.url !== "string" || typeof value.state !== "string" || !value.state) throw new Error("authorize");
-    const url = authorizeUrl(value.url, value.state, callback, mode, c.issuerOrigin);
+    const url = authorizeUrl(value.url, value.state, callback, mode, c.issuerOrigin, input.selectAccount === true, c.clientId);
     const cookies: CookieInstruction[] = [
       ...staleSession,
       { name: c.names.flow, value: sealReaderFlow({ state: value.state, subscribe: input.subscribe === true && mode === "interactive", returnTo: next, mode, provider, tx }, c.key, c.now()), maxAge: READER_SSO_FLOW_SECONDS },

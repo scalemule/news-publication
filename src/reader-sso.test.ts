@@ -10,6 +10,7 @@ import {
   cookieReader,
   linkAccount,
   localReturnPath,
+  networkHandoffReturnPath,
   openPendingSession,
   openReaderFlow,
   precedence,
@@ -57,7 +58,7 @@ function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: 
       if (path.startsWith("/v1/auth/oauth/ledvery/authorize")) {
         const query = new URL(path, ORIGIN).searchParams;
         const prompt = query.get("prompt");
-        return options.authorize ?? { status: 200, body: { data: { url: `https://api.ledvery.com/authorize?state=st-1&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=abc${prompt ? `&prompt=${prompt}` : ""}`, state: "st-1" } } };
+        return options.authorize ?? { status: 200, body: { data: { url: `https://api.ledvery.com/authorize?client_id=napsite-paper&response_type=code&scope=openid+email+profile&nonce=n-1&state=st-1&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=abc${prompt ? `&prompt=${prompt}` : ""}`, state: "st-1" } } };
       }
       if (path.startsWith("/v1/auth/oauth/ledvery/callback")) return options.exchange ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later, user: {}, is_new_user: true } } };
       if (path === "/v1/auth/oauth/ledvery/link") return options.link ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later } } };
@@ -99,6 +100,11 @@ describe("reader SSO cookies", () => {
 });
 
 describe("flow sealing", () => {
+  it("ignores account and redirect parameters attached to a handoff link", () => {
+    expect(networkHandoffReturnPath(new URLSearchParams("next=https://evil.test&account=alice&state=forged"))).toBe("/");
+    expect(networkHandoffReturnPath(new URLSearchParams("sm_consent=0&next=%2F%2Fevil.test"))).toBe("/?sm_consent=0");
+    expect(networkHandoffReturnPath(new URLSearchParams("sm_consent=0&sm_consent=1"))).toBe("/");
+  });
   it("round-trips mode, provider and transaction id", () => {
     const cookie = flowCookie({ state: "st-1", subscribe: true, returnTo: "/news/story?x=1", mode: "silent", provider: undefined, tx: "deadbeef" });
     const flow = openReaderFlow(cookie, KEY, NOW);
@@ -123,12 +129,19 @@ describe("flow sealing", () => {
     expect(localReturnPath("/bad\r\nheader")).toBe("");
   });
   it("validates the authorization URL and insists on prompt=none for silent attempts", () => {
-    const base = `https://api.ledvery.com/authorize?state=st&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=c`;
+    const base = `https://api.ledvery.com/authorize?client_id=napsite-paper&response_type=code&scope=openid&nonce=n&state=st&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=c`;
     expect(authorizeUrl(base, "st", CALLBACK, "interactive")).toBe(base);
     expect(() => authorizeUrl(base, "st", CALLBACK, "silent")).toThrow();
     expect(authorizeUrl(base + "&prompt=none", "st", CALLBACK, "silent")).toContain("prompt=none");
+    expect(() => authorizeUrl(base + "&prompt=select_account", "st", CALLBACK, "interactive")).toThrow();
+    expect(authorizeUrl(base + "&prompt=select_account", "st", CALLBACK, "interactive", undefined, true)).toContain("prompt=select_account");
+    expect(() => authorizeUrl(base + "&prompt=none&prompt=none", "st", CALLBACK, "silent")).toThrow();
     expect(() => authorizeUrl(base.replace("api.ledvery.com", "evil.test"), "st", CALLBACK, "interactive")).toThrow();
     expect(() => authorizeUrl(base, "other", CALLBACK, "interactive")).toThrow();
+    expect(() => authorizeUrl(base + "&state=st", "st", CALLBACK, "interactive")).toThrow();
+    expect(() => authorizeUrl(base.replace("client_id=napsite-paper", "client_id=attacker"), "st", CALLBACK, "interactive", undefined, false, "napsite-paper")).toThrow();
+    expect(() => authorizeUrl(base.replace("response_type=code", "response_type=token"), "st", CALLBACK, "interactive")).toThrow();
+    expect(() => authorizeUrl(base.replace("nonce=n", "nonce="), "st", CALLBACK, "interactive")).toThrow();
   });
 });
 
@@ -138,15 +151,23 @@ describe("startSignIn", () => {
     const result = await startSignIn(h.config, { mode: "interactive", provider: "google", subscribe: true, next: "/meet", cookies: jar({ [names.signedOut]: "1" }) });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.url).toContain("prompt=select_account");
+    expect(result.url).not.toContain("prompt=");
     expect(h.calls[0].path).toContain("upstream=google");
-    expect(h.calls[0].path).toContain("prompt=select_account");
+    expect(h.calls[0].path).not.toContain("prompt=");
     const flow = result.cookies.find((c) => c.name === names.flow)!;
     expect(flow.maxAge).toBe(600);
     expect(openReaderFlow(flow.value, KEY, NOW)).toMatchObject({ subscribe: true, returnTo: "/meet", mode: "interactive", provider: "google", tx: "ab".repeat(16) });
     expect(result.cookies.map((c) => [c.name, c.maxAge])).toContainEqual([names.signedOut, 0]);
     expect(result.cookies.map((c) => [c.name, c.maxAge])).toContainEqual([names.ssoChecked, 0]);
     expect(h.events).toEqual([{ name: "reader_signin_started", properties: { method: "google", mode: "interactive", transaction: "ab".repeat(16) } }]);
+  });
+  it("only an explicit account-switch start requests the chooser", async () => {
+    const h = harness();
+    const result = await startSignIn(h.config, { mode: "interactive", selectAccount: true, cookies: jar({}) });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(new URL(result.url).searchParams.get("prompt")).toBe("select_account");
+    expect(h.calls[0].path).toContain("prompt=select_account");
   });
   it("email provider is gated and uses the consumer upstream", async () => {
     const off = harness();

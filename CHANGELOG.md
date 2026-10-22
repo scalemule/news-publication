@@ -1,3 +1,8 @@
+## 0.0.89
+
+- Ordinary reader sign-in now omits the OIDC `prompt` parameter so Ledvery can reuse an existing session or show its sign-in screen in one trip. Only an explicit account-switch request asks for `select_account`; click-driven network handoff keeps `prompt=none`.
+- Validate the returned Ledvery authorization URL's issuer, callback, client ID, state, nonce, code flow, PKCE method and prompt, rejecting duplicate security parameters. Provide a fixed handoff destination for the two initial canaries and ignore identity or redirect parameters appended to its link. Other publications still need their reader-SSO route rollout and browser acceptance.
+
 ## 0.0.88
 
 - Retire automatic reader SSO navigation. `ReaderSsoBoot` remains as a no-op compatibility export; rendered publication pages no longer redirect to Ledvery after load, including when a local session is stale or needs an SSO upgrade. Explicit sign-in and server-side OIDC completion remain available. Click-initiated network handoff and FedCM require separate implementation and browser acceptance.
