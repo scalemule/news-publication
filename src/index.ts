@@ -211,6 +211,7 @@ export {
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
+  getNetworkReaderHandoffUrl,
   NETWORK_PARENT,
   EDITORIAL_PRINCIPLES,
 } from "./network";

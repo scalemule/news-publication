@@ -249,7 +249,7 @@ The consent banner now offers a choice in every geography where optional measure
 ## Reader sign-in through Ledvery
 
 The `reader-sso` (server) and `reader-sso-client` entry points generalize the
-publications' Google sign-in into one Ledvery consumer flow with silent sign-in,
+publications' Google sign-in into one Ledvery consumer flow with click-driven handoff,
 explicit email sign-in, account linking, precedence between two accounts,
 RP-initiated sign-out and server-recorded telemetry. A site supplies its cookie
 prefix, canonical origin, Ledvery client id and a request adapter that performs
@@ -262,7 +262,13 @@ them with `applyCookies` and answers with private, no-store headers. Merge
 `READER_SSO_EVENTS` into the site's analytics registry and allow
 `READER_SSO_PROPERTY_KEYS` in its property sanitizer. `ReaderSsoBoot` is a
 no-op compatibility export: a rendered page never starts Ledvery authorization
-on a timer. The explicit sign-in routes still work. `ReaderGreeting` is a client
+on a timer. Ordinary explicit sign-in omits `prompt`; `select_account` is reserved
+for an explicit account-switch control and `prompt=none` for a sister-paper
+handoff. Handoff links carry no identity or session token, and
+`networkHandoffReturnPath` discards caller-selected destinations. The two
+initial canaries are listed by `getNetworkReaderHandoffUrl`; other papers
+remain plain links until their route and client registration are verified.
+`ReaderGreeting` is a client
 island that renders only a first name, in the reader's own time zone and locale,
 after loading.
 

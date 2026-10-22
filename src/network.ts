@@ -336,6 +336,15 @@ export function getNetworkPublicationUrl(slug: string): string | null {
   return decorateNetworkUrl(pub.url + "/");
 }
 
+/** Initial destinations targeted for the click-driven reader handoff rollout. */
+const readerHandoffReady = new Set(["sanramontimes", "trivalleyweekly"]);
+
+/** The fixed destination route; no identity or caller-selected return URL is carried. */
+export function getNetworkReaderHandoffUrl(slug: string): string | null {
+  const publication = findPublicationBySlug(slug);
+  return publication && readerHandoffReady.has(slug) ? `${publication.url}/api/news/network-handoff` : null;
+}
+
 const NETWORK_HOSTNAMES = new Set(
   localPublications.map((p) => {
     try {
