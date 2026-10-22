@@ -260,11 +260,11 @@ other than that key and the browser only ever sees host-only HttpOnly cookies.
 `sessionSummary` return cookie instructions and destinations; the site applies
 them with `applyCookies` and answers with private, no-store headers. Merge
 `READER_SSO_EVENTS` into the site's analytics registry and allow
-`READER_SSO_PROPERTY_KEYS` in its property sanitizer. `ReaderSsoBoot` performs at
-most one silent attempt per page load and never on private paths, for bots,
-while typing, in frames or in prerendered documents; the server's negative cache
-makes a loop impossible. `ReaderGreeting` is a client island that renders only a
-first name, in the reader's own time zone and locale, after loading.
+`READER_SSO_PROPERTY_KEYS` in its property sanitizer. `ReaderSsoBoot` is a
+no-op compatibility export: a rendered page never starts Ledvery authorization
+on a timer. The explicit sign-in routes still work. `ReaderGreeting` is a client
+island that renders only a first name, in the reader's own time zone and locale,
+after loading.
 
 ## Community pet sections
 

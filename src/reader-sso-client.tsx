@@ -4,13 +4,13 @@
  * component talks to the publication's own same-origin routes, which carry the
  * HttpOnly reader cookies. See ./reader-sso.ts for the server contract.
  */
-import { mountReaderSsoScheduler } from "./reader-sso-scheduler";
 import { useEffect, useId, useState } from "react";
 
 export type ReaderSsoProvider = "google" | "email";
 
 // ---------------------------------------------------------------------------
-// Silent sign-in gating (ADR 4.4). Pure so it can be unit-tested without a DOM.
+// Legacy silent sign-in helpers remain exported for compatibility. The SDK no
+// longer schedules or performs automatic navigation from a rendered page.
 // ---------------------------------------------------------------------------
 export const READER_SSO_BOT_PATTERN =
   /bot|crawl|spider|headless|lighthouse|pagespeed|preview|slurp|facebookexternalhit|embedly|python|curl|wget|phantom|puppeteer|playwright|selenium|prerender/i;
@@ -46,6 +46,7 @@ export type SilentSignInEnvironment = {
 
 export type SilentSignInDecision = { attempt: true } | { attempt: false; reason: string };
 
+/** @deprecated No automatic reader sign-in should use this decision. */
 export function silentSignInDecision(env: SilentSignInEnvironment): SilentSignInDecision {
   if (!env.enabled) return { attempt: false, reason: "disabled" };
   if (env.hasSession) return { attempt: false, reason: "session" };
@@ -62,6 +63,7 @@ export function silentSignInDecision(env: SilentSignInEnvironment): SilentSignIn
   return { attempt: true };
 }
 
+/** @deprecated Use an explicit, user-initiated handoff flow instead. */
 export function silentSignInUrl(startPath: string, pathname: string, search: string): string {
   return `${startPath}?${new URLSearchParams({ mode: "silent", next: pathname + search })}`;
 }
@@ -78,44 +80,13 @@ export function isFormField(element: Element | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (focused as HTMLElement).isContentEditable === true;
 }
 
-const ATTEMPT_KEY = "reader-sso-attempt-v1";
-function readAttempt(): number | null {
-  try {
-    const raw = window.sessionStorage.getItem(ATTEMPT_KEY);
-    const value = raw ? Number(raw) : NaN;
-    return Number.isFinite(value) ? value : null;
-  } catch { return null; }
-}
-function writeAttempt(now: number): void {
-  try { window.sessionStorage.setItem(ATTEMPT_KEY, String(now)); } catch { /* storage may be disabled */ }
-}
-
-function browserEnvironment(flags: { enabled: boolean; hasSession: boolean; suppressed: boolean; privatePaths?: RegExp[] }): SilentSignInEnvironment {
-  const doc = document as Document & { prerendering?: boolean };
-  let framed = false;
-  try { framed = window.top !== window.self; } catch { framed = true; }
-  return {
-    ...flags,
-    webdriver: navigator.webdriver === true,
-    userAgent: navigator.userAgent,
-    pathname: location.pathname,
-    search: location.search,
-    fieldFocused: isFormField(document.activeElement),
-    prerendering: doc.prerendering === true,
-    visibilityState: document.visibilityState,
-    framed,
-    lastAttemptAt: readAttempt(),
-    now: Date.now(),
-  };
-}
-
 /**
- * Renders nothing. Once per page load, after the DOM is usable and an idle period, performs a
- * top-level navigation to the silent sign-in start route when nothing argues
- * against it. The server sets the negative-cache cookie on every silent negative,
- * so this can never loop.
+ * Compatibility export for publications that still mount the old boot island.
+ * Reader identity is checked by the same-origin session UI; authentication
+ * must begin with an intentional click, never a timer or page-load navigation.
+ * @deprecated Remove this component from publication layouts.
  */
-export function ReaderSsoBoot({ enabled = true, hasSession: hasSessionCookie, suppressed, startPath = "/api/news/ledvery-start", sessionPath = "/api/news/session", privatePaths, idleDelayMs = 1500 }: {
+export function ReaderSsoBoot(_props: {
   enabled?: boolean;
   /** A reader session cookie is present (it may have been revoked elsewhere). */
   hasSession: boolean;
@@ -126,37 +97,6 @@ export function ReaderSsoBoot({ enabled = true, hasSession: hasSessionCookie, su
   privatePaths?: RegExp[];
   idleDelayMs?: number;
 }) {
-  // A cookie is not a session: one revoked by another app's sign-out must not
-  // suppress the silent check (release review R5). Ask the server once.
-  const [staleCookie, setStaleCookie] = useState(false);
-  useEffect(() => {
-    if (!enabled || !hasSessionCookie || staleCookie) return;
-    let cancelled = false;
-    fetch(sessionPath, { credentials: "same-origin", cache: "no-store" })
-      .then((response) => response.json())
-      .then((body: { authenticated?: boolean; session_upgrade_required?: boolean }) => {
-        // Pre-SSO reader sessions need one silent renewal to acquire their
-        // logout binding. Keep the existing account if Ledvery differs.
-        if (!cancelled && (body?.authenticated !== true || body.session_upgrade_required === true)) setStaleCookie(true);
-      })
-      .catch(() => { /* unknown: keep treating the reader as signed in */ });
-    return () => { cancelled = true; };
-  }, [enabled, hasSessionCookie, staleCookie, sessionPath]);
-  const hasSession = hasSessionCookie && !staleCookie;
-  useEffect(() => {
-    const flags = { enabled, hasSession, suppressed, privatePaths };
-    return mountReaderSsoScheduler({
-      document,
-      timers: window,
-      idleDelayMs,
-      eligible: () => silentSignInDecision(browserEnvironment(flags)).attempt === true,
-      attempt: () => {
-        const env = browserEnvironment(flags);
-        writeAttempt(env.now);
-        window.location.assign(silentSignInUrl(startPath, env.pathname, env.search));
-      },
-    });
-  }, [enabled, hasSession, suppressed, startPath, privatePaths, idleDelayMs]);
   return null;
 }
 
