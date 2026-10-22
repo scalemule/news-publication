@@ -1,3 +1,7 @@
+## 0.0.88
+
+- Retire automatic reader SSO navigation. `ReaderSsoBoot` remains as a no-op compatibility export; rendered publication pages no longer redirect to Ledvery after load, including when a local session is stale or needs an SSO upgrade. Explicit sign-in and server-side OIDC completion remain available. Click-initiated network handoff and FedCM require separate implementation and browser acceptance.
+
 ## 0.0.87
 
 - Reader SSO linking onto an **unconfirmed** reader account asks for a 6-digit code emailed to that account (platform ADR-2026-10-21 D2.3). The challenge token is kept in a new HttpOnly cookie (`<prefix>-link-code`), and the reader types the code in the existing code field. Paper routes and forms need no changes beyond the version bump.
