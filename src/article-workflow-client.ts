@@ -126,6 +126,8 @@ export type ArticleWorkflowOptions = {
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
     versioned_editorial_fields?: boolean;
+    /** The server stores headline, fly_title and seo_title on the versioned document. */
+    headline_set?: boolean;
     versioned_editorial_tags?: boolean;
     managed_submission_version?: number | null;
     multipart_submission?: boolean;
