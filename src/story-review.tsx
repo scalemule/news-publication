@@ -32,6 +32,12 @@ export type Document = {
   format?: ArticleFormat;
   layout?: { id: string; version: number };
   title: string;
+  /** Short display headline; the title is the fallback. */
+  headline?: string;
+  /** Kicker above the headline; the section is the fallback. */
+  fly_title?: string;
+  /** Search title for <title>; the title is the fallback. */
+  seo_title?: string;
   subtitle: string;
   content_markdown: string;
   section: string;
@@ -1063,6 +1069,27 @@ export function StoryReview({
                   <label>
                     Headline
                     <input
+                      value={document.headline ?? ""}
+                      maxLength={120}
+                      placeholder={document.title}
+                      onChange={(e) =>
+                        setDocument({ ...document, headline: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Fly title (the small label above the headline)
+                    <input
+                      value={document.fly_title ?? ""}
+                      maxLength={40}
+                      onChange={(e) =>
+                        setDocument({ ...document, fly_title: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Full title
+                    <input
                       value={document.title}
                       onChange={(e) =>
                         setDocument({ ...document, title: e.target.value })
@@ -1098,6 +1125,8 @@ export function StoryReview({
                         {
                           action: "PROPOSE_EDITS",
                           title: document.title,
+                          headline: document.headline ?? "",
+                          fly_title: document.fly_title ?? "",
                           subtitle: document.subtitle,
                           content_markdown: document.content_markdown,
                           message,
@@ -1707,7 +1736,9 @@ export function ReviewDiff({
 }) {
   const [side, setSide] = useState(false);
   const fields: [keyof Document, string][] = [
-    ["title", "Headline"],
+    ["headline", "Headline"],
+    ["fly_title", "Fly title"],
+    ["title", "Full title"],
     ["subtitle", "Dek"],
     ["content_markdown", "Article"],
     ["section", "Section"],
