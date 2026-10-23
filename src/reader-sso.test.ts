@@ -11,11 +11,13 @@ import {
   linkAccount,
   localReturnPath,
   networkHandoffReturnPath,
+  openLinkChallenge,
   openPendingSession,
   openReaderFlow,
   precedence,
   readerSsoBootFlags,
   readerSsoCookieNames,
+  sealLinkChallenge,
   sealPendingSession,
   sealReaderFlow,
   sessionSummary,
@@ -75,6 +77,7 @@ function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: 
 
 const jar = (cookies: Record<string, string>) => (name: string) => cookies[name];
 const flowCookie = (input: Parameters<typeof sealReaderFlow>[0]) => sealReaderFlow(input, KEY, NOW);
+const linkCookie = (challengeId = "ch_1", extra: Record<string, string> = {}) => jar({ [names.linkFlow]: sealLinkChallenge(challengeId, KEY, NOW), ...extra });
 const callbackUrl = (query: string) => `${CALLBACK}?${query}`;
 
 describe("reader SSO cookies", () => {
@@ -82,11 +85,19 @@ describe("reader SSO cookies", () => {
     expect(names).toEqual({
       session: "__Host-media-reader", flow: "__Host-media-ledvery", newsletter: "__Host-media-newsletter",
       ssoChecked: "__Host-media-sso-checked", signedOut: "__Host-media-signed-out", pending: "__Host-media-sso-pending",
-      linkCode: "__Host-media-link-code",
+      linkCode: "__Host-media-link-code", linkFlow: "__Host-media-sso-link",
     });
     expect(readerSsoCookieNames("__Host-trivalley").session).toBe("__Host-trivalley-reader");
     expect(() => readerSsoCookieNames("media")).toThrow();
     expect(() => readerSsoCookieNames("__Host-a;b")).toThrow();
+  });
+  it("expires and authenticates the browser's account-link challenge", () => {
+    const cookie = sealLinkChallenge("ch_1", KEY, NOW);
+    expect(openLinkChallenge(cookie, KEY, NOW)).toBe("ch_1");
+    expect(openLinkChallenge(cookie, KEY, NOW + 600_000)).toBeNull();
+    expect(openLinkChallenge(cookie, "other-key", NOW)).toBeNull();
+    expect(openLinkChallenge(cookie + "x", KEY, NOW)).toBeNull();
+    expect(() => sealLinkChallenge("evil?next=alice", KEY, NOW)).toThrow();
   });
   it("renders instructions for a Next jar and as raw headers", () => {
     const set = vi.fn();
@@ -322,7 +333,8 @@ describe("completeSignIn", () => {
     const h = harness({ exchange });
     const interactive = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.flow]: flowCookie({ state: "st-1", provider: "google", subscribe: true, returnTo: "/meet" }) }) });
     expect(interactive).toMatchObject({ kind: "redirect", location: "/account?link=ch_123&hint=a***%40example.test&next=%2Fmeet&subscribe=1", outcome: "link_required" });
-    expect(interactive.cookies.map((c) => c.name)).toEqual([names.flow]);
+    expect(interactive.cookies.map((c) => c.name)).toEqual([names.flow, names.linkFlow]);
+    expect(openLinkChallenge(interactive.cookies[1].value, KEY, NOW)).toBe("ch_123");
     const silent = await completeSignIn(h.config, { url: callbackUrl("code=c&state=st-1"), cookies: jar({ [names.flow]: flowCookie({ state: "st-1", mode: "silent", returnTo: "/news" }) }) });
     expect(silent).toMatchObject({ kind: "redirect", location: "/news" });
     expect(silent.cookies.map((c) => c.name)).toEqual([names.flow, names.ssoChecked]);
@@ -339,29 +351,40 @@ describe("completeSignIn", () => {
 });
 
 describe("linkAccount", () => {
+  it("rejects a challenge attached to a link without the matching callback cookie", async () => {
+    const h = harness();
+    for (const cookies of [jar({}), linkCookie("attacker-challenge"), jar({ [names.linkFlow]: sealLinkChallenge("ch_1", KEY, NOW - 600_001) })]) {
+      const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "victim-password", cookies });
+      expect(result).toMatchObject({ ok: false, status: 400 });
+    }
+    h.config.enabled = false;
+    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "victim-password", cookies: linkCookie() })).toMatchObject({ ok: false, status: 400 });
+    expect(h.calls).toHaveLength(0);
+  });
   it("validates input neutrally and issues the session on success", async () => {
     const h = harness();
     expect(await linkAccount(h.config, { challenge_id: "bad id!", password: "x", cookies: jar({}) })).toMatchObject({ ok: false, status: 400 });
-    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "", cookies: jar({}) })).toMatchObject({ ok: false, status: 400 });
-    const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", next: "/meet", cookies: jar({}) });
+    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "", cookies: linkCookie() })).toMatchObject({ ok: false, status: 400 });
+    const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", next: "/meet", cookies: linkCookie() });
     expect(result).toMatchObject({ ok: true, switch: false, token: "new-token", location: "/meet" });
+    expect(result.cookies).toContainEqual({ name: names.linkFlow, value: "", maxAge: 0 });
     expect(h.calls[0]).toMatchObject({ path: "/v1/auth/oauth/ledvery/link", method: "POST", body: { challenge_id: "ch_1", password: "pw" } });
     expect(h.events.map((e) => e.name)).toEqual(["reader_signin_failed", "reader_signin_failed", "reader_signin_completed", "reader_account_linked"]);
     expect(JSON.stringify(h.events)).not.toContain("pw");
     const wrong = harness({ link: { status: 401, body: { success: false, error: { code: "INVALID_CREDENTIALS" } } } });
-    expect(await linkAccount(wrong.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) })).toMatchObject({ ok: false, status: 400 });
+    expect(await linkAccount(wrong.config, { challenge_id: "ch_1", password: "pw", cookies: linkCookie() })).toMatchObject({ ok: false, status: 400 });
   });
   it("asks for and forwards the MFA code an existing protected account requires (review R6)", async () => {
     const mfa = harness({ link: { status: 401, body: { success: false, error: { code: "MFA_REQUIRED" } } } });
-    expect(await linkAccount(mfa.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) })).toMatchObject({ ok: false, status: 401, mfaRequired: true });
+    expect(await linkAccount(mfa.config, { challenge_id: "ch_1", password: "pw", cookies: linkCookie() })).toMatchObject({ ok: false, status: 401, mfaRequired: true });
     const h = harness();
-    const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: " 123456 ", cookies: jar({}) });
+    const result = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: " 123456 ", cookies: linkCookie() });
     expect(result.ok).toBe(true);
     expect(h.calls[0].body).toEqual({ challenge_id: "ch_1", password: "pw", mfa_code: "123456" });
-    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "12 34<script>", cookies: jar({}) })).toMatchObject({ ok: false, status: 400, mfaRequired: true });
+    expect(await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "12 34<script>", cookies: linkCookie() })).toMatchObject({ ok: false, status: 400, mfaRequired: true });
     for (const code of ["MFA_SETUP_REQUIRED", "MFA_METHOD_UNSUPPORTED", "IDENTITY_ALREADY_BOUND"]) {
       const x = harness({ link: { status: 409, body: { success: false, error: { code } } } });
-      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) });
+      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", cookies: linkCookie() });
       expect(r).toMatchObject({ ok: false, status: 409 });
       expect(r.ok === false && r.mfaRequired).toBeFalsy();
     }
@@ -371,14 +394,14 @@ describe("linkAccount", () => {
 describe("linking onto an unconfirmed account", () => {
   it("keeps the emailed-code challenge in an HttpOnly cookie and sends the typed code with it", async () => {
     const needs = harness({ link: { status: 403, body: { success: false, error: { code: "LOGIN_CHALLENGE_REQUIRED", message: JSON.stringify({ challenge_token: "tok-1", method: "email" }) } } } });
-    const first = await linkAccount(needs.config, { challenge_id: "ch_1", password: "pw", cookies: jar({}) });
+    const first = await linkAccount(needs.config, { challenge_id: "ch_1", password: "pw", cookies: linkCookie() });
     expect(first).toMatchObject({ ok: false, status: 401, mfaRequired: true });
     const cookieName = needs.config.prefix + "-link-code";
     expect(first.cookies).toEqual([{ name: cookieName, value: "tok-1", maxAge: 600 }]);
     expect(first.ok === false && first.error).toMatch(/6-digit code/);
 
     const h = harness();
-    const done = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: jar({ [cookieName]: "tok-1" }) });
+    const done = await linkAccount(h.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: linkCookie("ch_1", { [cookieName]: "tok-1" }) });
     expect(done.ok).toBe(true);
     expect(h.calls[0].body).toEqual({ challenge_id: "ch_1", password: "pw", challenge_token: "tok-1", challenge_code: "123456" });
     expect(done.cookies).toContainEqual({ name: cookieName, value: "", maxAge: 0 });
@@ -388,7 +411,7 @@ describe("linking onto an unconfirmed account", () => {
     const cookieName = (c: { prefix: string }) => c.prefix + "-link-code";
     for (const [code, status, mfa] of [["LOGIN_CHALLENGE_INVALID", 401, true], ["CHALLENGE_RATE_LIMITED", 429, true], ["LOGIN_CHALLENGE_LOCKED", 429, false]] as const) {
       const x = harness({ link: { status: 400, body: { success: false, error: { code } } } });
-      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: jar({ [cookieName(x.config)]: "tok-1" }) });
+      const r = await linkAccount(x.config, { challenge_id: "ch_1", password: "pw", mfa_code: "123456", cookies: linkCookie("ch_1", { [cookieName(x.config)]: "tok-1" }) });
       expect(r).toMatchObject({ ok: false, status });
       expect(Boolean(r.ok === false && r.mfaRequired)).toBe(mfa);
     }
@@ -401,7 +424,7 @@ describe("signOut and session", () => {
     const result = await signOut(h.config, { cookies: jar({ [names.session]: "new-token" }), extraCookies: [{ name: "__Host-paw-signed-out", value: "1", maxAge: 10 }] });
     expect(h.calls[0]).toMatchObject({ path: "/v1/auth/logout", body: { session_token: "new-token" }, token: "new-token" });
     expect(result.cookies.map((c) => [c.name, c.maxAge])).toEqual([
-      [names.session, 0], [names.flow, 0], [names.newsletter, 0], [names.pending, 0], [names.ssoChecked, 0],
+      [names.session, 0], [names.flow, 0], [names.newsletter, 0], [names.pending, 0], [names.ssoChecked, 0], [names.linkFlow, 0], [names.linkCode, 0],
       [names.signedOut, READER_SSO_SIGNED_OUT_SECONDS], ["__Host-paw-signed-out", 10],
     ]);
     const url = new URL(result.endSessionUrl);

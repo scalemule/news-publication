@@ -18,6 +18,7 @@ export const READER_SSO_FLOW_SECONDS = 600;
 export const READER_SSO_NEGATIVE_CACHE_SECONDS = 300;
 export const READER_SSO_SIGNED_OUT_SECONDS = 86400;
 export const READER_SSO_PENDING_SECONDS = 600;
+export const READER_SSO_LINK_SECONDS = 600;
 export const LEDVERY_ISSUER_ORIGIN = "https://api.ledvery.com";
 
 /** Ledvery results that mean "no silent session here"; never authentication failures. */
@@ -43,6 +44,8 @@ export type ReaderSsoCookieNames = {
   pending: string;
   /** Linking onto an unconfirmed account: the platform's emailed-code challenge token (10 minutes). */
   linkCode: string;
+  /** Signed proof that this browser received the account-link challenge from our callback. */
+  linkFlow: string;
 };
 
 /** Cookie names derived from a `__Host-` prefix, e.g. `__Host-media` → `__Host-media-reader`. */
@@ -56,6 +59,7 @@ export function readerSsoCookieNames(prefix: string): ReaderSsoCookieNames {
     signedOut: `${prefix}-signed-out`,
     pending: `${prefix}-sso-pending`,
     linkCode: `${prefix}-link-code`,
+    linkFlow: `${prefix}-sso-link`,
   };
 }
 
@@ -291,6 +295,19 @@ export function openReaderFlow(
   return { digest: raw.digest, subscribe: raw.subscribe && mode === "interactive", expires: raw.expires, returnTo, mode, provider, tx };
 }
 
+/** A URL's challenge ID is not enough to start linking an existing account. */
+export function sealLinkChallenge(challengeId: string, key: string, now = Date.now()): string {
+  if (!CHALLENGE_ID.test(challengeId)) throw new Error("Invalid reader link challenge");
+  return seal("reader-link:v1", { challengeId, expires: now + READER_SSO_LINK_SECONDS * 1000 }, key);
+}
+
+export function openLinkChallenge(cookie: string | undefined, key: string, now = Date.now()): string | null {
+  const raw = open("reader-link:v1", cookie, key);
+  return raw && typeof raw.challengeId === "string" && CHALLENGE_ID.test(raw.challengeId)
+    && typeof raw.expires === "number" && Number.isFinite(raw.expires) && raw.expires > now
+    ? raw.challengeId : null;
+}
+
 /** A verified session the reader has not yet chosen over their current one. */
 export type PendingSession = {
   token: string;
@@ -418,7 +435,7 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
       { name: c.names.flow, value: sealReaderFlow({ state: value.state, subscribe: input.subscribe === true && mode === "interactive", returnTo: next, mode, provider, tx }, c.key, c.now()), maxAge: READER_SSO_FLOW_SECONDS },
     ];
     // An explicit sign-in bypasses the negative cache and ends the signed-out suppression.
-    if (mode === "interactive") cookies.push(clear(c.names.signedOut), clear(c.names.ssoChecked));
+    if (mode === "interactive") cookies.push(clear(c.names.signedOut), clear(c.names.ssoChecked), clear(c.names.linkFlow), clear(c.names.linkCode));
     emit(c, { name: "reader_signin_started", properties: { method: provider ?? "unknown", mode, transaction: tx } });
     return { ok: true, url, tx, cookies };
   } catch {
@@ -536,6 +553,7 @@ export async function completeSignIn(config: ReaderSsoConfig, input: CompleteSig
       if (hint) link.set("hint", hint);
       if (flow.returnTo) link.set("next", flow.returnTo);
       if (flow.subscribe) link.set("subscribe", "1");
+      cookies.push({ name: c.names.linkFlow, value: sealLinkChallenge(challengeId, c.key, now), maxAge: READER_SSO_LINK_SECONDS });
       return redirect(`${c.accountPath}?${link}`, "link_required");
     }
     if (failed(exchange)) throw new Error("exchange");
@@ -644,7 +662,11 @@ export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInp
   const c = resolve(config);
   const challengeId = typeof input.challenge_id === "string" && CHALLENGE_ID.test(input.challenge_id) ? input.challenge_id : "";
   const password = typeof input.password === "string" && input.password.length > 0 && input.password.length <= 1024 ? input.password : "";
-  if (!challengeId || !password) {
+  if (c.enabled === false || !challengeId || openLinkChallenge(input.cookies(c.names.linkFlow), c.key, c.now()) !== challengeId) {
+    emit(c, { name: "reader_signin_failed", properties: { reason: "link_invalid", mode: "interactive" } });
+    return { ok: false, status: 400, error: "Start sign-in again to connect your existing reader account.", cookies: [] };
+  }
+  if (!password) {
     emit(c, { name: "reader_signin_failed", properties: { reason: "link_invalid", mode: "interactive" } });
     return { ok: false, status: 400, error: "Enter the password of your existing reader account.", cookies: [] };
   }
@@ -681,7 +703,7 @@ export async function linkAccount(config: ReaderSsoConfig, input: LinkAccountInp
     }
     const session = issuedSession(response, c.now());
     const flow: ReaderSsoFlow = { digest: "", subscribe: input.subscribe === true, expires: 0, returnTo: next, mode: "interactive", provider: undefined };
-    const result = await establish(c, { session, flow, method: "link", cookies: emailChallenge ? [clear(c.names.linkCode)] : [], input, negativeCache: { name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS } });
+    const result = await establish(c, { session, flow, method: "link", cookies: [clear(c.names.linkFlow), ...(emailChallenge ? [clear(c.names.linkCode)] : [])], input, negativeCache: { name: c.names.ssoChecked, value: "1", maxAge: READER_SSO_NEGATIVE_CACHE_SECONDS } });
     if (result.kind === "signed-in") emit(c, { name: "reader_account_linked", properties: {} });
     return result.kind === "signed-in"
       ? { ok: true, switch: false, cookies: result.cookies, token: result.token, expiresAt: result.expiresAt, user: result.user, location: result.location }
@@ -761,7 +783,7 @@ export async function signOut(config: ReaderSsoConfig, input: { cookies: CookieR
   emit(c, { name: "reader_signed_out", properties: { method: "explicit" } });
   return {
     cookies: [
-      clear(c.names.session), clear(c.names.flow), clear(c.names.newsletter), clear(c.names.pending), clear(c.names.ssoChecked),
+      clear(c.names.session), clear(c.names.flow), clear(c.names.newsletter), clear(c.names.pending), clear(c.names.ssoChecked), clear(c.names.linkFlow), clear(c.names.linkCode),
       { name: c.names.signedOut, value: "1", maxAge: READER_SSO_SIGNED_OUT_SECONDS },
       ...(input.extraCookies ?? []),
     ],
