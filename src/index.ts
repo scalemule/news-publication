@@ -70,6 +70,7 @@ export {
   publicationMeta,
   publicHttps,
 } from "./seo";
+export { FLY_TITLE_MAX_CHARS, HEADLINE_MAX_CHARS, HEADLINE_RECOMMENDED_CHARS, RUBRIC_MAX_CHARS, SEO_TITLE_MAX_CHARS, headlineLength, headlineProblems, headlineSet, type HeadlineSet } from "./headline";
 export {
   ANALYTICS_COOKIE,
   ANALYTICS_VERSION,

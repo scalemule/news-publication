@@ -7,7 +7,14 @@ export { ArticleEditOperationError, type ArticleEditInput, type ArticleEditCheck
 export { ArticlePhotoOperationError, type ArticlePhotoInput, type PhotoOperationCheckpoint } from "./article-photo-operation";
 export type ArticleDocument = {
   title: string;
+  /** Short display headline (<= 120 characters, 70 recommended); see `headlineSet`. */
+  headline?: string;
+  /** Kicker above the headline (<= 40 characters). */
+  fly_title?: string;
+  /** The rubric (deck). */
   subtitle?: string;
+  /** Search title for <title> and previews. */
+  seo_title?: string;
   content_markdown: string;
   excerpt?: string;
   cards?: unknown[];

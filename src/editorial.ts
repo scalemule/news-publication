@@ -193,8 +193,9 @@ export function composeEdition(items: NewsItem[], selection: HomepageSelection =
   return { lead, secondary, briefs, compact, sections, pendingImages, navigation: editorialSections(inventory) };
 }
 
+/** The paper's override, else the article's short headline, else its long title (see `headlineSet`). */
 export function displayHeadline(article: NewsItem, selection: HomepageSelection = {}): string {
-  return selection.stories?.[article.slug]?.display_title?.trim() || article.title;
+  return selection.stories?.[article.slug]?.display_title?.trim() || article.headline?.trim() || article.title;
 }
 
 /** A complete existing sentence, not a cut-off or generated summary. */

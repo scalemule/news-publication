@@ -1,9 +1,13 @@
 import type { ArticleDocument } from "./article-workflow-client";
+import { headlineProblems } from "./headline";
 export type ArticleEditPatch = Partial<
   Pick<
     ArticleDocument,
     | "title"
+    | "headline"
+    | "fly_title"
     | "subtitle"
+    | "seo_title"
     | "content_markdown"
     | "excerpt"
     | "section"
@@ -109,7 +113,10 @@ const digest = async (v: unknown) =>
     .join("");
 const patchKeys = new Set([
   "title",
+  "headline",
+  "fly_title",
   "subtitle",
+  "seo_title",
   "content_markdown",
   "excerpt",
   "section",
@@ -151,6 +158,8 @@ function validate(input: ArticleEditInput) {
     } else if (typeof value !== "string")
       throw Error(key + " must be a string");
   }
+  const problems = headlineProblems(input.patch);
+  if (problems.length) throw Error(problems.join("; "));
   if (
     input.expectedGeneration !== undefined &&
     (!Number.isSafeInteger(input.expectedGeneration) ||
