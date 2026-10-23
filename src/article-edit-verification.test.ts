@@ -75,3 +75,23 @@ it("requires visible canonical tag links rather than serialized tag data", () =>
   expect(articleEditHtmlMatches(body + '<a href="/news?tag=sherry-hu">Sherry Hu</a>', expected)).toBe(true);
   expect(articleEditHtmlMatches(body + '<a href="/news?tag=other">Sherry Hu</a>', expected)).toBe(false);
 });
+
+describe("the papers' entity cards and the search title", () => {
+  // Markup copied from sanramontimes.com on 2026-10-23: the paper renders verified cards as
+  // <aside data-entity-card="venue">, not the package's article-verified-card class.
+  const paperCard = `<section class="MThonG_footerSection" aria-label="Venue and directory information"><div><p class="MThonG_sectionHeading">About the Venue</p><aside id="san-ramon-council-bella-village-oct2026" data-entity-card="venue" class="MThonG_card  MThonG_venueCard" aria-label="LOCAL VENUE · DIRECTORY: San Ramon City Hall — Public Safety &amp; Housing Actions"><div class="MThonG_header"><p class="MThonG_kicker">LOCAL VENUE · DIRECTORY</p></div><h2 class="MThonG_title">San Ramon City Hall — Public Safety &amp; Housing Actions</h2><dl class="MThonG_factGrid"><div class="MThonG_factRow"><dt class="MThonG_factLabel">Public Safety Contract</dt><dd class="MThonG_factValue">10-year, $4.1 million agreement</dd></div></dl></aside></div></section>`;
+  const page = (title: string) => `<html><head><title>${title}</title></head><body><h1>San Ramon approves $4.1m police technology upgrade</h1><p>Body paragraph one. София 李</p>${paperCard}</body></html>`;
+  const expected = { title: "San Ramon City Council Approves $4.1 Million Police Technology Upgrade", headline: "San Ramon approves $4.1m police technology upgrade", content_html: "<p>Body paragraph one. София 李</p>", card_titles: ["San Ramon City Hall — Public Safety & Housing Actions"] };
+  it("recognises a paper's data-entity-card aside by its h2", () => {
+    expect(articleEditHtmlMatches(page("Anything"), expected)).toBe(true);
+    expect(articleEditHtmlMatches(page("Anything"), { ...expected, card_titles: ["A card the page does not show"] })).toBe(false);
+    expect(articleEditHtmlMatches(page("Anything").replace(' data-entity-card="venue"', ""), expected)).toBe(false);
+  });
+  it("checks the document title only when the edit carried a search title, allowing the site's suffix", () => {
+    const seo = "San Ramon police technology upgrade and Bella Village housing approved";
+    expect(articleEditHtmlMatches(page("Stale title"), { ...expected, seo_title: seo })).toBe(false);
+    expect(articleEditHtmlMatches(page(seo), { ...expected, seo_title: seo })).toBe(true);
+    expect(articleEditHtmlMatches(page(seo + " · San Ramon Times"), { ...expected, seo_title: seo })).toBe(true);
+    expect(articleEditHtmlMatches(page("Stale title"), { ...expected, seo_title: null })).toBe(true);
+  });
+});

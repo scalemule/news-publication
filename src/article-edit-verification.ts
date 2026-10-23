@@ -20,10 +20,16 @@ const text = (html: string) =>
     .replace(/\s+/gu, " ")
     .trim();
 const plain = (value: string) => value.replace(/\s+/gu, " ").trim();
-/** Requires visible body and actual card asides; serialized page data is not delivery. */
+/**
+ * Requires visible body and actual card asides; serialized page data is not delivery.
+ * Cards are recognised by either rendering the papers use: the package's `article-verified-card`
+ * aside, or the papers' entity cards (`<aside data-entity-card="venue|event|…">`), each titled by its h2.
+ * When the edit carried a search title, the document's `<title>` must show it (a site may append its
+ * own name after it).
+ */
 export function articleEditHtmlMatches(
   html: string,
-  expected: { title: string; headline?: string | null; content_html: string; card_titles: string[]; tags?: { name: string; slug: string }[] },
+  expected: { title: string; headline?: string | null; seo_title?: string | null; content_html: string; card_titles: string[]; tags?: { name: string; slug: string }[] },
 ): boolean {
   const visible = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/giu, " ")
@@ -34,6 +40,11 @@ export function articleEditHtmlMatches(
     (m) => text(m[1]) === shown,
   );
   if (!headline) return false;
+  const seo = expected.seo_title?.trim();
+  if (seo) {
+    const pageTitle = text(visible.match(/<title\b[^>]*>([\s\S]*?)<\/title>/iu)?.[1] ?? "");
+    if (pageTitle !== plain(seo) && !pageTitle.startsWith(plain(seo) + " ")) return false;
+  }
   const paragraphs = [
     ...expected.content_html.matchAll(
       /<(p|li|h[2-6]|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/giu,
@@ -51,13 +62,12 @@ export function articleEditHtmlMatches(
       catch { return false; }
     }))) return false;
   }
-  const titles = [
-    ...visible.matchAll(
-      /<aside\b[^>]*class=["'][^"']*\barticle-verified-card\b[^"']*["'][^>]*>([\s\S]*?)<\/aside>/giu,
-    ),
-  ].flatMap((m) =>
-    [...m[1].matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/giu)].map((m) => text(m[1])),
-  );
+  const titles = [...visible.matchAll(/<aside\b([^>]*)>([\s\S]*?)<\/aside>/giu)]
+    .filter((m) => /\bdata-entity-card=["'][^"']+["']/iu.test(m[1]) || /class=["'][^"']*\barticle-verified-card\b/iu.test(m[1]))
+    .flatMap((m) => {
+      const first = m[2].match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/iu);
+      return first ? [text(first[1])] : [];
+    });
   return (
     JSON.stringify(titles.sort()) ===
     JSON.stringify(expected.card_titles.map(plain).sort())
