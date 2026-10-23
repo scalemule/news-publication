@@ -326,8 +326,13 @@ describe("search metadata", () => {
     const modifiedGraph = newsArticleJsonLd(walnutCreekTimes, modifiedArticle, "https://walnutcreektimes.com", "Walnut Creek Times");
     expect(modifiedGraph.dateModified).toBe("2026-10-15T20:38:00Z");
 
-    const meta = articleMeta(walnutCreekTimes, { ...storyArticle, seo_title: "Tenant ri" }, "https://walnutcreektimes.com", true);
-    expect(meta.title).toBe(storyArticle.title);
+    // The search title names the page; the display headline names the story on cards and in the graph.
+    const meta = articleMeta(walnutCreekTimes, { ...storyArticle, seo_title: "Tenant rights workshop in Walnut Creek" }, "https://walnutcreektimes.com", true);
+    expect(meta.title).toBe("Tenant rights workshop in Walnut Creek");
+    expect(articleMeta(walnutCreekTimes, { ...storyArticle, seo_title: "  " }, "https://walnutcreektimes.com", true).title).toBe(storyArticle.title);
+    const headlined = { ...storyArticle, headline: "Renters learn their rights", subtitle: "A free workshop downtown." };
+    expect(newsArticleJsonLd(walnutCreekTimes, headlined, "https://walnutcreektimes.com", "Walnut Creek Times")).toMatchObject({ headline: "Renters learn their rights", alternativeHeadline: storyArticle.title, description: "A free workshop downtown." });
+    expect(articleMeta(walnutCreekTimes, headlined, "https://walnutcreektimes.com", true).openGraph.title).toBe("Renters learn their rights");
     expect(meta.openGraph).not.toHaveProperty("modifiedTime");
     expect(meta.openGraph.siteName).toBe(walnutCreekTimes.name);
     expect(llmsText(walnutCreekTimes, "https://walnutcreektimes.com")).toContain("Walnut Creek, Rossmoor, Saranap, Pleasant Hill");

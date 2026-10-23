@@ -28,8 +28,9 @@ export function newsArticleJsonLd(
   return {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
-    headline: article.title,
-    description: article.excerpt ?? undefined,
+    headline: article.headline?.trim() || article.title,
+    ...(article.headline?.trim() && article.headline.trim() !== article.title ? { alternativeHeadline: article.title } : {}),
+    description: article.subtitle ?? article.excerpt ?? undefined,
     datePublished: article.published_at,
     ...(article.metadata?.editorial?.modified_at ? { dateModified: article.metadata.editorial.modified_at } : {}),
     // updated_at also changes for media/operational maintenance. A trusted
@@ -83,15 +84,15 @@ export function articleMeta(publication: NewsPublication, article: NewsArticle, 
   const canonicalUrl = publicHttps(article.canonical_url) ?? url;
   const image = publicHttps(article.og_image_url) ?? publicHttps(article.cover_image_url);
   return {
-    title: article.title,
-    description: article.seo_description ?? article.excerpt ?? publication.description,
+    title: article.seo_title?.trim() || article.title,
+    description: article.seo_description ?? article.subtitle ?? article.excerpt ?? publication.description,
     canonical: canonicalUrl,
     indexable: indexable && !article.no_index,
     openGraph: {
       type: "article" as const,
       siteName: publication.name,
-      title: article.title,
-      description: article.excerpt ?? undefined,
+      title: article.headline?.trim() || article.title,
+      description: article.subtitle ?? article.excerpt ?? undefined,
       url,
       publishedTime: article.published_at,
       images: image ? [image] : [],

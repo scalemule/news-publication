@@ -18,7 +18,9 @@ Credentials: SCALEMULE_API_KEY and SCALEMULE_ACCESS_TOKEN (normal authorized mem
 Platform admins may use their normal access token with --application-id ID.
 Optional --api-url URL defaults to https://api.scalemule.com.
 
-edit saves prose, excerpt, cards, citations and tenant-owned tag_ids in one immutable revision.
+edit saves prose, excerpt, cards, citations, tenant-owned tag_ids and the headline set (title,
+headline <= 120 chars with 70 recommended, fly_title <= 40, subtitle as the rubric, seo_title) in
+one immutable revision.
 Unspecified fields and media are retained. Default: save for review.
 --release explicitly requests release under the existing policy; it never issues
 APPROVE or changes a policy. Legacy onboarding requires an explicit
@@ -157,7 +159,7 @@ try {
             while(!verified){
               const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,remaining()))});
               const html=await response.text();
-              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
+              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,headline:article.headline,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
               if(!verified)await new Promise(r=>setTimeout(r,Math.min(300,remaining())));
             }
           }catch(error){reason=error.message;}

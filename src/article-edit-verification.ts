@@ -23,13 +23,15 @@ const plain = (value: string) => value.replace(/\s+/gu, " ").trim();
 /** Requires visible body and actual card asides; serialized page data is not delivery. */
 export function articleEditHtmlMatches(
   html: string,
-  expected: { title: string; content_html: string; card_titles: string[]; tags?: { name: string; slug: string }[] },
+  expected: { title: string; headline?: string | null; content_html: string; card_titles: string[]; tags?: { name: string; slug: string }[] },
 ): boolean {
   const visible = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/giu, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/giu, " ");
+  // The page's h1 is the display headline when the article carries one, else the title.
+  const shown = plain(expected.headline?.trim() || expected.title);
   const headline = [...visible.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/giu)].some(
-    (m) => text(m[1]) === plain(expected.title),
+    (m) => text(m[1]) === shown,
   );
   if (!headline) return false;
   const paragraphs = [

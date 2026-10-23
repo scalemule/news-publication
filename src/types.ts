@@ -106,7 +106,12 @@ export type CategoryRef = { id?: string; name: string; slug: string };
 export type NewsItem = {
   id: string;
   slug: string;
+  /** The long descriptive title; the fallback for `headline` and `seo_title`. */
   title: string;
+  /** Short display headline for front pages and the article h1 (see `headlineSet`). */
+  headline?: string | null;
+  /** Kicker above the headline; the section is the fallback. */
+  fly_title?: string | null;
   excerpt: string | null;
   cover_image_url: string | null;
   /** Versioned canonical pixel identity supplied by the publication owner. */
@@ -221,7 +226,8 @@ export type NewsArticle = NewsItem & {
   };
 };
 
-export type StoryDisplay = { display_title?: string; deck?: string; brief?: string; towns?: string[] };
+/** A paper's own homepage overrides for one story; `fly_title` here overrides the article's kicker on that paper only. */
+export type StoryDisplay = { display_title?: string; deck?: string; brief?: string; towns?: string[]; fly_title?: string };
 export type NearbyUpdate = { slug: string; title: string; summary: string; town: string; starts: string; ends?: string };
 export type HomepageSelection = {
   lead_slug?: string;
