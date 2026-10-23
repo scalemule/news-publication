@@ -71,10 +71,11 @@ describe("publication network", () => {
     expect(url).toContain("https://alamoweekly.com/");
   });
 
-  it("only builds fixed handoff URLs for deployed destinations", () => {
-    expect(getNetworkReaderHandoffUrl("sanramontimes")).toBe("https://sanramontimes.com/api/news/network-handoff");
-    expect(getNetworkReaderHandoffUrl("trivalleyweekly")).toBe("https://trivalleyweekly.com/api/news/network-handoff");
-    expect(getNetworkReaderHandoffUrl("alamoweekly")).toBeNull();
+  it("builds fixed handoff URLs for all 12 network publications", () => {
+    expect(localPublications).toHaveLength(12);
+    for (const publication of localPublications) {
+      expect(getNetworkReaderHandoffUrl(publication.slug)).toBe(`${publication.url}/api/news/network-handoff`);
+    }
     expect(getNetworkReaderHandoffUrl("sanramontimes.evil.test")).toBeNull();
     expect(getNetworkReaderHandoffUrl("https://evil.test")).toBeNull();
   });
