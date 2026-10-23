@@ -1,3 +1,12 @@
+## 0.0.91
+
+- Bind an existing-account link challenge to a signed, host-only, 10-minute cookie set by this paper's validated Ledvery callback. A challenge ID attached to a link or submitted without the matching browser cookie cannot send a password to Auth or attach an identity. Clear the cookie after success and sign-out; inactive clients reject linking.
+- Publication PRs, client activation, an independent review and signed-in browser acceptance remain rollout gates.
+
+## 0.0.90
+
+- Build fixed click-driven handoff URLs for all 12 registered publication origins. Site handoff switches remain off until every destination route is deployed and its client is safely activated.
+
 ## 0.0.89
 
 - Ordinary reader sign-in now omits the OIDC `prompt` parameter so Ledvery can reuse an existing session or show its sign-in screen in one trip. Only an explicit account-switch request asks for `select_account`; click-driven network handoff keeps `prompt=none`.
