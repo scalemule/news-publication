@@ -462,7 +462,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
         409,
         state.revisionId,
       );
-    for (const key of ["title", "subtitle", "content_markdown", "excerpt"])
+    for (const key of ["title", "headline", "fly_title", "seo_title", "subtitle", "content_markdown", "excerpt"])
       if (
         state.document?.[key as keyof ArticleDocument] !== undefined &&
         !equal(after[key] ?? "", state.document[key as keyof ArticleDocument])

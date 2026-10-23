@@ -26,7 +26,8 @@ Unspecified fields and media are retained. Default: save for review.
 APPROVE or changes a policy. Legacy onboarding requires an explicit
 --enable-review-policy value. Scheduled legacy articles stop before onboarding.
 Use --expected-generation when coordinating an edit with another editor.
-Default edit deadline: 10000 ms. Reuse the same patch/key/checkpoint on retry.
+Default edit deadline: 10000 ms (--timeout-ms, API work). The public page check after --release
+has its own --page-timeout-ms (default 60000). Reuse the same patch/key/checkpoint on retry.
 RELEASE_HELD means the revision is saved and existing review gates remain.
 
 replace-photo accepts a local file and uses normal member/API-key credentials.
@@ -58,7 +59,7 @@ that every website/CDN cache already displays the new image.
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true, strict: true,
-    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
+    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','page-timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
   });
   if (values.help || !positionals.length) {
     console.log(help);
@@ -68,6 +69,10 @@ try {
     const budget = Number(values['timeout-ms'] ?? (command==='edit'?10000:30000));
     if (!Number.isFinite(budget) || budget < 100 || budget > 120000) throw Error('--timeout-ms must be between 100 and 120000');
     const remaining = () => { const ms = Math.floor(budget - (performance.now()-commandStarted)); if (ms < 1) throw Error('Operation deadline reached; resume the same operation'); return ms; };
+    // The public page check has its own deadline: caches and rolling pods make it slower than the API, and
+    // a slow page must never consume the API operation's budget or vice versa.
+    const pageBudget = Number(values['page-timeout-ms'] ?? 60000);
+    if (!Number.isFinite(pageBudget) || pageBudget < 1000 || pageBudget > 300000) throw Error('--page-timeout-ms must be between 1000 and 300000');
     if (extra.length || !['submit','status','inspect', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use submit, status, inspect, edit, replace-cover or replace-photo; see --help');
     if (values.url) {
       if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN || values['application-id']) throw Error('URL resolution requires normal publication member/API-key credentials');
@@ -152,15 +157,17 @@ try {
         });
         if(values.url&&values.release&&['published','already_published'].includes(result.state)){
           let verified=false,reason;
+          const pageStarted=performance.now();
+          const pageRemaining=()=>{const ms=Math.floor(pageBudget-(performance.now()-pageStarted));if(ms<1)throw Error('Public page deadline reached; the page may still be refreshing. Resume the same operation or raise --page-timeout-ms');return ms;};
           try{
-            const snapshot=await client.publicArticle(checkpoint.sourceIdentity.slug,AbortSignal.timeout(remaining()));
+            const snapshot=await client.publicArticle(checkpoint.sourceIdentity.slug,AbortSignal.timeout(pageRemaining()));
             const article=snapshot.article;
             if(!article||!article.content_html||article.id!==values.article)throw Error('Published reader snapshot is missing');
             while(!verified){
-              const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,remaining()))});
+              const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,pageRemaining()))});
               const html=await response.text();
-              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,headline:article.headline,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
-              if(!verified)await new Promise(r=>setTimeout(r,Math.min(300,remaining())));
+              verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,headline:article.headline,seo_title:'seo_title' in patch?article.seo_title:undefined,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
+              if(!verified)await new Promise(r=>setTimeout(r,Math.min(1000,pageRemaining())));
             }
           }catch(error){reason=error.message;}
           if(!verified){console.error(JSON.stringify({...result,state:'published_public_verification_pending',stage:'public_page',message:'The exact revision is published; rendered prose/cards/tags remain unverified. Resume the same edit.',reason}));process.exitCode=2;}
