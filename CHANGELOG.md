@@ -1,3 +1,7 @@
+## 0.0.92
+
+- A click-driven network handoff ignores the old five-minute negative-cache cookie. A reader who signed in on another paper can retry the destination immediately; explicit sign-out still suppresses automatic re-entry there. Wider site activation and signed-in browser acceptance remain rollout gates.
+
 ## 0.0.91
 
 - Bind an existing-account link challenge to a signed, host-only, 10-minute cookie set by this paper's validated Ledvery callback. A challenge ID attached to a link or submitted without the matching browser cookie cannot send a password to Auth or attach an identity. Clear the cookie after success and sign-out; inactive clients reject linking.

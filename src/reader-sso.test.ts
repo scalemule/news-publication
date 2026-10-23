@@ -189,14 +189,15 @@ describe("startSignIn", () => {
     expect(result.ok).toBe(true);
     expect(h.calls[0].path).toContain("upstream=scalemule_consumer");
   });
-  it("silent start is suppressed by a sign-out or the negative cache without touching the gateway", async () => {
-    for (const cookie of [names.signedOut, names.ssoChecked]) {
-      const h = harness();
-      const result = await startSignIn(h.config, { mode: "silent", next: "/news/x", cookies: jar({ [cookie]: "1" }) });
-      expect(result).toMatchObject({ ok: false, reason: "suppressed", redirect: "/news/x", cookies: [] });
-      expect(h.calls).toEqual([]);
-      expect(h.events).toEqual([]);
-    }
+  it("explicit sign-out suppresses a handoff but an old negative cache never blocks a new click", async () => {
+    const signedOut = harness();
+    const suppressed = await startSignIn(signedOut.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.signedOut]: "1" }) });
+    expect(suppressed).toMatchObject({ ok: false, reason: "suppressed", redirect: "/news/x", cookies: [] });
+    expect(signedOut.calls).toEqual([]);
+    const staleCheck = harness();
+    const retried = await startSignIn(staleCheck.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.ssoChecked]: "1" }) });
+    expect(retried.ok).toBe(true);
+    expect(staleCheck.calls[0].path).toContain("prompt=none");
   });
   it("silent start is suppressed only by a session that still validates", async () => {
     const h = harness();

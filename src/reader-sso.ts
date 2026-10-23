@@ -410,9 +410,9 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     }
   }
   if (mode === "silent") {
-    // A handoff never overrides an explicit sign-out or repeats a recent
-    // failed check.
-    if (input.cookies(c.names.signedOut) || input.cookies(c.names.ssoChecked) === "1") {
+    // A handoff respects explicit sign-out. A past failed check must not block
+    // a fresh reader click after the Ledvery session may have changed.
+    if (input.cookies(c.names.signedOut)) {
       return { ok: false, status: 204, error: "", reason: "suppressed", redirect, cookies: staleSession };
     }
   }
