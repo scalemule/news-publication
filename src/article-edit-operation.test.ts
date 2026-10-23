@@ -55,6 +55,7 @@ function fixture(normalizeMedia = false) {
   let enabled = true,
     capability = true,
     tagCapability = true,
+    headlineCapability = true,
     hold = false,
     lostSave = false,
     lostRelease = false,
@@ -79,7 +80,7 @@ function fixture(normalizeMedia = false) {
     if (path.endsWith("/options"))
       return reply({
         workflow_version: 1,
-        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability },
+        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability, headline_set: headlineCapability },
       });
     if (path.endsWith("/document")) return reply(source);
     if (path.endsWith("/enable")) {
@@ -193,6 +194,7 @@ function fixture(normalizeMedia = false) {
   return {
     client,
     withoutTagCapability: () => { tagCapability = false; },
+    withoutHeadlineCapability: () => { headlineCapability = false; },
     input,
     original,
     transport,
@@ -421,6 +423,15 @@ describe("versioned article tags", () => {
     expect(f.checkpoint?.document?.tag_ids).toEqual([tag]);
     expect(f.source.tags).toEqual([{ id: tag }]);
     expect(f.counts).toEqual({ saves: 1, releases: 1, enrolls: 0 });
+  });
+  it("requires the deployed headline_set capability before writing any of the headline set", async () => {
+    const f = fixture(); f.withoutHeadlineCapability();
+    for (const patch of [{ headline: "Short line" }, { fly_title: "Beat" }, { seo_title: "Search title" }]) {
+      await expect(f.client.editArticle({ ...f.input(), patch })).rejects.toMatchObject({ code: "CAPABILITY_UNAVAILABLE", message: /headline_set/ });
+    }
+    expect(f.counts).toEqual({ saves: 0, releases: 0, enrolls: 0 });
+    const g = fixture(); g.withoutHeadlineCapability();
+    await expect(g.client.editArticle({ ...g.input(), patch: { excerpt: "A prose-only edit still works on an older server." } })).resolves.toBeTruthy();
   });
   it("requires the deployed tag capability before any write", async () => {
     const f = fixture(); f.withoutTagCapability();

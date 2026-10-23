@@ -48,7 +48,7 @@ export function headlineSet(article: Headlined, selection: HomepageSelection = {
   const title = text(article.title) ?? "";
   const headline = text(display?.display_title) ?? text(article.headline) ?? title;
   return {
-    flyTitle: text(article.fly_title) ?? text(article.section),
+    flyTitle: text(display?.fly_title) ?? text(article.fly_title) ?? text(article.section),
     headline,
     rubric: text(display?.deck) ?? text(article.subtitle),
     seoTitle: text(article.seo_title) ?? title,
@@ -59,10 +59,13 @@ export function headlineSet(article: Headlined, selection: HomepageSelection = {
 /** Validation shared by the edit command and the editors: hard limits match the service. */
 export function headlineProblems(fields: { headline?: unknown; fly_title?: unknown; subtitle?: unknown; seo_title?: unknown }): string[] {
   const problems: string[] = [];
+  // Mirrors the service: a present field must be a non-blank string within its limit, with no control characters.
   const check = (name: string, value: unknown, max: number) => {
     if (value === undefined || value === null) return;
     if (typeof value !== "string") { problems.push(`${name} must be a string`); return; }
+    if (!value.trim()) { problems.push(`${name} is blank; omit it to fall back to the title`); return; }
     if (headlineLength(value.trim()) > max) problems.push(`${name} exceeds ${max} characters`);
+    if (/[\p{Cc}]/u.test(value)) problems.push(`${name} contains control characters`);
   };
   check("headline", fields.headline, HEADLINE_MAX_CHARS);
   check("fly_title", fields.fly_title, FLY_TITLE_MAX_CHARS);

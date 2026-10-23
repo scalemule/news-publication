@@ -22,10 +22,13 @@ describe("headline set", () => {
     expect(set.headline).toBe("Paper's own line");
     expect(set.rubric).toBe("Paper's deck");
     expect(set.flyTitle).toBe("Civic life");
+    expect(headlineSet({ ...base, fly_title: "City hall" }, { stories: { s: { fly_title: "Our town" } } }).flyTitle).toBe("Our town", "a paper's fly title override wins on that paper");
   });
   it("counts characters, never bytes, and reports limits the service enforces", () => {
     expect(headlineLength("Жители 学校 🎃")).toBe(11);
     expect(headlineProblems({ headline: "Ж".repeat(HEADLINE_MAX_CHARS), fly_title: "学".repeat(FLY_TITLE_MAX_CHARS) })).toEqual([]);
     expect(headlineProblems({ headline: "🎃".repeat(HEADLINE_MAX_CHARS + 1), fly_title: 12 })).toEqual([`headline exceeds ${HEADLINE_MAX_CHARS} characters`, "fly_title must be a string"]);
+    expect(headlineProblems({ headline: "   " })).toEqual(["headline is blank; omit it to fall back to the title"]);
+    expect(headlineProblems({ seo_title: "Line\u0007bell" })).toEqual(["seo_title contains control characters"]);
   });
 });

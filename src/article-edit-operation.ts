@@ -262,6 +262,13 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
         throw error;
       }),
     ]);
+    const headlineKeys = ["headline", "fly_title", "seo_title"].filter((key) => key in input.patch);
+    if (headlineKeys.length && options.capabilities?.headline_set !== true)
+      throw new ArticleEditOperationError(
+        "CAPABILITY_UNAVAILABLE",
+        "preflight",
+        `The server must expose headline_set before editing ${headlineKeys.join(", ")}; no article was changed`,
+      );
     if (
       options.workflow_version !== 1 ||
       options.capabilities?.versioned_editorial_fields !== true
