@@ -336,13 +336,14 @@ export function getNetworkPublicationUrl(slug: string): string | null {
   return decorateNetworkUrl(pub.url + "/");
 }
 
-/** Initial destinations targeted for the click-driven reader handoff rollout. */
-const readerHandoffReady = new Set(["sanramontimes", "trivalleyweekly"]);
-
-/** The fixed destination route; no identity or caller-selected return URL is carried. */
+/**
+ * The fixed destination route for a publication in this reviewed network list.
+ * Sites only use it when their handoff switch is enabled after every destination
+ * has deployed the route. No identity or caller-selected return URL is carried.
+ */
 export function getNetworkReaderHandoffUrl(slug: string): string | null {
   const publication = findPublicationBySlug(slug);
-  return publication && readerHandoffReady.has(slug) ? `${publication.url}/api/news/network-handoff` : null;
+  return publication ? `${publication.url}/api/news/network-handoff` : null;
 }
 
 const NETWORK_HOSTNAMES = new Set(
