@@ -461,7 +461,10 @@ function devicePosition(raw: FormDataEntryValue | null) {
     typeof v.longitude !== "number" ||
     typeof v.accuracy_m !== "number" ||
     typeof v.read_at !== "string" ||
-    (v.method !== "camera" && v.method !== "at-display")
+    (v.method !== "camera" && v.method !== "at-display") ||
+    Math.abs(v.latitude) > 90 ||
+    Math.abs(v.longitude) > 180 ||
+    v.accuracy_m < 0
   )
     throw new ProxyProblem(400, "Invalid device position.");
   return {
