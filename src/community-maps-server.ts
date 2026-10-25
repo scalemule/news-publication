@@ -340,6 +340,9 @@ export function createPublicationCommunityMapsHandler(
               ...(form.has("idempotency_key")
                 ? { idempotency_key: String(form.get("idempotency_key")) }
                 : {}),
+              ...(form.has("device_position")
+                ? { device_position: devicePosition(form.get("device_position")) }
+                : {}),
             },
             callOptions,
           );
@@ -433,5 +436,42 @@ export function createPublicationCommunityMapsHandler(
         error instanceof ProxyProblem ? error.status : 503,
       );
     }
+  };
+}
+
+/**
+ * The reader's device position travels as one JSON multipart field; only the
+ * documented keys are forwarded (the service rejects unknown ones) and anything
+ * malformed is the contributor's problem, not a 500.
+ */
+function devicePosition(raw: FormDataEntryValue | null) {
+  if (typeof raw !== "string" || raw.length > 512)
+    throw new ProxyProblem(400, "Invalid device position.");
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new ProxyProblem(400, "Invalid device position.");
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new ProxyProblem(400, "Invalid device position.");
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.latitude !== "number" ||
+    typeof v.longitude !== "number" ||
+    typeof v.accuracy_m !== "number" ||
+    typeof v.read_at !== "string" ||
+    (v.method !== "camera" && v.method !== "at-display") ||
+    Math.abs(v.latitude) > 90 ||
+    Math.abs(v.longitude) > 180 ||
+    v.accuracy_m < 0
+  )
+    throw new ProxyProblem(400, "Invalid device position.");
+  return {
+    latitude: v.latitude,
+    longitude: v.longitude,
+    accuracy_m: v.accuracy_m,
+    read_at: v.read_at,
+    method: v.method as "camera" | "at-display",
   };
 }

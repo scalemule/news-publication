@@ -114,6 +114,47 @@ describe("publication Community Maps boundary", () => {
     );
     expect(uploaded.status).toBe(200);
     expect(calls).toHaveLength(3);
+    // The reader's device position reaches the service as one JSON field with only the documented keys.
+    const withPosition = new FormData();
+    withPosition.append("file", new Blob(["photo"], { type: "image/png" }), "photo.png");
+    withPosition.append("rights_confirmed", "true");
+    withPosition.append("consent_version", "current-policy");
+    withPosition.append(
+      "device_position",
+      JSON.stringify({
+        latitude: 38.00112,
+        longitude: -122.032162,
+        accuracy_m: 12,
+        read_at: "2026-10-25T01:49:11Z",
+        method: "camera",
+        heading: 90,
+      }),
+    );
+    const positioned = await handler(
+      new Request("https://paper.example.test/api", { method: "POST", headers, body: withPosition }),
+      [...route, "submissions", reader, "media"],
+    );
+    expect(positioned.status).toBe(200);
+    const forwarded = calls[3].body as FormData;
+    expect(JSON.parse(String(forwarded.get("device_position")))).toEqual({
+      latitude: 38.00112,
+      longitude: -122.032162,
+      accuracy_m: 12,
+      read_at: "2026-10-25T01:49:11Z",
+      method: "camera",
+    });
+    const bad = new FormData();
+    bad.append("file", new Blob(["photo"], { type: "image/png" }), "photo.png");
+    bad.append("rights_confirmed", "true");
+    bad.append("consent_version", "current-policy");
+    bad.append("device_position", JSON.stringify({ latitude: "north" }));
+    const rejected = await handler(
+      new Request("https://paper.example.test/api", { method: "POST", headers, body: bad }),
+      [...route, "submissions", reader, "media"],
+    );
+    expect(rejected.status).toBe(400);
+    expect(calls).toHaveLength(4);
+    calls.length = 3;
     for (const call of calls) {
       expect(new Headers(call.headers).get("x-anonymous-id")).toBe(reader);
       expect(new Headers(call.headers).get("x-client-ip")).toBe("192.0.2.1");
