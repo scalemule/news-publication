@@ -119,7 +119,7 @@ describe("ad measurement", () => {
     expect(track).toHaveBeenCalledTimes(1);
     expect(track.mock.calls[0][0]).toEqual({
       event_name: "ad_impression",
-      properties: { delivery_id: DELIVERY, placement: "leaderboard", format: "band", measurement_version: 2 },
+      properties: { delivery_id: DELIVERY, placement: "leaderboard", format: "band", measurement_version: 2, measurable: true },
     });
     const io = FakeIntersectionObserver.instances[0];
     const unit = document.querySelector("[data-ad-delivery]")!;
@@ -138,6 +138,16 @@ describe("ad measurement", () => {
     io.emit(unit, 0.9);
     vi.advanceTimersByTime(1500);
     expect(track).toHaveBeenCalledTimes(2);
+  });
+  it("marks impressions unmeasurable and never emits a view without an IntersectionObserver", () => {
+    delete (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
+    const track = vi.fn();
+    stop = observeAdUnits(track);
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track.mock.calls[0][0].properties.measurable).toBe(false);
+    vi.advanceTimersByTime(5000);
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(FakeIntersectionObserver.instances).toHaveLength(0);
   });
   it("does not count a hidden tab and removes a unit on hide", () => {
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });

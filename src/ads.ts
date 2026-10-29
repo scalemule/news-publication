@@ -36,6 +36,8 @@ export type AdPlacementKey =
   | (string & {});
 
 export type AdPageType = "front" | "section" | "article" | "utility";
+/** From the content-safety classification, never the template; unknown fails closed. */
+export type AdSensitivity = "clear" | "sensitive" | "unknown";
 export type AdLengthClass = "short" | "standard" | "long";
 export type AdMeasurementTier = "cookieless" | "performance" | "advertising";
 export type AdLabelKey = "advertisement" | "sponsored";
@@ -48,7 +50,7 @@ export type AdPlanRequest = {
     section?: string;
     towns?: string[];
     topics?: string[];
-    sensitive: boolean;
+    sensitivity: AdSensitivity;
     content_id?: string;
   };
   layout: {
@@ -59,6 +61,8 @@ export type AdPlanRequest = {
   };
   placements: AdPlacementKey[];
   reader: { tier: AdMeasurementTier };
+  /** Forwarded from `?sm_ad_preview=`; a signed token that forces one creative revision. */
+  preview_token?: string;
 };
 
 export type AdImage = {
@@ -94,6 +98,16 @@ export type AdDelivery = {
   label: AdLabelKey;
   about: { advertiser: string; policy_path?: string };
   insertion_point?: string;
+};
+
+/**
+ * What the service emits (contracts/ad-plan.schema.json). `destination_url`
+ * and `tier` are server-to-server only: `getAdPlan` signs the fallback href
+ * from them and strips them before the plan reaches a page.
+ */
+export type AdWireDelivery = AdDelivery & {
+  destination_url?: string;
+  tier?: AdMeasurementTier;
 };
 
 export type AdPlan = {
@@ -279,20 +293,6 @@ export function validateCreativeContent(
   return { ok: errors.length === 0, errors };
 }
 
-export function emptyAdPlan(): AdPlan {
-  return { plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
-}
-
-export function isAdPlan(value: unknown): value is AdPlan {
-  if (!value || typeof value !== "object") return false;
-  const plan = value as Record<string, unknown>;
-  return (
-    typeof plan.plan_id === "string" &&
-    typeof plan.policy_snapshot_at === "string" &&
-    !!plan.deliveries &&
-    typeof plan.deliveries === "object" &&
-    Array.isArray(plan.empty)
-  );
 /**
  * Authoritative article sensitivity for ad decisions (ADR §6.2 step 2). Only the
  * platform classification counts; a missing or malformed field is `unknown`, and the
@@ -311,6 +311,106 @@ export function adSensitivity(
       : "unknown";
 }
 
+export function emptyAdPlan(): AdPlan {
+  return { plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
+}
+
+const LABELS = new Set<string>(["advertisement", "sponsored"]);
+const TIERS = new Set<string>(["cookieless", "performance", "advertising"]);
+const FORMATS = new Set<string>(AD_FORMAT_KEYS);
+const isString = (v: unknown): v is string => typeof v === "string";
+const isUuid7 = (v: unknown): v is string => isString(v) && UUID_V7.test(v);
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v > 0;
+
+function image(value: unknown): AdImage | null | undefined {
+  if (value === null || value === undefined) return value;
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  if (!isString(v.url) || !/^https:\/\//i.test(v.url) || !isCount(v.width) || !isCount(v.height)) return undefined;
+  if (v.alt !== undefined && !isString(v.alt)) return undefined;
+  const out: AdImage = { url: v.url, width: v.width, height: v.height };
+  if (isString(v.alt)) out.alt = v.alt;
+  return out;
+}
+
+/** A structurally valid delivery (wire shape), or null. Never throws. */
+export function validateAdDelivery(value: unknown): AdWireDelivery | null {
+  if (!value || typeof value !== "object") return null;
+  const d = value as Record<string, unknown>;
+  if (!isUuid7(d.delivery_id) || !isUuid7(d.flight_id) || !isUuid7(d.creative_id)) return null;
+  if (!isCount(d.revision)) return null;
+  if (!isString(d.format) || !FORMATS.has(d.format)) return null;
+  if (!isString(d.href) || !d.href.startsWith("/")) return null;
+  if (!isString(d.label) || !LABELS.has(d.label)) return null;
+  const about = d.about as Record<string, unknown> | undefined;
+  if (!about || typeof about !== "object" || !isString(about.advertiser)) return null;
+  if (about.policy_path !== undefined && (!isString(about.policy_path) || !about.policy_path.startsWith("/"))) return null;
+  const c = d.content as Record<string, unknown> | undefined;
+  if (!c || typeof c !== "object") return null;
+  if (!isString(c.advertiser) || !isString(c.headline) || !isString(c.description) || !isString(c.cta)) return null;
+  if (c.link_label !== undefined && !isString(c.link_label)) return null;
+  const logo = image(c.logo);
+  const picture = image(c.image);
+  if (logo === undefined && c.logo !== undefined) return null;
+  if (picture === undefined && c.image !== undefined) return null;
+  if (d.insertion_point !== undefined && !isString(d.insertion_point)) return null;
+  if (d.destination_url !== undefined && !isString(d.destination_url)) return null;
+  if (d.tier !== undefined && (!isString(d.tier) || !TIERS.has(d.tier))) return null;
+  const content: AdCreativeContent = {
+    advertiser: c.advertiser,
+    headline: c.headline,
+    description: c.description,
+    cta: c.cta,
+    logo: logo ?? null,
+    image: picture ?? null,
+  };
+  if (isString(c.link_label)) content.link_label = c.link_label;
+  const out: AdWireDelivery = {
+    delivery_id: d.delivery_id.toLowerCase(),
+    flight_id: d.flight_id.toLowerCase(),
+    creative_id: d.creative_id.toLowerCase(),
+    revision: d.revision,
+    format: d.format as AdFormatKey,
+    content,
+    href: d.href,
+    label: d.label as AdLabelKey,
+    about: isString(about.policy_path)
+      ? { advertiser: about.advertiser, policy_path: about.policy_path }
+      : { advertiser: about.advertiser },
+  };
+  if (isString(d.insertion_point)) out.insertion_point = d.insertion_point;
+  if (isString(d.destination_url)) out.destination_url = d.destination_url;
+  if (isString(d.tier)) out.tier = d.tier as AdMeasurementTier;
+  return out;
+}
+
+/**
+ * Deep-validates a service response. Invalid deliveries are dropped into
+ * `empty`; an unusable envelope yields the empty plan. Never throws.
+ */
+export function normalizeAdPlan(value: unknown): AdPlan & { deliveries: Partial<Record<AdPlacementKey, AdWireDelivery>> } {
+  if (!value || typeof value !== "object") return emptyAdPlan();
+  const plan = value as Record<string, unknown>;
+  if (!isString(plan.plan_id) || !isString(plan.policy_snapshot_at)) return emptyAdPlan();
+  if (!plan.deliveries || typeof plan.deliveries !== "object" || Array.isArray(plan.deliveries)) return emptyAdPlan();
+  const empty = new Set<string>(Array.isArray(plan.empty) ? plan.empty.filter(isString) : []);
+  const deliveries: Partial<Record<AdPlacementKey, AdWireDelivery>> = {};
+  for (const [placement, raw] of Object.entries(plan.deliveries as Record<string, unknown>)) {
+    if (!/^[a-z0-9_]{1,40}$/.test(placement)) continue;
+    const delivery = validateAdDelivery(raw);
+    if (delivery) deliveries[placement] = delivery;
+    else empty.add(placement);
+  }
+  return { plan_id: plan.plan_id, policy_snapshot_at: plan.policy_snapshot_at, deliveries, empty: [...empty] };
+}
+
+/** True when every delivery in `value` is structurally valid. */
+export function isAdPlan(value: unknown): value is AdPlan {
+  if (!value || typeof value !== "object") return false;
+  const plan = value as Record<string, unknown>;
+  if (!isString(plan.plan_id) || !isString(plan.policy_snapshot_at) || !Array.isArray(plan.empty)) return false;
+  if (!plan.deliveries || typeof plan.deliveries !== "object" || Array.isArray(plan.deliveries)) return false;
+  return Object.values(plan.deliveries as Record<string, unknown>).every((d) => validateAdDelivery(d) !== null);
 }
 
 /** Section 5: short pages get no inline unit and at most one unit in total. */

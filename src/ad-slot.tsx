@@ -27,7 +27,7 @@ function Logo({ logo, advertiser, format }: { logo?: AdImage | null; advertiser:
   if (!logo?.url) {
     return (
       <span className="sm-ad-logo sm-ad-logo--mark" aria-hidden="true">
-        {Array.from(advertiser.trim())[0] ?? ""}
+        {Array.from(String(advertiser ?? "").trim())[0] ?? ""}
       </span>
     );
   }
@@ -123,8 +123,14 @@ export function AdUnit({
   eager?: boolean;
 }) {
   const { content, format } = delivery;
+  if (!content || typeof content !== "object" || !delivery.delivery_id) return null;
   const label = AD_LABELS[delivery.label] ?? AD_LABELS.advertisement;
-  const href = `/go/${delivery.delivery_id}`;
+  // Only the property's own click route, with the signed fallback the server attached.
+  const base = `/go/${delivery.delivery_id}`;
+  const href =
+    typeof delivery.href === "string" && (delivery.href === base || delivery.href.startsWith(base + "?"))
+      ? delivery.href
+      : base;
   const hasImage = Boolean(content.image?.url) && format !== "partner_footer" && format !== "credit_line";
   const classes = [
     "sm-ad",

@@ -8,7 +8,8 @@
  */
 import { cache } from "react";
 import { buildClientContextHeaders, type ClientContext } from "@scalemule/sdk";
-import { emptyAdPlan, isAdPlan, type AdPlan, type AdPlanRequest } from "./ads";
+import { emptyAdPlan, normalizeAdPlan, type AdDelivery, type AdPlan, type AdPlanRequest } from "./ads";
+import { base64url, signClickFallback } from "./ads-signing";
 
 export type AdScope = {
   apiKey: string;
@@ -68,11 +69,46 @@ export async function fetchAdPlan(
     });
     if (!response.ok) return emptyAdPlan();
     const json = await response.json();
-    const plan = json?.data ?? json;
-    return isAdPlan(plan) ? plan : emptyAdPlan();
+    return await sealAdPlan(scope.apiKey, normalizeAdPlan(json?.data ?? json));
   } catch {
     return emptyAdPlan();
   }
+}
+
+const encoder = new TextEncoder();
+
+/**
+ * Turns the wire plan into the page plan: every delivery's href becomes the
+ * property's `/go/{id}` route carrying the signed fallback destination, and
+ * the server-to-server fields (`destination_url`, `tier`) are removed so
+ * nothing but the signed, verified form ever reaches the page.
+ */
+export async function sealAdPlan(apiKey: string, wire: ReturnType<typeof normalizeAdPlan>): Promise<AdPlan> {
+  const deliveries: AdPlan["deliveries"] = {};
+  const empty = new Set(wire.empty);
+  for (const [placement, delivery] of Object.entries(wire.deliveries)) {
+    if (!delivery) continue;
+    const { destination_url, tier: _tier, ...rest } = delivery;
+    let href = `/go/${rest.delivery_id}`;
+    if (destination_url) {
+      let ok = false;
+      try {
+        const url = new URL(destination_url);
+        ok = url.protocol === "https:" && !url.username && !url.password;
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        empty.add(placement);
+        continue;
+      }
+      const s = await signClickFallback(apiKey, rest.delivery_id, destination_url);
+      href += `?to=${base64url(encoder.encode(destination_url))}&s=${s}`;
+    }
+    const sealed: AdDelivery = { ...rest, href };
+    deliveries[placement] = sealed;
+  }
+  return { plan_id: wire.plan_id, policy_snapshot_at: wire.policy_snapshot_at, deliveries, empty: [...empty] };
 }
 
 /** One Map per React request; outside a request React's cache is a pass-through. */

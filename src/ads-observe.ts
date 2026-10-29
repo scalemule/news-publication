@@ -19,6 +19,8 @@ export type AdTrackEvent = {
     placement: string | null;
     format: string | null;
     measurement_version: number;
+    /** Viewability could be observed: IntersectionObserver exists and the unit is in a visible document. */
+    measurable: boolean;
   };
 };
 
@@ -29,12 +31,13 @@ export type AdsMetricsProps = {
   enabled?: boolean;
 };
 
-export function adUnitProperties(element: Element): AdTrackEvent["properties"] {
+export function adUnitProperties(element: Element, measurable: boolean): AdTrackEvent["properties"] {
   return {
     delivery_id: element.getAttribute("data-ad-delivery") || "",
     placement: element.getAttribute("data-ad-placement"),
     format: element.getAttribute("data-ad-format"),
     measurement_version: AD_MEASUREMENT_VERSION,
+    measurable,
   };
 }
 
@@ -49,12 +52,14 @@ export function observeAdUnits(
   const observed = new Set<Element>();
 
   const id = (el: Element) => el.getAttribute("data-ad-delivery") || "";
+  const hasObserver = "IntersectionObserver" in window;
+  const measurable = (el: Element) => hasObserver && el.isConnected && root.visibilityState === "visible";
 
   function impression(el: Element) {
     const key = id(el);
     if (!key || impressed.has(key) || root.visibilityState !== "visible") return;
     impressed.add(key);
-    void track({ event_name: "ad_impression", properties: adUnitProperties(el) });
+    void track({ event_name: "ad_impression", properties: adUnitProperties(el, measurable(el)) });
   }
   function cancel(el: Element) {
     const timer = timers.get(el);
@@ -68,16 +73,16 @@ export function observeAdUnits(
       el,
       window.setTimeout(() => {
         timers.delete(el);
-        if (visible.has(el) && root.visibilityState === "visible" && !viewed.has(key)) {
+        if (visible.has(el) && measurable(el) && !viewed.has(key)) {
           viewed.add(key);
-          void track({ event_name: "ad_viewed", properties: adUnitProperties(el) });
+          void track({ event_name: "ad_viewed", properties: adUnitProperties(el, true) });
         }
       }, AD_VIEW_DWELL_MS),
     );
   }
 
   const io =
-    "IntersectionObserver" in window
+    hasObserver
       ? new IntersectionObserver(
           (entries) => {
             for (const entry of entries) {

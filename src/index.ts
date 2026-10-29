@@ -289,14 +289,16 @@ export {
   adPrivateHeaders,
   fetchAdPlan,
   getAdPlan,
+  sealAdPlan,
 } from "./ads-server";
 export type { AdScope } from "./ads-server";
 export {
   AD_CLICK_TIMEOUT_MS,
-  clickFallback,
   createAdClickHandler,
   createAdReportHandler,
+  reportIdempotencyKey,
 } from "./ads-click-route";
+export { signClickFallback, verifyClickFallback, CLICK_FALLBACK_CONTEXT } from "./ads-signing";
 export { AD_SLOT_LABELS, AD_LOGO_BOX, AdControls, AdSlot, AdUnit } from "./ad-slot";
 export {
   AD_MEASUREMENT_VERSION,

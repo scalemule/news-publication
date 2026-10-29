@@ -25,9 +25,12 @@
 .sm-ad-bar {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0 12px;
+  overflow-wrap: normal;
+  word-break: keep-all;
   min-height: 44px;
   color: var(--sm-ad-control-fg);
   font: 600 0.625rem/1.5 var(--pub-sans, Arial, sans-serif);
@@ -159,7 +162,9 @@
 .sm-ad--showcase .sm-ad-cta { justify-self: start; }
 
 /* Credit line: text only, sits in a masthead. */
-.sm-ad--credit_line { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Inline in a masthead: no container queries here, since inline-size containment
+   would collapse an inline-flex box to zero width. */
+.sm-ad--credit_line { container-type: normal; display: inline-flex; max-width: 100%; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sm-ad--credit_line .sm-ad-bar { min-height: 30px; font-size: 0.5625rem; }
 .sm-ad--credit_line .sm-ad-links summary, .sm-ad--credit_line .sm-ad-hide { min-height: 30px; }
 .sm-ad--credit_line .sm-ad-creative {
@@ -181,6 +186,7 @@
 .sm-ad-hide {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
   min-height: 44px;
   padding: 0 4px;
   background: none;
