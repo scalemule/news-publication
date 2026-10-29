@@ -1,11 +1,22 @@
 /** The server enforces the same explicit consent gate as the browser. */
-export function measurementConsent(
+export type ConsentPreferences = {
+  essential: true;
+  functional: boolean;
+  performance: boolean;
+  advertising: boolean;
+};
+
+/**
+ * The reader's current consent record from the request cookies, or null when
+ * there is none, it is malformed, stale, or Do Not Track / Global Privacy
+ * Control is asserted. Shared by `measurementConsent` and the ads tier.
+ */
+export function readConsentRecord(
   headers: Pick<Headers, "get">,
-  sponsorship = false,
   now = Date.now(),
-): boolean {
+): ConsentPreferences | null {
   if (headers.get("dnt") === "1" || headers.get("sec-gpc") === "1")
-    return false;
+    return null;
   const cookies =
     headers
       .get("cookie")
@@ -15,24 +26,42 @@ export function measurementConsent(
   const cookie =
     cookies.find((value) => value.startsWith("sm_cookie_consent_v1=")) ??
     cookies.find((value) => value.startsWith("napsite_cookie_consent_v1="));
-  if (!cookie) return false;
+  if (!cookie) return null;
   try {
     const record = JSON.parse(
       decodeURIComponent(cookie.substring(cookie.indexOf("=") + 1)),
     );
     const date = Date.parse(record.timestamp);
-    return (
+    const p = record.preferences;
+    if (
       record.version === 1 &&
-      record.preferences?.essential === true &&
-      typeof record.preferences?.functional === "boolean" &&
-      typeof record.preferences?.advertising === "boolean" &&
-      record.preferences?.performance === true &&
-      (!sponsorship || record.preferences?.advertising === true) &&
+      p?.essential === true &&
+      typeof p?.functional === "boolean" &&
+      typeof p?.advertising === "boolean" &&
+      typeof p?.performance === "boolean" &&
       Number.isFinite(date) &&
       date <= now + 300000 &&
       now - date < 365 * 86400000
-    );
+    ) {
+      return {
+        essential: true,
+        functional: p.functional,
+        performance: p.performance,
+        advertising: p.advertising,
+      };
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function measurementConsent(
+  headers: Pick<Headers, "get">,
+  sponsorship = false,
+  now = Date.now(),
+): boolean {
+  const record = readConsentRecord(headers, now);
+  if (!record) return false;
+  return record.performance === true && (!sponsorship || record.advertising === true);
 }

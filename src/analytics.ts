@@ -17,6 +17,8 @@ export const EVENTS: Record<string, Definition> = {
   article_shared: browser("engagement"),
   promotion_viewed: browser("content"),
   promotion_clicked: browser("engagement"),
+  ad_impression: browser("content"),
+  ad_viewed: browser("content"),
   newsletter_invitation_viewed: browser("content"),
   related_stories_viewed: browser("content"),
   newsletter_signup_started: browser("engagement"),

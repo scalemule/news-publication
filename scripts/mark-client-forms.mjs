@@ -10,6 +10,7 @@ const targeted = new Set([
   "toys-forms.js", "toys-forms.cjs",
   "toys-interactions.js", "toys-interactions.cjs",
   "reader-sso-client.js", "reader-sso-client.cjs",
+  "ads-metrics.js", "ads-metrics.cjs",
 ]);
 
 for (const name of readdirSync("dist")) {

@@ -281,3 +281,28 @@ export type {
   ContextualCommunityInvitation,
 } from "./community-conversion";
 
+export * from "./ads";
+export { measurementTier } from "./ads-tier";
+export {
+  AD_PLAN_TIMEOUT_MS,
+  adGateway,
+  adPrivateHeaders,
+  fetchAdPlan,
+  getAdPlan,
+} from "./ads-server";
+export type { AdScope } from "./ads-server";
+export {
+  AD_CLICK_TIMEOUT_MS,
+  clickFallback,
+  createAdClickHandler,
+  createAdReportHandler,
+} from "./ads-click-route";
+export { AD_SLOT_LABELS, AD_LOGO_BOX, AdControls, AdSlot, AdUnit } from "./ad-slot";
+export {
+  AD_MEASUREMENT_VERSION,
+  AD_VIEW_DWELL_MS,
+  AD_VIEW_THRESHOLD,
+  adUnitProperties,
+  observeAdUnits,
+} from "./ads-observe";
+export type { AdTrackEvent, AdsMetricsProps } from "./ads-observe";
