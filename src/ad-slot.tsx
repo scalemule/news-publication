@@ -64,40 +64,49 @@ function Picture({ image, eager }: { image?: AdImage | null; eager: boolean }) {
   );
 }
 
-export function AdControls({ delivery }: { delivery: AdDelivery }) {
+/**
+ * The disclosure row above every creative: the label on the left, then
+ * "About · Hide · Report" as small links on the right. The About and Report
+ * panels are native `<details>`, collapsed by default, and open as a card
+ * beneath the row so the unit's height never changes.
+ */
+export function AdControls({ delivery, label }: { delivery: AdDelivery; label: string }) {
   const policy = delivery.about.policy_path || "/advertising-policy";
   return (
-    <div className="sm-ad-controls">
-      <details className="sm-ad-about">
-        <summary>About this ad</summary>
-        <p>
-          <strong>{delivery.about.advertiser}</strong>. {AD_ABOUT_SENTENCE}{" "}
-          <a href={policy}>Advertising policy</a>
-        </p>
-      </details>
-      <details className="sm-ad-report">
-        <summary>Report this ad</summary>
-        <form method="post" action="/api/ads/report">
-          <input type="hidden" name="delivery_id" value={delivery.delivery_id} />
-          <label>
-            <span>Reason</span>
-            <select name="reason" required defaultValue="">
-              <option value="" disabled>
-                Choose a reason
-              </option>
-              {AD_REPORT_REASONS.map(([value, text]) => (
-                <option key={value} value={value}>
-                  {text}
+    <div className="sm-ad-bar">
+      <span className="sm-ad-label">{label}</span>
+      <span className="sm-ad-links">
+        <details className="sm-ad-about">
+          <summary aria-label="About this ad">About</summary>
+          <p className="sm-ad-panel">
+            <strong>{delivery.about.advertiser}</strong>. {AD_ABOUT_SENTENCE}{" "}
+            <a href={policy}>Advertising policy</a>
+          </p>
+        </details>
+        <button type="button" className="sm-ad-hide" data-ad-hide={delivery.delivery_id} aria-label="Hide this ad on this page">
+          Hide
+        </button>
+        <details className="sm-ad-report">
+          <summary aria-label="Report this ad">Report</summary>
+          <form className="sm-ad-panel" method="post" action="/api/ads/report">
+            <input type="hidden" name="delivery_id" value={delivery.delivery_id} />
+            <label>
+              <span>Reason</span>
+              <select name="reason" required defaultValue="">
+                <option value="" disabled>
+                  Choose a reason
                 </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit">Send report</button>
-        </form>
-      </details>
-      <button type="button" className="sm-ad-hide" data-ad-hide={delivery.delivery_id}>
-        Hide on this page
-      </button>
+                {AD_REPORT_REASONS.map(([value, text]) => (
+                  <option key={value} value={value}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit">Send report</button>
+          </form>
+        </details>
+      </span>
     </div>
   );
 }
@@ -136,21 +145,20 @@ export function AdUnit({
   if (format === "credit_line") {
     return (
       <aside {...common}>
-        <span className="sm-ad-label">{label}</span>
+        <AdControls delivery={delivery} label={label} />
         <a className="sm-ad-creative" href={href} rel="sponsored noopener" referrerPolicy="no-referrer">
           {content.logo?.url && <Logo logo={content.logo} advertiser={content.advertiser} format={format} />}
           <span className="sm-ad-credit">
             {content.link_label || content.headline || content.advertiser}
           </span>
         </a>
-        <AdControls delivery={delivery} />
       </aside>
     );
   }
 
   return (
     <aside {...common}>
-      <span className="sm-ad-label">{label}</span>
+      <AdControls delivery={delivery} label={label} />
       <a className="sm-ad-creative" href={href} rel="sponsored noopener" referrerPolicy="no-referrer">
         <span className="sm-ad-brand">
           <Logo logo={content.logo} advertiser={content.advertiser} format={format} />
@@ -163,7 +171,6 @@ export function AdUnit({
         {hasImage && <Picture image={content.image} eager={eager} />}
         <span className="sm-ad-cta">{content.cta}</span>
       </a>
-      <AdControls delivery={delivery} />
     </aside>
   );
 }

@@ -21,14 +21,24 @@
   overflow-wrap: anywhere;
 }
 .sm-ad *, .sm-ad *::before, .sm-ad *::after { box-sizing: border-box; }
-.sm-ad-label {
-  display: block;
-  padding: 0 0 8px;
-  color: var(--pub-muted, #545c55);
+/* Disclosure row: label left, "About · Hide · Report" right, one line. */
+.sm-ad-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--sm-ad-control-fg);
   font: 600 0.625rem/1.5 var(--pub-sans, Arial, sans-serif);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+.sm-ad-label { display: inline-block; padding: 4px 0; }
+.sm-ad-links { display: inline-flex; align-items: center; }
+.sm-ad-links details { display: inline; }
+.sm-ad-links > :not(:first-child) > summary::before,
+.sm-ad-links > button:not(:first-child)::before { content: "\00b7"; margin: 0 6px; }
 
 /* The creative: one link, block layout. */
 .sm-ad-creative {
@@ -39,12 +49,12 @@
   background: var(--sm-ad-bg);
   color: var(--sm-ad-fg);
   text-decoration: none;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto;
   grid-template-areas: "brand copy cta";
 }
 .sm-ad-creative:focus-visible { outline: 3px solid var(--sm-ad-focus); outline-offset: 4px; }
 .sm-ad--with-image .sm-ad-creative {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto auto;
   grid-template-areas: "brand copy image cta";
 }
 .sm-ad-brand { grid-area: brand; display: grid; justify-items: start; gap: 10px; min-width: 0; }
@@ -89,6 +99,7 @@
   max-width: 48ch;
 }
 .sm-ad-cta {
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -149,7 +160,8 @@
 
 /* Credit line: text only, sits in a masthead. */
 .sm-ad--credit_line { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sm-ad--credit_line .sm-ad-label { padding: 0; font-size: 0.5625rem; }
+.sm-ad--credit_line .sm-ad-bar { min-height: 30px; font-size: 0.5625rem; }
+.sm-ad--credit_line .sm-ad-links summary, .sm-ad--credit_line .sm-ad-hide { min-height: 30px; }
 .sm-ad--credit_line .sm-ad-creative {
   display: inline-flex;
   align-items: center;
@@ -163,51 +175,55 @@
 .sm-ad--credit_line .sm-ad-creative:focus-visible { outline-color: var(--pub-sponsor, #173d32); }
 .sm-ad--credit_line .sm-ad-logo { width: 20px; height: 20px; padding: 0; background: none; }
 .sm-ad--credit_line .sm-ad-credit { text-decoration: underline; text-underline-offset: 3px; }
-.sm-ad--credit_line .sm-ad-controls { padding: 0; border: 0; gap: 8px; }
 
-/* Controls: always visible, quiet, 44px targets. */
-.sm-ad-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 16px;
-  padding: 4px 0 0;
-  border-bottom: 1px solid var(--sm-ad-control-rule);
-  color: var(--sm-ad-control-fg);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-.sm-ad-controls summary,
+/* Control links: 44px targets by padding, not by stacking. */
+.sm-ad-links summary,
 .sm-ad-hide {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  min-width: 44px;
   padding: 0 4px;
   background: none;
   border: 0;
   color: inherit;
   font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
   list-style: none;
 }
-.sm-ad-controls summary::-webkit-details-marker { display: none; }
-.sm-ad-controls summary:focus-visible,
+.sm-ad-links summary::-webkit-details-marker { display: none; }
+.sm-ad-links summary::marker { content: none; }
+.sm-ad-links summary:focus-visible,
 .sm-ad-hide:focus-visible,
-.sm-ad-controls a:focus-visible,
-.sm-ad-controls button[type="submit"]:focus-visible,
-.sm-ad-controls select:focus-visible { outline: 3px solid var(--pub-sponsor, #173d32); outline-offset: 2px; }
-.sm-ad-controls details { flex: 1 1 100%; order: 2; }
-.sm-ad-controls details[open] { padding-bottom: 8px; }
-.sm-ad-controls details summary { flex: none; }
-.sm-ad-about p { margin: 0; max-width: 60ch; }
-.sm-ad-about a, .sm-ad-controls a { color: inherit; }
-.sm-ad-report form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
-.sm-ad-report label { display: grid; gap: 4px; }
-.sm-ad-report select,
-.sm-ad-report button[type="submit"] {
+.sm-ad-panel a:focus-visible,
+.sm-ad-panel button:focus-visible,
+.sm-ad-panel select:focus-visible { outline: 3px solid var(--pub-sponsor, #173d32); outline-offset: 2px; }
+/* Panels open as a card beneath the row; the unit's height never changes. */
+.sm-ad-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 2;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--pub-paper, #fff);
+  color: var(--pub-ink, #171917);
+  border: 1px solid var(--sm-ad-control-rule);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  font: 400 0.8125rem/1.5 var(--pub-sans, Arial, sans-serif);
+  letter-spacing: 0;
+  text-transform: none;
+}
+p.sm-ad-panel { max-width: none; }
+.sm-ad-panel a { color: inherit; }
+form.sm-ad-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.sm-ad-panel label { display: grid; gap: 4px; }
+.sm-ad-panel select,
+.sm-ad-panel button[type="submit"] {
   min-height: 44px;
   padding: 0 12px;
   font: inherit;
@@ -216,13 +232,12 @@
   border: 1px solid var(--sm-ad-control-rule);
   border-radius: 4px;
 }
-.sm-ad-report button[type="submit"] { cursor: pointer; }
+.sm-ad-panel button[type="submit"] { cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) { .sm-ad-cta { transition: background 120ms ease; } }
 
 /* Narrow containers (phones, and any column under 600px). */
 @container (max-width: 600px) {
   .sm-ad .sm-ad-creative,
-  .sm-ad--with-image .sm-ad-creative,
   .sm-ad--inline_card.sm-ad--with-image .sm-ad-creative,
   .sm-ad--showcase .sm-ad-creative {
     grid-template-columns: minmax(0, 1fr);
@@ -231,27 +246,54 @@
     padding: 24px 20px;
     align-content: start;
   }
+  /* Band, column and footer: the 1:1 image sits in the brand row as a 96px square. */
+  .sm-ad--band.sm-ad--with-image .sm-ad-creative,
+  .sm-ad--column.sm-ad--with-image .sm-ad-creative,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-creative {
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-areas: "image brand" "copy copy" "cta cta";
+    gap: 16px;
+  }
+  .sm-ad--band.sm-ad--with-image .sm-ad-image,
+  .sm-ad--column.sm-ad--with-image .sm-ad-image,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-image { width: 96px; height: 96px; }
+  .sm-ad--band.sm-ad--with-image .sm-ad-brand,
+  .sm-ad--column.sm-ad--with-image .sm-ad-brand,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    align-self: center;
+  }
+  .sm-ad--band.sm-ad--with-image .sm-ad-logo,
+  .sm-ad--column.sm-ad--with-image .sm-ad-logo,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-logo { width: 24px; height: 24px; padding: 2px; border-radius: 2px; }
+  .sm-ad--band.sm-ad--with-image .sm-ad-logo--wide,
+  .sm-ad--column.sm-ad--with-image .sm-ad-logo--wide { width: 60px; }
+  .sm-ad--band.sm-ad--with-image .sm-ad-logo--mark,
+  .sm-ad--column.sm-ad--with-image .sm-ad-logo--mark { font-size: 0.875rem; }
   .sm-ad--band .sm-ad-creative { min-height: 320px; }
   .sm-ad--column .sm-ad-creative { min-height: 320px; }
   .sm-ad--inline_card .sm-ad-creative { min-height: 360px; }
   .sm-ad--partner_footer .sm-ad-creative { min-height: 300px; }
   .sm-ad--showcase .sm-ad-creative { min-height: 560px; }
-  .sm-ad .sm-ad-image { width: 100%; }
+  .sm-ad--inline_card .sm-ad-image, .sm-ad--showcase .sm-ad-image { width: 100%; }
   .sm-ad .sm-ad-logo { width: 48px; height: 48px; }
   .sm-ad .sm-ad-logo--wide { width: 120px; }
-  .sm-ad .sm-ad-headline { font-size: 1.5rem; max-width: 20ch; }
+  .sm-ad .sm-ad-headline { font-size: 1.375rem; max-width: 20ch; }
+  .sm-ad .sm-ad-description { font-size: 0.875rem; }
   .sm-ad .sm-ad-cta { justify-self: stretch; white-space: normal; }
 }
 /* Wide containers: a column collapses to a band. */
 @container (min-width: 601px) {
   .sm-ad--column .sm-ad-creative {
     min-height: 280px;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto;
     grid-template-areas: "brand copy cta";
     align-content: center;
   }
   .sm-ad--column.sm-ad--with-image .sm-ad-creative {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto auto;
     grid-template-areas: "brand copy image cta";
   }
   .sm-ad--column .sm-ad-image { width: 180px; }
