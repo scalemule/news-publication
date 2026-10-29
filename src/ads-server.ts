@@ -3,12 +3,13 @@
  *
  * Never import this from a client component: it carries the property's API
  * key. The plan request is answered by `scalemule-ads` through the gateway;
- * any failure, including the 150 ms timeout, yields an empty plan so an ad
- * outage can never slow or break a page.
+ * any failure, including the 150 ms timeout, yields a plan with
+ * `status: "unavailable"` and no deliveries, so an ad outage can never slow
+ * or break a page and is distinguishable from an intentional empty answer.
  */
 import { cache } from "react";
 import { buildClientContextHeaders, type ClientContext } from "@scalemule/sdk";
-import { emptyAdPlan, normalizeAdPlan, type AdDelivery, type AdPlan, type AdPlanRequest } from "./ads";
+import { emptyAdPlan, normalizeAdPlan, unavailableAdPlan, type AdDelivery, type AdPlan, type AdPlanRequest } from "./ads";
 import { base64url, signClickFallback } from "./ads-signing";
 
 export type AdScope = {
@@ -50,7 +51,7 @@ export async function fetchAdPlan(
   fetcher: typeof fetch = fetch,
 ): Promise<AdPlan> {
   const gateway = adGateway(scope);
-  if (!gateway) return emptyAdPlan();
+  if (!gateway) return unavailableAdPlan();
   const body: AdPlanRequest = scope.publicationId
     ? { ...request, property: { ...request.property, publication_id: scope.publicationId } }
     : request;
@@ -67,11 +68,11 @@ export async function fetchAdPlan(
       redirect: "error",
       signal: AbortSignal.timeout(AD_PLAN_TIMEOUT_MS),
     });
-    if (!response.ok) return emptyAdPlan();
+    if (!response.ok) return unavailableAdPlan();
     const json = await response.json();
     return await sealAdPlan(scope.apiKey, normalizeAdPlan(json?.data ?? json));
   } catch {
-    return emptyAdPlan();
+    return unavailableAdPlan();
   }
 }
 
@@ -108,7 +109,7 @@ export async function sealAdPlan(apiKey: string, wire: ReturnType<typeof normali
     const sealed: AdDelivery = { ...rest, href };
     deliveries[placement] = sealed;
   }
-  return { plan_id: wire.plan_id, policy_snapshot_at: wire.policy_snapshot_at, deliveries, empty: [...empty] };
+  return { status: wire.status, plan_id: wire.plan_id, policy_snapshot_at: wire.policy_snapshot_at, deliveries, empty: [...empty] };
 }
 
 /** One Map per React request; outside a request React's cache is a pass-through. */

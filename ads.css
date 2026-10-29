@@ -64,9 +64,11 @@
   grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto auto;
   grid-template-areas: "brand copy image cta";
 }
-.sm-ad-brand { grid-area: brand; display: grid; justify-items: start; gap: 10px; min-width: 0; }
-.sm-ad-copy { grid-area: copy; display: grid; gap: 10px; min-width: 0; }
-.sm-ad-image { grid-area: image; display: block; width: 180px; max-width: 100%; background: var(--sm-ad-logo-field); overflow: hidden; }
+/* Every grid child may shrink below its min-content; copy breaks anywhere. */
+.sm-ad-creative > * { min-width: 0; max-width: 100%; }
+.sm-ad-brand { grid-area: brand; display: grid; justify-items: start; gap: 10px; overflow-wrap: anywhere; }
+.sm-ad-copy { grid-area: copy; display: grid; gap: 10px; overflow-wrap: anywhere; }
+.sm-ad-image { grid-area: image; display: block; width: 180px; background: var(--sm-ad-logo-field); overflow: hidden; }
 .sm-ad-image img { display: block; width: 100%; height: auto; }
 .sm-ad-cta { grid-area: cta; }
 
@@ -118,7 +120,7 @@
   font-size: 0.875rem;
   font-weight: 700;
   text-align: center;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .sm-ad-creative:hover .sm-ad-cta { background: #ffffff; }
 
@@ -169,8 +171,7 @@
 /* Inline in a masthead: no container queries here, since inline-size containment
    would collapse an inline-flex box to zero width. */
 .sm-ad--credit_line { container-type: normal; display: inline-flex; max-width: 100%; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sm-ad--credit_line .sm-ad-bar { min-height: 30px; font-size: 0.5625rem; }
-.sm-ad--credit_line .sm-ad-links summary, .sm-ad--credit_line .sm-ad-hide { min-height: 30px; }
+.sm-ad--credit_line .sm-ad-bar { font-size: 0.5625rem; }
 .sm-ad--credit_line .sm-ad-creative {
   display: inline-flex;
   align-items: center;
@@ -296,7 +297,7 @@ form.sm-ad-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12
   .sm-ad .sm-ad-logo--wide { width: 120px; }
   .sm-ad .sm-ad-headline { font-size: 1.375rem; max-width: 20ch; }
   .sm-ad .sm-ad-description { font-size: 0.875rem; }
-  .sm-ad .sm-ad-cta { justify-self: stretch; white-space: normal; }
+  .sm-ad .sm-ad-cta { justify-self: stretch; }
 }
 /* Wide containers: a column collapses to a band. */
 @container (min-width: 601px) {

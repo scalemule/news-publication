@@ -82,7 +82,8 @@ describe("length class and insertion points", () => {
 });
 
 describe("plan shape", () => {
-  it("empty plan is a valid plan", () => {
+  it("empty plan is a valid plan with status ok", () => {
+    expect(emptyAdPlan().status).toBe("ok");
     expect(isAdPlan(emptyAdPlan())).toBe(true);
     expect(isAdPlan(null)).toBe(false);
     expect(isAdPlan({ plan_id: "x" })).toBe(false);

@@ -4,74 +4,236 @@
   "title": "ScaleMule Ads plan response (wire)",
   "description": "What scalemule-ads returns from POST /v1/ads/plan inside the {success,data} envelope. The SDK (getAdPlan) signs each delivery's fallback href from destination_url and strips destination_url and tier before the plan reaches a page. ADR-2026-10-29 sections 6.1 and 7.5.2.",
   "type": "object",
-  "required": ["plan_id", "policy_snapshot_at", "deliveries", "empty"],
+  "required": [
+    "status",
+    "plan_id",
+    "policy_snapshot_at",
+    "deliveries",
+    "empty"
+  ],
   "additionalProperties": false,
   "properties": {
-    "plan_id": { "type": "string", "minLength": 1, "maxLength": 64 },
-    "policy_snapshot_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok"
+      ],
+      "description": "The service always answers ok; the SDK sets unavailable itself when it could not get an answer."
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "policy_snapshot_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "deliveries": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/placementKey" },
-      "additionalProperties": { "$ref": "#/$defs/delivery" }
+      "propertyNames": {
+        "$ref": "#/$defs/placementKey"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/delivery"
+      }
     },
-    "empty": { "type": "array", "items": { "$ref": "#/$defs/placementKey" }, "uniqueItems": true }
+    "empty": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/placementKey"
+      },
+      "uniqueItems": true
+    }
   },
   "$defs": {
-    "placementKey": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" },
-    "uuidv7": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
-    "format": { "type": "string", "enum": ["band", "column", "inline_card", "partner_footer", "credit_line", "showcase"] },
-    "label": { "type": "string", "enum": ["advertisement", "sponsored"] },
-    "tier": { "type": "string", "enum": ["cookieless", "performance", "advertising"] },
+    "placementKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,40}$"
+    },
+    "uuidv7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "band",
+        "column",
+        "inline_card",
+        "partner_footer",
+        "credit_line",
+        "showcase"
+      ]
+    },
+    "label": {
+      "type": "string",
+      "enum": [
+        "advertisement",
+        "sponsored"
+      ]
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "cookieless",
+        "performance",
+        "advertising"
+      ]
+    },
     "image": {
       "type": "object",
-      "required": ["url", "width", "height"],
+      "required": [
+        "url",
+        "width",
+        "height"
+      ],
       "additionalProperties": false,
       "properties": {
-        "url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
-        "width": { "type": "integer", "minimum": 1, "maximum": 10000 },
-        "height": { "type": "integer", "minimum": 1, "maximum": 10000 },
-        "alt": { "type": "string", "maxLength": 200 }
+        "url": {
+          "type": "string",
+          "pattern": "^https://",
+          "maxLength": 2048
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 200
+        }
       }
     },
     "content": {
       "type": "object",
-      "required": ["advertiser", "headline", "description", "cta"],
+      "required": [
+        "advertiser",
+        "headline",
+        "description",
+        "cta"
+      ],
       "additionalProperties": false,
       "properties": {
-        "advertiser": { "type": "string", "maxLength": 60 },
-        "headline": { "type": "string", "maxLength": 60 },
-        "description": { "type": "string", "maxLength": 120 },
-        "cta": { "type": "string", "maxLength": 20 },
-        "link_label": { "type": "string", "maxLength": 40 },
-        "logo": { "oneOf": [{ "$ref": "#/$defs/image" }, { "type": "null" }] },
-        "image": { "oneOf": [{ "$ref": "#/$defs/image" }, { "type": "null" }] }
+        "advertiser": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "headline": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "cta": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "link_label": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "logo": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "delivery": {
       "type": "object",
-      "required": ["delivery_id", "flight_id", "creative_id", "revision", "format", "content", "href", "label", "about"],
+      "required": [
+        "delivery_id",
+        "flight_id",
+        "creative_id",
+        "revision",
+        "format",
+        "content",
+        "href",
+        "label",
+        "about"
+      ],
       "additionalProperties": false,
       "properties": {
-        "delivery_id": { "$ref": "#/$defs/uuidv7" },
-        "flight_id": { "$ref": "#/$defs/uuidv7" },
-        "creative_id": { "$ref": "#/$defs/uuidv7" },
-        "revision": { "type": "integer", "minimum": 1 },
-        "format": { "$ref": "#/$defs/format" },
-        "content": { "$ref": "#/$defs/content" },
-        "href": { "type": "string", "pattern": "^/go/[0-9a-f-]{36}$" },
-        "label": { "$ref": "#/$defs/label" },
+        "delivery_id": {
+          "$ref": "#/$defs/uuidv7"
+        },
+        "flight_id": {
+          "$ref": "#/$defs/uuidv7"
+        },
+        "creative_id": {
+          "$ref": "#/$defs/uuidv7"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "format": {
+          "$ref": "#/$defs/format"
+        },
+        "content": {
+          "$ref": "#/$defs/content"
+        },
+        "href": {
+          "type": "string",
+          "pattern": "^/go/[0-9a-f-]{36}$"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
         "about": {
           "type": "object",
-          "required": ["advertiser"],
+          "required": [
+            "advertiser"
+          ],
           "additionalProperties": false,
           "properties": {
-            "advertiser": { "type": "string", "maxLength": 60 },
-            "policy_path": { "type": "string", "pattern": "^/", "maxLength": 200 }
+            "advertiser": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "policy_path": {
+              "type": "string",
+              "pattern": "^/",
+              "maxLength": 200
+            }
           }
         },
-        "insertion_point": { "type": "string", "pattern": "^p[0-9]{1,4}$" },
-        "destination_url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
-        "tier": { "$ref": "#/$defs/tier" }
+        "insertion_point": {
+          "type": "string",
+          "pattern": "^p[0-9]{1,4}$"
+        },
+        "destination_url": {
+          "type": "string",
+          "pattern": "^https://",
+          "maxLength": 2048
+        },
+        "tier": {
+          "$ref": "#/$defs/tier"
+        }
       }
     }
   }

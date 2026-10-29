@@ -110,7 +110,11 @@ export type AdWireDelivery = AdDelivery & {
   tier?: AdMeasurementTier;
 };
 
+/** "ok" is a real answer (possibly with no deliveries); "unavailable" means the service could not be asked. */
+export type AdPlanStatus = "ok" | "unavailable";
+
 export type AdPlan = {
+  status: AdPlanStatus;
   plan_id: string;
   policy_snapshot_at: string;
   deliveries: Partial<Record<AdPlacementKey, AdDelivery>>;
@@ -312,7 +316,12 @@ export function adSensitivity(
 }
 
 export function emptyAdPlan(): AdPlan {
-  return { plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
+  return { status: "ok", plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
+}
+
+/** The plan a page gets when the service could not be asked (timeout, error, bad envelope). */
+export function unavailableAdPlan(): AdPlan {
+  return { ...emptyAdPlan(), status: "unavailable" };
 }
 
 const LABELS = new Set<string>(["advertisement", "sponsored"]);
@@ -389,10 +398,11 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
  * `empty`; an unusable envelope yields the empty plan. Never throws.
  */
 export function normalizeAdPlan(value: unknown): AdPlan & { deliveries: Partial<Record<AdPlacementKey, AdWireDelivery>> } {
-  if (!value || typeof value !== "object") return emptyAdPlan();
+  if (!value || typeof value !== "object") return unavailableAdPlan();
   const plan = value as Record<string, unknown>;
-  if (!isString(plan.plan_id) || !isString(plan.policy_snapshot_at)) return emptyAdPlan();
-  if (!plan.deliveries || typeof plan.deliveries !== "object" || Array.isArray(plan.deliveries)) return emptyAdPlan();
+  if (plan.status !== "ok") return unavailableAdPlan();
+  if (!isString(plan.plan_id) || !isString(plan.policy_snapshot_at)) return unavailableAdPlan();
+  if (!plan.deliveries || typeof plan.deliveries !== "object" || Array.isArray(plan.deliveries)) return unavailableAdPlan();
   const empty = new Set<string>(Array.isArray(plan.empty) ? plan.empty.filter(isString) : []);
   const deliveries: Partial<Record<AdPlacementKey, AdWireDelivery>> = {};
   for (const [placement, raw] of Object.entries(plan.deliveries as Record<string, unknown>)) {
@@ -401,14 +411,14 @@ export function normalizeAdPlan(value: unknown): AdPlan & { deliveries: Partial<
     if (delivery) deliveries[placement] = delivery;
     else empty.add(placement);
   }
-  return { plan_id: plan.plan_id, policy_snapshot_at: plan.policy_snapshot_at, deliveries, empty: [...empty] };
+  return { status: "ok", plan_id: plan.plan_id, policy_snapshot_at: plan.policy_snapshot_at, deliveries, empty: [...empty] };
 }
 
 /** True when every delivery in `value` is structurally valid. */
 export function isAdPlan(value: unknown): value is AdPlan {
   if (!value || typeof value !== "object") return false;
   const plan = value as Record<string, unknown>;
-  if (!isString(plan.plan_id) || !isString(plan.policy_snapshot_at) || !Array.isArray(plan.empty)) return false;
+  if (plan.status !== "ok" || !isString(plan.plan_id) || !isString(plan.policy_snapshot_at) || !Array.isArray(plan.empty)) return false;
   if (!plan.deliveries || typeof plan.deliveries !== "object" || Array.isArray(plan.deliveries)) return false;
   return Object.values(plan.deliveries as Record<string, unknown>).every((d) => validateAdDelivery(d) !== null);
 }

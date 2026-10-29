@@ -1,4 +1,5 @@
 {
+  "status": "ok",
   "plan_id": "0192f8a0-0000-7000-8000-0000000000aa",
   "policy_snapshot_at": "2026-10-29T18:00:00.000Z",
   "deliveries": {
@@ -13,12 +14,20 @@
         "headline": "Support that lives inside Zendesk",
         "description": "Shared inboxes, SLAs and reporting for teams who answer customers all day.",
         "cta": "See MergeYard",
-        "logo": { "url": "https://cdn.scalemule.com/photo/logo/mergeyard.png", "width": 256, "height": 256, "alt": "MergeYard" },
+        "logo": {
+          "url": "https://cdn.scalemule.com/photo/logo/mergeyard.png",
+          "width": 256,
+          "height": 256,
+          "alt": "MergeYard"
+        },
         "image": null
       },
       "href": "/go/0192f8a0-1234-7abc-8def-0123456789ab",
       "label": "advertisement",
-      "about": { "advertiser": "MergeYard", "policy_path": "/advertising-policy" },
+      "about": {
+        "advertiser": "MergeYard",
+        "policy_path": "/advertising-policy"
+      },
       "destination_url": "https://mergeyard.com/?utm_source=trivalleyweekly&utm_medium=house",
       "tier": "cookieless"
     },
@@ -33,12 +42,23 @@
         "headline": "A calmer inbox for busy practices.",
         "description": "Every client conversation, file and task in one place.",
         "cta": "Start free",
-        "logo": { "url": "https://cdn.scalemule.com/photo/logo/plouris.svg", "width": 392, "height": 119 },
-        "image": { "url": "https://cdn.scalemule.com/photo/inline/plouris.jpg", "width": 900, "height": 600, "alt": "" }
+        "logo": {
+          "url": "https://cdn.scalemule.com/photo/logo/plouris.svg",
+          "width": 392,
+          "height": 119
+        },
+        "image": {
+          "url": "https://cdn.scalemule.com/photo/inline/plouris.jpg",
+          "width": 900,
+          "height": 600,
+          "alt": ""
+        }
       },
       "href": "/go/0192f8a0-1234-7abc-8def-0123456789ba",
       "label": "advertisement",
-      "about": { "advertiser": "Plouris" },
+      "about": {
+        "advertiser": "Plouris"
+      },
       "insertion_point": "p6",
       "destination_url": "https://plouris.com/",
       "tier": "cookieless"
@@ -49,13 +69,26 @@
       "creative_id": "0192f8a0-1234-7abc-8def-0123456789b0",
       "revision": 2,
       "format": "credit_line",
-      "content": { "advertiser": "NapSite", "headline": "", "description": "", "cta": "", "link_label": "Built on napsite.com", "logo": null, "image": null },
+      "content": {
+        "advertiser": "NapSite",
+        "headline": "",
+        "description": "",
+        "cta": "",
+        "link_label": "Built on napsite.com",
+        "logo": null,
+        "image": null
+      },
       "href": "/go/0192f8a0-1234-7abc-8def-0123456789bb",
       "label": "sponsored",
-      "about": { "advertiser": "NapSite" },
+      "about": {
+        "advertiser": "NapSite"
+      },
       "destination_url": "https://napsite.com/?utm_source=trivalleyweekly",
       "tier": "cookieless"
     }
   },
-  "empty": ["sidebar", "partner_footer"]
+  "empty": [
+    "sidebar",
+    "partner_footer"
+  ]
 }

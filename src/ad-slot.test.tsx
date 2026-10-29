@@ -32,6 +32,7 @@ function delivery(format: AdFormatKey, image = true): AdDelivery {
   };
 }
 const plan: AdPlan = {
+  status: "ok",
   plan_id: "p",
   policy_snapshot_at: "2026-10-29T00:00:00Z",
   deliveries: { leaderboard: delivery("band") },

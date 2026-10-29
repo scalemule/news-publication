@@ -42,11 +42,21 @@ describe("contracts/ad-plan.schema.json", () => {
     expect(normalized.empty).toContain(broken);
     expect(Object.keys(normalized.deliveries)).toHaveLength(2);
   });
+  it("requires status ok on the wire and reports unavailable otherwise", () => {
+    const { status: _s, ...noStatus } = clone(valid);
+    expect(validate(noStatus)).toBe(false);
+    expect(normalizeAdPlan(noStatus).status).toBe("unavailable");
+    const wrong = { ...clone(valid), status: "unavailable" };
+    expect(validate(wrong)).toBe(false);
+    expect(normalizeAdPlan(wrong).status).toBe("unavailable");
+    expect(normalizeAdPlan({ ...clone(valid), deliveries: {}, empty: ["leaderboard"] })).toMatchObject({ status: "ok", deliveries: {}, empty: ["leaderboard"] });
+  });
   it("never throws on garbage envelopes", () => {
     for (const junk of [null, 1, "x", [], {}, { plan_id: 1 }, { plan_id: "a", policy_snapshot_at: "b", deliveries: [] }, { plan_id: "a", policy_snapshot_at: "b", deliveries: { leaderboard: "nope" }, empty: "x" }]) {
       expect(() => normalizeAdPlan(junk)).not.toThrow();
       expect(() => isAdPlan(junk)).not.toThrow();
       expect(Object.keys(normalizeAdPlan(junk).deliveries)).toHaveLength(0);
+      expect(normalizeAdPlan(junk).status).toBe("unavailable");
     }
     expect(validateAdDelivery({ delivery_id: "x" })).toBeNull();
   });

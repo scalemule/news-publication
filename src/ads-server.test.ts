@@ -22,6 +22,7 @@ const FLIGHT = "0192f8a0-1234-7abc-8def-0123456789ac";
 const CREATIVE = "0192f8a0-1234-7abc-8def-0123456789ad";
 const DESTINATION = "https://mergeyard.com/?utm_source=paper&utm_medium=house";
 const plan = {
+  status: "ok",
   plan_id: "p1",
   policy_snapshot_at: "2026-10-29T00:00:00Z",
   deliveries: {
@@ -54,8 +55,8 @@ describe("getAdPlan", () => {
     expect(JSON.stringify(result)).not.toContain('"tier"');
     expect(fetcher).toHaveBeenCalledWith("https://api.scalemule.com/v1/ads/plan", expect.objectContaining({ method: "POST", cache: "no-store" }));
   });
-  it("is empty on a 500, on malformed JSON, on a timeout and on a thrown error", async () => {
-    const empty = { plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
+  it("is unavailable on a 500, on malformed JSON, on a timeout and on a thrown error", async () => {
+    const empty = { status: "unavailable", plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
     expect(await fetchAdPlan(scope, request, (async () => new Response("x", { status: 500 })) as typeof fetch)).toEqual(empty);
     expect(await fetchAdPlan(scope, request, (async () => ok({ data: { nope: 1 } })) as typeof fetch)).toEqual(empty);
     expect(await fetchAdPlan(scope, request, (async () => { throw new Error("boom"); }) as typeof fetch)).toEqual(empty);
@@ -67,9 +68,17 @@ describe("getAdPlan", () => {
   });
   it("refuses insecure gateways and missing keys without calling out", async () => {
     const fetcher = vi.fn();
-    expect(await fetchAdPlan({ ...scope, gatewayUrl: "http://evil.example" }, request, fetcher)).toEqual({ plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] });
-    expect(await fetchAdPlan({ ...scope, apiKey: "" }, request, fetcher)).toEqual({ plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] });
+    const unavailable = { status: "unavailable", plan_id: "", policy_snapshot_at: "", deliveries: {}, empty: [] };
+    expect(await fetchAdPlan({ ...scope, gatewayUrl: "http://evil.example" }, request, fetcher)).toEqual(unavailable);
+    expect(await fetchAdPlan({ ...scope, apiKey: "" }, request, fetcher)).toEqual(unavailable);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("keeps status ok for an intentional empty answer and marks a missing status unavailable", async () => {
+    const none = await fetchAdPlan(scope, request, (async () => ok({ data: { status: "ok", plan_id: "p2", policy_snapshot_at: "2026-10-29T00:00:00Z", deliveries: {}, empty: ["leaderboard", "article_inline"] } })) as typeof fetch);
+    expect(none).toEqual({ status: "ok", plan_id: "p2", policy_snapshot_at: "2026-10-29T00:00:00Z", deliveries: {}, empty: ["leaderboard", "article_inline"] });
+    const { status: _s, ...noStatus } = plan;
+    expect((await fetchAdPlan(scope, request, (async () => ok({ data: noStatus })) as typeof fetch)).status).toBe("unavailable");
+    expect((await fetchAdPlan(scope, request, (async () => ok({ data: { ...plan, status: "unavailable" } })) as typeof fetch)).status).toBe("unavailable");
   });
   it("drops an invalid delivery into empty and refuses a non-https destination", async () => {
     const bad = { ...plan, deliveries: { ...plan.deliveries, sidebar: { ...plan.deliveries.leaderboard, delivery_id: "nope" }, footer: { ...plan.deliveries.leaderboard, destination_url: "http://plain.example" } } };
