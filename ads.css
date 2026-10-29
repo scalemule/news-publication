@@ -38,7 +38,7 @@
 .sm-ad-links { display: inline-flex; align-items: center; }
 .sm-ad-links details { display: inline; }
 .sm-ad-links > :not(:first-child) > summary::before,
-.sm-ad-links > button:not(:first-child)::before { content: "\00b7"; margin: 0 6px; }
+.sm-ad-links > button:not(:first-child)::before { content: "\00b7"; display: inline-block; margin: 0 6px; text-decoration: none; }
 
 /* The creative: one link, block layout. */
 .sm-ad-creative {
@@ -298,4 +298,33 @@ form.sm-ad-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12
   }
   .sm-ad--column .sm-ad-image { width: 180px; }
   .sm-ad--column .sm-ad-cta { justify-self: auto; }
+}
+/* Tablet containers (601–959px): two rows so the headline keeps a real measure.
+   Row 1: brand (logo + name) and copy. Row 2: the optional 1:1 image as a
+   120px square on the left, the CTA on the right. Showcase keeps its own grid. */
+@container (min-width: 601px) and (max-width: 959px) {
+  .sm-ad--band .sm-ad-creative,
+  .sm-ad--column .sm-ad-creative,
+  .sm-ad--partner_footer .sm-ad-creative {
+    min-height: 240px;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    grid-template-areas: "brand copy" "cta cta";
+    gap: 20px 24px;
+    padding: 28px;
+    align-content: space-between;
+  }
+  .sm-ad--band.sm-ad--with-image .sm-ad-creative,
+  .sm-ad--column.sm-ad--with-image .sm-ad-creative,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-creative {
+    grid-template-areas: "brand copy" "image cta";
+  }
+  .sm-ad--band .sm-ad-image,
+  .sm-ad--column .sm-ad-image,
+  .sm-ad--partner_footer .sm-ad-image { width: 120px; height: 120px; align-self: end; }
+  .sm-ad--band .sm-ad-headline,
+  .sm-ad--column .sm-ad-headline,
+  .sm-ad--partner_footer .sm-ad-headline { max-width: 22ch; }
+  .sm-ad--band .sm-ad-cta,
+  .sm-ad--column .sm-ad-cta,
+  .sm-ad--partner_footer .sm-ad-cta { justify-self: end; align-self: end; }
 }
