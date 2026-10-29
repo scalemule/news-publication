@@ -34,7 +34,37 @@ else {
   console.log(`200%: description min ${min(sizes.description)}px, headline min ${min(sizes.headline)}px, label min ${min(sizes.label)}px`);
   if (min(sizes.description) < 28) fail("description under 28px at 200%");
   if (min(sizes.headline) < 44) fail("headline under 44px at 200%");
+  const heights = await frame.evaluate(() => {
+    const rows = [];
+    for (const frameEl of document.querySelectorAll('.row[data-state="realistic"] .frame')) {
+      const unit = frameEl.querySelector(".sm-ad");
+      const w = parseInt(frameEl.style.width, 10);
+      if (unit && (w === 320 || w === 390)) rows.push(`${unit.dataset.adFormat}@${w}=${Math.round(unit.getBoundingClientRect().height)}px`);
+    }
+    return rows;
+  });
+  console.log("200% realistic unit heights: " + heights.join(", "));
 }
+
+// The disclosure row must never break a word: every text run in the bar is one line box.
+const barCheck = () => {
+  const doc = document;
+  const broken = [];
+  const range = doc.createRange();
+  for (const el of doc.querySelectorAll(".sm-ad-bar .sm-ad-label, .sm-ad-bar summary, .sm-ad-bar .sm-ad-hide")) {
+    const text = [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!text) continue;
+    range.selectNodeContents(text);
+    const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+    if (lines > 1) broken.push(`${el.closest(".sm-ad")?.dataset.adFormat} "${text.textContent.trim()}" ${lines} lines`);
+  }
+  return broken;
+};
+const brokenMain = await page.evaluate(barCheck);
+const brokenBig = frame ? await frame.evaluate(barCheck) : [];
+const broken = [...brokenMain, ...brokenBig];
+console.log(`bar text runs broken across lines: ${broken.length}`);
+if (broken.length) fail("bar words broken: " + [...new Set(broken)].slice(0, 8).join("; "));
 
 // Overflow and target sizes in the main document.
 const report = await page.evaluate(() => {

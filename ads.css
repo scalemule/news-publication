@@ -28,18 +28,22 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0 12px;
-  overflow-wrap: normal;
-  word-break: keep-all;
+  row-gap: 0;
+  column-gap: 12px;
   min-height: 44px;
   color: var(--sm-ad-control-fg);
   font: 600 0.625rem/1.5 var(--pub-sans, Arial, sans-serif);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
 }
-.sm-ad-label { display: inline-block; padding: 4px 0; }
-.sm-ad-links { display: inline-flex; align-items: center; }
-.sm-ad-links details { display: inline; }
+/* Never hyphenate: the label and the link group are unbreakable blocks; when
+   the row is too narrow the whole link group wraps under the label. */
+.sm-ad-label { display: inline-block; flex-shrink: 0; white-space: nowrap; padding: 4px 0; }
+.sm-ad-links { display: inline-flex; flex-shrink: 0; align-items: center; white-space: nowrap; }
+.sm-ad-links details { display: inline; flex-shrink: 0; }
 .sm-ad-links > :not(:first-child) > summary::before,
 .sm-ad-links > button:not(:first-child)::before { content: "\00b7"; display: inline-block; margin: 0 6px; text-decoration: none; }
 
@@ -223,6 +227,10 @@
   font: 400 0.8125rem/1.5 var(--pub-sans, Arial, sans-serif);
   letter-spacing: 0;
   text-transform: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
 }
 p.sm-ad-panel { max-width: none; }
 .sm-ad-panel a { color: inherit; }

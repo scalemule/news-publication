@@ -36,10 +36,25 @@ const svg = (w, h, fill, text) =>
   )}`;
 
 const advertisers = [
-  { advertiser: "NapSite", headline: "Your business deserves a better website.", description: "Designed, hosted and managed for you.", cta: "Explore NapSite", link_label: "Built on napsite.com", logo: BRAND.napsite },
-  { advertiser: "MergeYard", headline: "Support that lives inside Zendesk", description: "Shared inboxes, SLAs and reporting for teams who answer customers all day.", cta: "See MergeYard", logo: BRAND.mergeyard },
-  { advertiser: "Plouris", headline: "A calmer inbox for busy practices.", description: "Plouris keeps every client conversation, file and task in one place.", cta: "Start free", logo: BRAND.plouris },
+  // Each creative uses only its own brand's assets. NapSite has no 1:1 image asset.
+  { advertiser: "NapSite", headline: "Your business deserves a better website.", description: "Designed, hosted and managed for you.", cta: "Explore NapSite", link_label: "Built on napsite.com", logo: BRAND.napsite, square: null },
+  { advertiser: "MergeYard", headline: "Support that lives inside Zendesk", description: "Shared inboxes, SLAs and reporting for teams who answer customers all day.", cta: "See MergeYard", logo: BRAND.mergeyard, square: { ...BRAND.mergeyard, alt: "" } },
+  { advertiser: "Plouris", headline: "A calmer inbox for busy practices.", description: "Plouris keeps every client conversation, file and task in one place.", cta: "Start free", logo: BRAND.plouris, square: { ...BRAND.plourisIcon, alt: "" } },
 ];
+// Longest REALISTIC copy: every field at its limit, made of normal words.
+const realistic = {
+  advertiser: "Diablo Valley Roofing & Exterior Restoration Company",
+  headline: "Local roof repairs, honest quotes and crews who show up",
+  description: "Family owned since 1994. Licensed and insured. Free inspections in Pleasanton, Dublin, Livermore and San Ramon.",
+  cta: "Get a free estimate",
+  link_label: "Roof repairs by Diablo Valley Roofing",
+  logo: null,
+  square: null,
+};
+for (const [k, max] of Object.entries(AD_COPY_LIMITS)) {
+  if (realistic[k] && [...realistic[k]].length > max) throw new Error(`realistic ${k} exceeds ${max}`);
+}
+// Adversarial: unbroken strings at the limit (stress only, not a real creative).
 const longest = {
   advertiser: "A".repeat(AD_COPY_LIMITS.advertiser),
   headline: "Wwwwwwwwww ".repeat(6).trim().slice(0, AD_COPY_LIMITS.headline),
@@ -47,10 +62,10 @@ const longest = {
   cta: "Mmmmmmmmmmmmmmmmmmmm".slice(0, AD_COPY_LIMITS.cta),
   link_label: "Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww".slice(0, AD_COPY_LIMITS.link_label),
   logo: null,
+  square: null,
 };
+// Neutral format placeholders (not brand assets) for the 3:2 card and the showcase screenshot.
 const images = {
-  band: { ...BRAND.plourisIcon, alt: "" },
-  column: { ...BRAND.plourisIcon, alt: "" },
   inline_card: { url: svg(900, 600, "#3b6d8a", "3:2"), width: 900, height: 600, alt: "" },
   showcase: { url: svg(1280, 900, "#555", "1280×900"), width: 1280, height: 900, alt: "" },
 };
@@ -89,13 +104,18 @@ function unit(format, content, placement = "gallery") {
 }
 
 const widths = [320, 390, 768, 1280];
+// The image for a format: the advertiser's own 1:1 asset for band/column, a
+// neutral 3:2 or screenshot placeholder for inline_card/showcase, none otherwise.
+const imageFor = (format, a) => (format === "band" || format === "column" ? a.square ?? null : images[format] ?? null);
 const states = (format) => {
   const list = [];
   for (const a of advertisers) {
-    list.push({ name: `${a.advertiser}, with image`, content: { ...a, image: images[format] ?? null } });
-    list.push({ name: `${a.advertiser}, without image`, content: { ...a, image: null } });
+    const img = imageFor(format, a);
+    if (img) list.push({ name: `${a.advertiser}, with image`, content: { ...a, image: img } });
+    list.push({ name: `${a.advertiser}, without image${img ? "" : " (no 1:1 asset)"}`, content: { ...a, image: null } });
   }
-  list.push({ name: "Longest copy, no logo, no image", content: { ...longest, image: images[format] ?? null } });
+  list.push({ name: "Longest realistic copy, no logo", content: { ...realistic, image: imageFor(format, realistic) } });
+  list.push({ name: "Adversarial: unbroken 60-character strings, no logo", content: { ...longest, image: imageFor(format, longest) } });
   return list;
 };
 
@@ -118,18 +138,20 @@ for (const theme of ["light", "dark"]) {
 // in ads.css doubles (a parent font-size would not touch rem-based text).
 let big = "";
 for (const format of AD_FORMAT_KEYS) {
-  big += `<h2>${format}</h2><div class="row">`;
-  for (const w of [320, 768]) big += `<div class="frame" style="width:${w}px"><div class="frame-label">${w}px · 200%</div>${unit(format, { ...longest, image: images[format] ?? null })}</div>`;
+  big += `<h2>${format} · longest realistic copy</h2><div class="row" data-state="realistic">`;
+  for (const w of [320, 390, 768]) big += `<div class="frame" style="width:${w}px"><div class="frame-label">${w}px · 200%</div>${unit(format, { ...realistic, image: imageFor(format, realistic) })}</div>`;
+  big += `</div><h2>${format} · adversarial</h2><div class="row" data-state="adversarial">`;
+  for (const w of [320, 768]) big += `<div class="frame" style="width:${w}px"><div class="frame-label">${w}px · 200%</div>${unit(format, { ...longest, image: imageFor(format, longest) })}</div>`;
   big += `</div>`;
 }
 const bigDoc = (inner) => `<!doctype html><html lang="en" style="font-size:200%"><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>${tokens}\n${css}\n${GALLERY_CSS}</style></head><body><section class="publication" data-theme="light">${inner}</section></body></html>`;
-body += `<section class="publication" data-theme="light" id="text-200"><h1>200% text size (root font-size 200%, light)</h1><iframe title="200% text size" srcdoc="${bigDoc(big).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" style="width:100%;height:4200px;border:0;background:#fff"></iframe></section>`;
+body += `<section class="publication" data-theme="light" id="text-200"><h1>200% text size (root font-size 200%, light)</h1><iframe title="200% text size" srcdoc="${bigDoc(big).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" style="width:100%;height:9000px;border:0;background:#fff"></iframe></section>`;
 
 // Font fallback: system fonts only, no web fonts loaded.
 body += `<section class="publication fallback" data-theme="light" id="font-fallback"><h1>Font fallback (Georgia / Arial, no web fonts)</h1>`;
 for (const format of AD_FORMAT_KEYS) {
   body += `<h2>${format}</h2><div class="row">`;
-  for (const w of widths) body += `<div class="frame" style="width:${w}px"><div class="frame-label">${w}px · fallback</div>${unit(format, { ...advertisers[0], image: images[format] ?? null })}</div>`;
+  for (const w of widths) body += `<div class="frame" style="width:${w}px"><div class="frame-label">${w}px · fallback</div>${unit(format, { ...advertisers[2], image: imageFor(format, advertisers[2]) })}</div>`;
   body += `</div>`;
 }
 body += `</section>`;
@@ -156,9 +178,9 @@ const lorem = [
   "Readers with questions about the parking program can contact the city clerk. The Times will continue to follow the pilot as the monthly counts are released.",
 ];
 for (const theme of ["light", "dark"]) {
-  body += `<section class="publication" data-theme="${theme}"><h1>Page context (${theme}): 680px article with inline_card after paragraph 4, 300px sidebar with column</h1><div class="page"><article class="article"><h2 class="hed">Council extends parking pilot after merchants ask for more time</h2>${lorem.slice(0, 4).map(para).join("")}${unit("inline_card", { ...advertisers[1], image: images.inline_card }, "article_inline")}${lorem.slice(4).map(para).join("")}</article><aside class="side"><div class="side-box">Most read</div>${unit("column", { ...advertisers[2], image: images.column }, "sidebar")}<div class="side-box">Newsletter</div></aside></div></section>`;
+  body += `<section class="publication" data-theme="${theme}"><h1>Page context (${theme}): 680px article with inline_card after paragraph 4, 300px sidebar with column</h1><div class="page"><article class="article"><h2 class="hed">Council extends parking pilot after merchants ask for more time</h2>${lorem.slice(0, 4).map(para).join("")}${unit("inline_card", { ...advertisers[1], image: images.inline_card }, "article_inline")}${lorem.slice(4).map(para).join("")}</article><aside class="side"><div class="side-box">Most read</div>${unit("column", { ...advertisers[2], image: advertisers[2].square }, "sidebar")}<div class="side-box">Newsletter</div></aside></div></section>`;
 }
-body += `<section class="publication" data-theme="light"><h1>Page context, phone (390px): article with inline_card</h1><div class="frame" style="width:390px"><article class="article">${lorem.slice(0, 4).map(para).join("")}${unit("inline_card", { ...advertisers[1], image: images.inline_card }, "article_inline")}${lorem.slice(4, 7).map(para).join("")}${unit("band", { ...advertisers[0], image: images.band }, "leaderboard")}</article></div></section>`;
+body += `<section class="publication" data-theme="light"><h1>Page context, phone (390px): article with inline_card</h1><div class="frame" style="width:390px"><article class="article">${lorem.slice(0, 4).map(para).join("")}${unit("inline_card", { ...advertisers[1], image: images.inline_card }, "article_inline")}${lorem.slice(4, 7).map(para).join("")}${unit("band", { ...advertisers[1], image: advertisers[1].square }, "leaderboard")}</article></div></section>`;
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ScaleMule Ads gallery</title>
 <link rel="stylesheet" href="${FONTS}">
