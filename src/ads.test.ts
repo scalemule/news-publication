@@ -7,6 +7,7 @@ import {
   lengthClass,
   validateCreativeContent,
   type AdCreativeDraft,
+  adSensitivity,
 } from "./ads";
 import { measurementTier } from "./ads-tier";
 import { measurementConsent } from "./measurement-consent";
@@ -118,5 +119,18 @@ describe("measurement tier", () => {
     expect(measurementConsent(headers({ cookie: cookie({ ...all, advertising: false }) }), true)).toBe(false);
     expect(measurementConsent(headers({ cookie: cookie({ ...all, advertising: false }) }))).toBe(true);
     expect(measurementConsent(headers({ cookie: cookie({ ...all, performance: false }) }))).toBe(false);
+  });
+});
+
+describe("adSensitivity", () => {
+  it("is unknown when the platform field is absent or malformed", () => {
+    expect(adSensitivity(undefined)).toBe("unknown");
+    expect(adSensitivity({})).toBe("unknown");
+    expect(adSensitivity({ content_safety: null })).toBe("unknown");
+    expect(adSensitivity({ content_safety: { classification: "maybe" } })).toBe("unknown");
+  });
+  it("passes the platform classification through", () => {
+    expect(adSensitivity({ content_safety: { classification: "clear", reviewed: false } })).toBe("clear");
+    expect(adSensitivity({ content_safety: { classification: "sensitive", reviewed: true, rules: ["topic-death-fatality"] } })).toBe("sensitive");
   });
 });

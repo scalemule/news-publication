@@ -125,6 +125,17 @@ export type NewsItem = {
   canonical_url?: string | null;
   tags?: TagRef[];
   categories?: CategoryRef[];
+  /** Platform content-safety classification, written when the article was published. Absent on
+   *  older items until first read; advertising treats absence as unknown and fails closed. */
+  content_safety?: ArticleContentSafety | null;
+};
+
+export type ArticleContentSafety = {
+  classification: "clear" | "sensitive";
+  /** A human sensitivity review exists for this content. */
+  reviewed: boolean;
+  /** Policy rule ids, present only when sensitive. */
+  rules?: string[];
 };
 
 export type NewsFeed = {

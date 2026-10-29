@@ -293,6 +293,24 @@ export function isAdPlan(value: unknown): value is AdPlan {
     typeof plan.deliveries === "object" &&
     Array.isArray(plan.empty)
   );
+/**
+ * Authoritative article sensitivity for ad decisions (ADR §6.2 step 2). Only the
+ * platform classification counts; a missing or malformed field is `unknown`, and the
+ * service treats unknown article pages as sensitive (no deliveries). Never derive this
+ * from tags, sections or template heuristics.
+ */
+export function adSensitivity(
+  article: { content_safety?: unknown } | null | undefined,
+): AdSensitivity {
+  const value = article?.content_safety as { classification?: unknown } | null | undefined;
+  if (!value || typeof value !== "object") return "unknown";
+  return value.classification === "sensitive"
+    ? "sensitive"
+    : value.classification === "clear"
+      ? "clear"
+      : "unknown";
+}
+
 }
 
 /** Section 5: short pages get no inline unit and at most one unit in total. */
