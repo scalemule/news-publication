@@ -1,6 +1,6 @@
 {
   "name": "@scalemule/news-publication",
-  "version": "0.0.100",
+  "version": "0.0.101",
   "description": "Shared server framework for ScaleMule local news publications. Walnut Creek Times is the broadsheet default; each paper supplies its own identity and feature flags.",
   "type": "module",
   "bin": {
@@ -246,7 +246,7 @@
     "toys.css"
   ],
   "peerDependencies": {
-    "@scalemule/react": "0.0.26",
+    "@scalemule/react": "0.0.27",
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
@@ -266,7 +266,7 @@
     "prepublishOnly": "node -e \"const v=require('./package.json').version; if(!/^0\\.(0|1)\\.\\d+$/.test(v)){console.error('ERR: SDK '+v+' violates patch-only policy (0.0.x or 0.1.x only). See CONTRIBUTING.md SDK versioning section.');process.exit(1)}\" && npm run lint && npm test && npm run build"
   },
   "devDependencies": {
-    "@scalemule/react": "0.0.26",
+    "@scalemule/react": "0.0.27",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
@@ -300,7 +300,7 @@
   },
   "dependencies": {
     "@scalemule/compliance": "0.0.8",
-    "@scalemule/react": "0.0.26",
+    "@scalemule/react": "0.0.27",
     "@scalemule/sdk": "0.0.80"
   }
 }
