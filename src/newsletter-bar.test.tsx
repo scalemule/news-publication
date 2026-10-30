@@ -57,6 +57,10 @@ describe("NewsletterBar", () => {
     expect(screen.getByRole("button", { name: /Subscribe with Google/ })).toBeTruthy();
     expect(screen.getByLabelText("Email address")).toBeTruthy();
     expect(screen.getByText(/By subscribing you agree to receive Lazy Tensor emails/)).toBeTruthy();
+    // The Google button carries what it does for screen readers, including the reader account.
+    expect(screen.getByRole("button", { name: /Subscribe with Google/ }).getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByText(/Creates or signs in to your free Lazy Tensor reader account/)).toBeTruthy();
+    expect(screen.getByText(/with Google you also get a free reader account/)).toBeTruthy();
   });
 
   it("Google starts a subscribing Ledvery sign-in that returns to the story", async () => {

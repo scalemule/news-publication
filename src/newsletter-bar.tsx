@@ -143,9 +143,10 @@ export function NewsletterBar({
         subscribe
         label="Subscribe with Google"
         busyLabel="Opening Google…"
+        description={`Creates or signs in to your free ${publicationName} reader account and subscribes you to ${publicationName} emails. Unsubscribe anytime.`}
         returnTo={path}
         startPath={startPath}
-        classNames={{ wrapper: "sm-newsletter-bar__google", button: "sm-newsletter-bar__google-button", error: "sm-newsletter-bar__error" }}
+        classNames={{ wrapper: "sm-newsletter-bar__google", button: "sm-newsletter-bar__google-button", fine: "sm-conversion-bar__sr", error: "sm-newsletter-bar__error" }}
         onStart={() => emit({ name: "signup_started", channel: "google" })}
       />
     : null;
@@ -176,7 +177,7 @@ export function NewsletterBar({
       secondary={google ? form : null}
       fine={sent
         ? <Sent message={`Open the email we just sent to confirm your ${publicationName} subscription.`} />
-        : <Fine publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} emailToggle={Boolean(google && form)} />}
+        : <Fine publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} emailToggle={Boolean(google && form)} />}
       pathname={path || undefined}
       suppressed={suppressed}
       suppressWhen={() => readSubscribed(subscribedStorageKey)}
@@ -209,11 +210,11 @@ function Sent({ message }: { message: string }) {
   </>;
 }
 
-function Fine({ publicationName, frequency, privacyHref, emailToggle }: { publicationName: string; frequency: ReactNode; privacyHref: string; emailToggle: boolean }) {
+function Fine({ publicationName, frequency, privacyHref, google, emailToggle }: { publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean; emailToggle: boolean }) {
   const bar = useConversionBar();
   return (
     <p>
-      {frequency} By subscribing you agree to receive {publicationName} emails. Unsubscribe anytime.{" "}
+      {frequency} By subscribing you agree to receive {publicationName} emails{google ? "; with Google you also get a free reader account" : ""}. Unsubscribe anytime.{" "}
       <a href={privacyHref}>Privacy</a>
       {emailToggle && !bar.expanded && <>
         <span className="sm-conversion-bar__phone-only"> · </span>
