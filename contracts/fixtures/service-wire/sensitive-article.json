@@ -1,0 +1,12 @@
+{
+  "deliveries": {},
+  "empty": [
+    "leaderboard",
+    "article_inline",
+    "sidebar"
+  ],
+  "plan_id": "0192f3c0-0000-7000-8000-000000000384",
+  "policy_snapshot_at": "2026-10-29T12:00:00.000Z",
+  "reason": "sensitive",
+  "status": "ok"
+}
