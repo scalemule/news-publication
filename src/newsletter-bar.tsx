@@ -30,6 +30,61 @@ export type NewsletterBarEvent =
   | { name: "confirmation_sent"; channel: "email" }
   | { name: "confirmed"; channel: "google" };
 
+/** Every visible and announced string, so a site can speak its readers' language. */
+export interface NewsletterBarLabels {
+  title(publicationName: string): ReactNode;
+  googleButton: string;
+  googleBusy: string;
+  /** Read to screen-reader users with the Google button. */
+  googleDescription(publicationName: string): string;
+  emailLabel: string;
+  emailPlaceholder: string;
+  emailSubmit: string;
+  emailBusy: string;
+  invalidEmail: string;
+  tryAgain: string;
+  /** Fine print after the frequency: the consent sentence. */
+  consent(publicationName: string, withGoogle: boolean): ReactNode;
+  privacy: string;
+  useEmailInstead: string;
+  sentTitle: string;
+  sentMessage(publicationName: string): string;
+  confirmation(publicationName: string): ReactNode;
+  dismiss: string;
+}
+
+export const NEWSLETTER_BAR_LABELS_EN: NewsletterBarLabels = {
+  title: (name) => <>The {name} briefing</>,
+  googleButton: "Subscribe with Google",
+  googleBusy: "Opening Google…",
+  googleDescription: (name) => `Creates or signs in to your free ${name} reader account and subscribes you to ${name} emails. Unsubscribe anytime.`,
+  emailLabel: "Email address",
+  emailPlaceholder: "Your email",
+  emailSubmit: "Subscribe",
+  emailBusy: "Sending…",
+  invalidEmail: "Enter a valid email address.",
+  tryAgain: "Please try again.",
+  consent: (name, withGoogle) => `By subscribing you agree to receive ${name} emails${withGoogle ? "; with Google you also get a free reader account" : ""}. Unsubscribe anytime.`,
+  privacy: "Privacy",
+  useEmailInstead: "Use email instead",
+  sentTitle: "Check your inbox.",
+  sentMessage: (name) => `Open the email we just sent to confirm your ${name} subscription.`,
+  confirmation: (name) => <>You’re in. The next {name} briefing is on its way to your inbox.</>,
+  dismiss: "Close the newsletter invitation",
+};
+
+/** What the bar hands to a site's own sign-up route when `submitEmail` replaces the default request. */
+export interface NewsletterBarEmailRequest {
+  email: string;
+  cadence: "weekly" | "daily";
+  policyVersion: string;
+  timezone: string;
+  placement: "bar";
+  originStory?: string;
+  /** The honeypot field; non-empty means a bot. */
+  website: string;
+}
+
 /** Pages that already are the sign-up, an account step or a legal page. */
 export const NEWSLETTER_BAR_EXCLUDED_PATHS: RegExp[] = [
   /^\/newsletter(\/|$)/, /^\/account(\/|$)/, /^\/news\/unsubscribe(\/|$)/, /^\/review(\/|$)/,
@@ -78,6 +133,13 @@ export interface NewsletterBarProps {
   trigger?: ConversionBarTrigger;
   dismissDays?: number;
   confirmation?: ReactNode;
+  /** Replace any of the English strings. */
+  labels?: Partial<NewsletterBarLabels>;
+  /**
+   * Send the email sign-up yourself (a site with its own route or payload). Throw an Error whose
+   * message is shown to the reader. Default: POST JSON to `emailEndpoint`.
+   */
+  submitEmail?(request: NewsletterBarEmailRequest): Promise<void>;
   onEvent?(event: NewsletterBarEvent): void;
   className?: string;
 }
@@ -127,9 +189,12 @@ export function NewsletterBar({
   trigger = NEWSLETTER_BAR_TRIGGER,
   dismissDays = 14,
   confirmation,
+  labels: labelOverrides,
+  submitEmail,
   onEvent,
   className = "",
 }: NewsletterBarProps) {
+  const labels: NewsletterBarLabels = { ...NEWSLETTER_BAR_LABELS_EN, ...labelOverrides };
   const [email, setEmail] = useState<EmailState>({ status: "idle", error: "" });
   const [path, setPath] = useState(pathname ?? "");
   useEffect(() => { setPath(pathname ?? window.location.pathname); }, [pathname]);
@@ -141,9 +206,9 @@ export function NewsletterBar({
     ? <LedveryButton
         provider="google"
         subscribe
-        label="Subscribe with Google"
-        busyLabel="Opening Google…"
-        description={`Creates or signs in to your free ${publicationName} reader account and subscribes you to ${publicationName} emails. Unsubscribe anytime.`}
+        label={labels.googleButton}
+        busyLabel={labels.googleBusy}
+        description={labels.googleDescription(publicationName)}
         returnTo={path}
         startPath={startPath}
         classNames={{ wrapper: "sm-newsletter-bar__google", button: "sm-newsletter-bar__google-button", fine: "sm-conversion-bar__sr", error: "sm-newsletter-bar__error" }}
@@ -152,7 +217,8 @@ export function NewsletterBar({
     : null;
   const form = emailSignUp && !sent
     ? <EmailForm
-        endpoint={emailEndpoint}
+        labels={labels}
+        submit={submitEmail ?? ((request) => postEmail(emailEndpoint, request, labels.tryAgain))}
         policyVersion={policyVersion}
         cadence={cadence}
         path={path}
@@ -170,14 +236,14 @@ export function NewsletterBar({
     <ConversionBar
       id={id}
       className={`sm-newsletter-bar ${className}`.trim()}
-      title={sent ? "Check your inbox." : title ?? <>The {publicationName} briefing</>}
+      title={sent ? labels.sentTitle : title ?? labels.title(publicationName)}
       description={sent ? undefined : description}
       brand={brand}
       actions={sent ? null : google ?? form}
       secondary={google ? form : null}
       fine={sent
-        ? <Sent message={`Open the email we just sent to confirm your ${publicationName} subscription.`} />
-        : <Fine publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} emailToggle={Boolean(google && form)} />}
+        ? <Sent message={labels.sentMessage(publicationName)} />
+        : <Fine labels={labels} publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} emailToggle={Boolean(google && form)} />}
       pathname={path || undefined}
       suppressed={suppressed}
       suppressWhen={() => readSubscribed(subscribedStorageKey)}
@@ -186,8 +252,8 @@ export function NewsletterBar({
       dismissDays={dismissDays}
       confirmHash={NEWSLETTER_CONFIRMED_HASH}
       confirmationVerified={confirmed}
-      confirmation={confirmation ?? <>You’re in. The next {publicationName} briefing is on its way to your inbox.</>}
-      dismissLabel="Close the newsletter invitation"
+      confirmation={confirmation ?? labels.confirmation(publicationName)}
+      dismissLabel={labels.dismiss}
       onView={() => emit({ name: "viewed" })}
       onDismiss={() => emit({ name: "dismissed" })}
       onExpand={(open) => { if (open) emit({ name: "expanded" }); }}
@@ -210,12 +276,12 @@ function Sent({ message }: { message: string }) {
   </>;
 }
 
-function Fine({ publicationName, frequency, privacyHref, google, emailToggle }: { publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean; emailToggle: boolean }) {
+function Fine({ labels, publicationName, frequency, privacyHref, google, emailToggle }: { labels: NewsletterBarLabels; publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean; emailToggle: boolean }) {
   const bar = useConversionBar();
   return (
     <p>
-      {frequency} By subscribing you agree to receive {publicationName} emails{google ? "; with Google you also get a free reader account" : ""}. Unsubscribe anytime.{" "}
-      <a href={privacyHref}>Privacy</a>
+      {frequency} {labels.consent(publicationName, google)}{" "}
+      <a href={privacyHref}>{labels.privacy}</a>
       {emailToggle && !bar.expanded && <>
         <span className="sm-conversion-bar__phone-only"> · </span>
         <button type="button" className="sm-conversion-bar__phone-only sm-newsletter-bar__link" onClick={() => {
@@ -223,15 +289,36 @@ function Fine({ publicationName, frequency, privacyHref, google, emailToggle }: 
           // The link goes away; focus the field it revealed.
           window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".sm-newsletter-bar .sm-newsletter-bar__input")?.focus());
         }}>
-          Use email instead
+          {labels.useEmailInstead}
         </button>
       </>}
     </p>
   );
 }
 
-function EmailForm({ endpoint, policyVersion, cadence, path, state, compact, onState, onSent, onStart, onFailed }: {
-  endpoint: string;
+async function postEmail(endpoint: string, request: NewsletterBarEmailRequest, fallback: string): Promise<void> {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({
+      email: request.email,
+      consent: true,
+      cadence: request.cadence,
+      policy_version: request.policyVersion,
+      timezone: request.timezone,
+      placement: request.placement,
+      ...(request.originStory ? { origin_story: request.originStory } : {}),
+      website: request.website,
+    }),
+  });
+  const body = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(body.error || fallback);
+}
+
+function EmailForm({ labels, submit, policyVersion, cadence, path, state, compact, onState, onSent, onStart, onFailed }: {
+  labels: NewsletterBarLabels;
+  submit(request: NewsletterBarEmailRequest): Promise<void>;
   policyVersion: string;
   cadence: "weekly" | "daily";
   path: string;
@@ -254,40 +341,31 @@ function EmailForm({ endpoint, policyVersion, cadence, path, state, compact, onS
         const data = new FormData(event.currentTarget);
         const address = String(data.get("email") ?? "").trim();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-          onState({ status: "idle", error: "Enter a valid email address." });
+          onState({ status: "idle", error: labels.invalidEmail });
           return;
         }
         onState({ status: "busy", error: "" });
         onStart();
         try {
-          const story = originStory(path);
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({
-              email: address,
-              consent: true,
-              cadence,
-              policy_version: policyVersion,
-              timezone: readerTimeZone(),
-              placement: "bar",
-              ...(story ? { origin_story: story } : {}),
-              website: String(data.get("website") ?? ""),
-            }),
+          await submit({
+            email: address,
+            cadence,
+            policyVersion,
+            timezone: readerTimeZone(),
+            placement: "bar",
+            originStory: originStory(path),
+            website: String(data.get("website") ?? ""),
           });
-          const body = await response.json().catch(() => ({})) as { error?: string };
-          if (!response.ok) throw new Error(body.error || "Please try again.");
           onState({ status: "sent", error: "" });
           onSent();
         } catch (error) {
-          const message = error instanceof Error && error.message ? error.message : "Please try again.";
+          const message = error instanceof Error && error.message ? error.message : labels.tryAgain;
           onState({ status: "idle", error: message });
           onFailed(message);
         }
       }}
     >
-      <label className="sm-newsletter-bar__label" htmlFor={inputId}>Email address</label>
+      <label className="sm-newsletter-bar__label" htmlFor={inputId}>{labels.emailLabel}</label>
       <div className="sm-newsletter-bar__field">
         <input
           id={inputId}
@@ -296,13 +374,13 @@ function EmailForm({ endpoint, policyVersion, cadence, path, state, compact, onS
           type="email"
           inputMode="email"
           autoComplete="email"
-          placeholder="Your email"
+          placeholder={labels.emailPlaceholder}
           required
           disabled={busy}
           aria-invalid={state.error ? true : undefined}
           aria-describedby={state.error ? errorId : undefined}
         />
-        <button type="submit" disabled={busy}>{busy ? "Sending…" : "Subscribe"}</button>
+        <button type="submit" disabled={busy}>{busy ? labels.emailBusy : labels.emailSubmit}</button>
       </div>
       {/* Bots fill every field; people never see this one. */}
       <input className="sm-newsletter-bar__trap" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />

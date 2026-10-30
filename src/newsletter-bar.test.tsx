@@ -148,6 +148,43 @@ describe("NewsletterBar", () => {
     expect(screen.getByText(/You’re in/)).toBeTruthy();
   });
 
+  it("speaks the site's language and can send the email through the site's own route", async () => {
+    const submitEmail = vi.fn().mockResolvedValue(undefined);
+    render(<NewsletterBar
+      publicationName="Българско"
+      googleSignIn={false}
+      frequency="Безплатно, седмично."
+      labels={{
+        title: (name) => <>Бюлетинът на {name}</>,
+        emailLabel: "Имейл адрес",
+        emailPlaceholder: "Вашият имейл",
+        emailSubmit: "Абонирай ме",
+        consent: (name) => `Съгласявате се да получавате имейли от ${name}.`,
+        sentTitle: "Проверете пощата си.",
+        sentMessage: () => "Изпратихме връзка за потвърждение.",
+        dismiss: "Затвори",
+      }}
+      submitEmail={submitEmail}
+      pathname="/news/история"
+      trigger={immediate}
+    />);
+    expect(screen.getByText("Бюлетинът на Българско")).toBeTruthy();
+    expect(screen.getByText(/Съгласявате се да получавате имейли от Българско/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Имейл адрес"), { target: { value: "reader@example.com" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Абонирай ме" })); });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(submitEmail).toHaveBeenCalledWith(expect.objectContaining({ email: "reader@example.com", placement: "bar", cadence: "weekly", website: "", originStory: "/news/история" }));
+    expect(screen.getByText("Проверете пощата си.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Затвори" })).toBeTruthy();
+  });
+
+  it("a custom submit's error is shown to the reader", async () => {
+    render(<NewsletterBar publicationName="Paper" googleSignIn={false} submitEmail={async () => { throw new Error("Опитайте отново."); }} trigger={immediate} />);
+    fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "reader@example.com" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Subscribe" })); });
+    expect(screen.getByRole("alert").textContent).toBe("Опитайте отново.");
+  });
+
   it("dismissal is reported", () => {
     const events: NewsletterBarEvent[] = [];
     render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} onEvent={(e) => events.push(e)} />);

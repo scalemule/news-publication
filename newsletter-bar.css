@@ -133,10 +133,17 @@
   cursor: pointer;
 }
 
-/* Mid-width screens: give the actions room by letting the description go. */
+/* Tablet widths: title on its own row, then Google and email side by side across the full width,
+   so the title keeps one line. */
 @media (min-width: 761px) and (max-width: 1080px) {
-  .sm-newsletter-bar .sm-conversion-bar__description { display: none; }
-  .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] { width: 11rem; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__inner { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lead dismiss" "cta cta"; row-gap: 12px; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__lead { grid-area: lead; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__dismiss { grid-area: dismiss; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__cta { grid-area: cta; max-width: none; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__description { display: none; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-conversion-bar__secondary,
+  .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__form { flex: 1 1 auto; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] { width: auto; }
 }
 @media (max-width: 760px) {
   .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] { width: auto; }
