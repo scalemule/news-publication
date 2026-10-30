@@ -54,7 +54,7 @@ describe("NewsletterBar", () => {
   it("offers Google and email with consent fine print", () => {
     render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} />);
     expect(screen.getByText("The Lazy Tensor briefing")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Continue with Google/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Subscribe with Google/ })).toBeTruthy();
     expect(screen.getByLabelText("Email address")).toBeTruthy();
     expect(screen.getByText(/By subscribing you agree to receive Lazy Tensor emails/)).toBeTruthy();
   });
@@ -63,7 +63,7 @@ describe("NewsletterBar", () => {
     const events: NewsletterBarEvent[] = [];
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ url: "https://api.ledvery.com/authorize?x=1" }) });
     render(<NewsletterBar publicationName="Lazy Tensor" pathname="/news/the-story" trigger={immediate} onEvent={(e) => events.push(e)} />);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Continue with Google/ })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Subscribe with Google/ })); });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/news/ledvery-start");
     expect(JSON.parse(init.body)).toEqual({ provider: "google", subscribe: true, consent: true, returnTo: "/news/the-story" });
@@ -84,7 +84,10 @@ describe("NewsletterBar", () => {
     expect(screen.getByText("Check your inbox.")).toBeTruthy();
     expect(screen.queryByLabelText("Email address")).toBeNull();
     expect(events).toContainEqual({ name: "confirmation_sent", channel: "email" });
-    // The next page view does not ask again.
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close the newsletter invitation");
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)); });
+    expect(screen.getByRole("status").textContent).toContain("Open the email we just sent");
+    // The next page view does not ask again for a while (not converted until confirmed).
     cleanup();
     render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} />);
     expect(screen.queryByText("The Lazy Tensor briefing")).toBeNull();
@@ -120,13 +123,25 @@ describe("NewsletterBar", () => {
     expect(NEWSLETTER_BAR_EXCLUDED_PATHS.some((rule) => rule.test("/news/the-story"))).toBe(false);
   });
 
-  it("the 'Use email instead' link opens the email form on a phone", () => {
+  it("the 'Use email instead' link opens the email form on a phone and focuses it", async () => {
     const events: NewsletterBarEvent[] = [];
     render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} onEvent={(e) => events.push(e)} />);
     fireEvent.click(screen.getByRole("button", { name: "Use email instead" }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+    expect(document.activeElement).toBe(screen.getByLabelText("Email address"));
     expect(document.querySelector(".sm-conversion-bar")?.getAttribute("data-expanded")).toBe("true");
     expect(screen.queryByRole("button", { name: "Use email instead" })).toBeNull();
     expect(events).toContainEqual({ name: "expanded" });
+  });
+
+  it("shows 'you're in' only when the server confirmed the subscription", () => {
+    window.location.hash = "#newsletter-confirmed";
+    render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} />);
+    expect(screen.queryByText(/You’re in/)).toBeNull();
+    cleanup();
+    window.location.hash = "#newsletter-confirmed";
+    render(<NewsletterBar publicationName="Lazy Tensor" confirmed suppressed trigger={immediate} />);
+    expect(screen.getByText(/You’re in/)).toBeTruthy();
   });
 
   it("dismissal is reported", () => {

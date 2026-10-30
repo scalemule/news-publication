@@ -14,7 +14,7 @@
  * `@scalemule/news-publication/newsletter-bar.css`.
  */
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { ConversionBar, markConversionBarConverted, useConversionBar, type ConversionBarTrigger } from "@scalemule/react/conversion-bar";
+import { ConversionBar, markConversionBarDismissed, useConversionBar, type ConversionBarTrigger } from "@scalemule/react/conversion-bar";
 import { LedveryButton } from "./reader-sso-client";
 import { NEWSLETTER_CONFIRMED_HASH } from "./newsletter-confirmation";
 
@@ -56,6 +56,11 @@ export interface NewsletterBarProps {
   pathname?: string;
   /** Server-known reasons to stay away: a signed-in reader, a subscribed-state cookie. */
   suppressed?: boolean;
+  /**
+   * The server knows this browser just subscribed (a signed subscribed-state cookie). Required
+   * before `#newsletter-confirmed` shows "you're in"; a bare hash is ignored.
+   */
+  confirmed?: boolean;
   /** A localStorage key whose value "1" marks this browser as subscribed. */
   subscribedStorageKey?: string;
   /** Offer "Continue with Google" through Ledvery. Default true. */
@@ -108,6 +113,7 @@ export function NewsletterBar({
   brand,
   pathname,
   suppressed = false,
+  confirmed = false,
   subscribedStorageKey,
   googleSignIn = true,
   emailSignUp = true,
@@ -135,6 +141,8 @@ export function NewsletterBar({
     ? <LedveryButton
         provider="google"
         subscribe
+        label="Subscribe with Google"
+        busyLabel="Opening Google…"
         returnTo={path}
         startPath={startPath}
         classNames={{ wrapper: "sm-newsletter-bar__google", button: "sm-newsletter-bar__google-button", error: "sm-newsletter-bar__error" }}
@@ -150,7 +158,8 @@ export function NewsletterBar({
         state={email}
         compact={Boolean(google)}
         onState={setEmail}
-        onSent={() => { markConversionBarConverted(id); emit({ name: "confirmation_sent", channel: "email" }); }}
+        // Not converted until the reader confirms; the confirmed form sets the subscribed marker.
+        onSent={() => { markConversionBarDismissed(id); emit({ name: "confirmation_sent", channel: "email" }); }}
         onStart={() => emit({ name: "signup_started", channel: "email" })}
         onFailed={(error) => emit({ name: "signup_failed", channel: "email", error })}
       />
@@ -161,11 +170,13 @@ export function NewsletterBar({
       id={id}
       className={`sm-newsletter-bar ${className}`.trim()}
       title={sent ? "Check your inbox." : title ?? <>The {publicationName} briefing</>}
-      description={sent ? `Open the email we just sent to confirm your ${publicationName} subscription.` : description}
+      description={sent ? undefined : description}
       brand={brand}
       actions={sent ? null : google ?? form}
       secondary={google ? form : null}
-      fine={sent ? null : <Fine publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} emailToggle={Boolean(google && form)} />}
+      fine={sent
+        ? <Sent message={`Open the email we just sent to confirm your ${publicationName} subscription.`} />
+        : <Fine publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} emailToggle={Boolean(google && form)} />}
       pathname={path || undefined}
       suppressed={suppressed}
       suppressWhen={() => readSubscribed(subscribedStorageKey)}
@@ -173,6 +184,7 @@ export function NewsletterBar({
       trigger={trigger}
       dismissDays={dismissDays}
       confirmHash={NEWSLETTER_CONFIRMED_HASH}
+      confirmationVerified={confirmed}
       confirmation={confirmation ?? <>You’re in. The next {publicationName} briefing is on its way to your inbox.</>}
       dismissLabel="Close the newsletter invitation"
       onView={() => emit({ name: "viewed" })}
@@ -183,6 +195,20 @@ export function NewsletterBar({
   );
 }
 
+/** Announces the next step and keeps keyboard focus inside the bar after the form goes away. */
+function Sent({ message }: { message: string }) {
+  const [text, setText] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setText(message), 60);
+    document.querySelector<HTMLElement>(".sm-newsletter-bar .sm-conversion-bar__dismiss")?.focus();
+    return () => window.clearTimeout(timer);
+  }, [message]);
+  return <>
+    <p aria-hidden="true">{message}</p>
+    <p className="sm-conversion-bar__sr" role="status">{text}</p>
+  </>;
+}
+
 function Fine({ publicationName, frequency, privacyHref, emailToggle }: { publicationName: string; frequency: ReactNode; privacyHref: string; emailToggle: boolean }) {
   const bar = useConversionBar();
   return (
@@ -191,7 +217,11 @@ function Fine({ publicationName, frequency, privacyHref, emailToggle }: { public
       <a href={privacyHref}>Privacy</a>
       {emailToggle && !bar.expanded && <>
         <span className="sm-conversion-bar__phone-only"> · </span>
-        <button type="button" className="sm-conversion-bar__phone-only sm-newsletter-bar__link" onClick={() => bar.setExpanded(true)}>
+        <button type="button" className="sm-conversion-bar__phone-only sm-newsletter-bar__link" onClick={() => {
+          bar.setExpanded(true);
+          // The link goes away; focus the field it revealed.
+          window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".sm-newsletter-bar .sm-newsletter-bar__input")?.focus());
+        }}>
           Use email instead
         </button>
       </>}
