@@ -12,6 +12,7 @@ export default defineConfig({
     "pets-auth-server": "src/pets-auth-server.ts",
     "reader-sso": "src/reader-sso.ts",
     "reader-sso-client": "src/reader-sso-client.tsx",
+    "newsletter-bar": "src/newsletter-bar.tsx",
     toys: "src/toys.ts",
     "toys-view": "src/toys-view.tsx",
     "toys-forms": "src/toys-forms.tsx",
@@ -48,5 +49,5 @@ export default defineConfig({
   sourcemap: false,
   clean: true,
   treeshake: true,
-  external: ["@scalemule/news-publication/pets-forms", "@scalemule/news-publication/pets-interactions", "@scalemule/news-publication/toys-forms", "@scalemule/news-publication/toys-interactions", "react", "@scalemule/react", "@scalemule/sdk"],
+  external: ["@scalemule/news-publication/pets-forms", "@scalemule/news-publication/pets-interactions", "@scalemule/news-publication/toys-forms", "@scalemule/news-publication/toys-interactions", "react", "@scalemule/react", "@scalemule/react/conversion-bar", "@scalemule/sdk"],
 });

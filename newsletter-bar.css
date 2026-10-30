@@ -1,0 +1,140 @@
+/* ScaleMule News Publication - NewsletterBar
+   Pair with @scalemule/react/conversion-bar.css. The bar takes the publication's
+   type (serif title, sans UI) and a deep ink background that keeps white text
+   legible in light and dark themes; set --sm-bar-bg / --sm-bar-accent per paper. */
+
+.sm-newsletter-bar {
+  --sm-bar-font: var(--pub-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  --sm-bar-title-font: var(--pub-serif, Georgia, "Times New Roman", serif);
+  --sm-bar-width: var(--pub-width, 1180px);
+}
+
+.sm-newsletter-bar__google {
+  margin: 0;
+}
+.sm-newsletter-bar__google-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font: 600 15px / 1.2 var(--sm-bar-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.sm-newsletter-bar__google-button:hover {
+  background: #f1f4fa;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.sm-newsletter-bar__google-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+.sm-newsletter-bar__google-button svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.sm-newsletter-bar__form {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.sm-newsletter-bar__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sm-newsletter-bar__field {
+  display: flex;
+  min-width: 0;
+}
+.sm-newsletter-bar__field input {
+  flex: 1 1 auto;
+  width: 15rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--sm-bar-rule, rgba(255, 255, 255, 0.35));
+  border-right: 0;
+  border-radius: 4px 0 0 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: 16px / 1.2 var(--sm-bar-font);
+}
+.sm-newsletter-bar__field input::placeholder {
+  color: var(--sm-bar-muted, rgba(255, 255, 255, 0.7));
+}
+.sm-newsletter-bar__field button {
+  appearance: none;
+  flex: none;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--sm-bar-rule, rgba(255, 255, 255, 0.35));
+  border-radius: 0 4px 4px 0;
+  background: transparent;
+  color: inherit;
+  font: 600 14px / 1.2 var(--sm-bar-font);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sm-newsletter-bar__field button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.sm-newsletter-bar__field button:disabled,
+.sm-newsletter-bar__field input:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+/* Without a Google button the email form is the primary action. */
+.sm-newsletter-bar__form:not(.sm-newsletter-bar__form--compact) .sm-newsletter-bar__field button {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #1f1f1f;
+}
+.sm-newsletter-bar__trap {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.sm-newsletter-bar__error {
+  margin: 4px 0 0;
+  color: #ffd2cc;
+  font: 600 13px / 1.4 var(--sm-bar-font);
+}
+.sm-newsletter-bar__link {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Mid-width screens: give the actions room by letting the description go. */
+@media (min-width: 761px) and (max-width: 1080px) {
+  .sm-newsletter-bar .sm-conversion-bar__description { display: none; }
+  .sm-newsletter-bar__field input { width: 11rem; }
+}
+@media (max-width: 760px) {
+  .sm-newsletter-bar__field input { width: auto; }
+  .sm-newsletter-bar__google-button { min-height: 48px; font-size: 16px; }
+}

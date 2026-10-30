@@ -125,6 +125,7 @@ export type ReaderSsoEvent =
 
 export { READER_SSO_EVENTS, READER_SSO_PROPERTY_KEYS } from "./reader-sso-events";
 export type { ReaderSsoEventName, ReaderSsoEventDefinition } from "./reader-sso-events";
+export { NEWSLETTER_CONFIRMED_HASH, isPublicReadingPath, newsletterConfirmedLocation } from "./newsletter-confirmation";
 
 // ---------------------------------------------------------------------------
 // Gateway adapter. The site supplies a function that performs the request with
