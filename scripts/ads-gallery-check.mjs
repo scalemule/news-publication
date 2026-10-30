@@ -69,15 +69,23 @@ if (broken.length) fail("bar words broken: " + [...new Set(broken)].slice(0, 8).
 // Overflow and target sizes in the main document and in every 200% iframe.
 // Every control in every format (credit_line included) must be at least 44px.
 const measure = (tag) => {
-  const out = { overflow: [], smallTargets: [], targets: 0 };
+  const out = { overflow: [], smallTargets: [], targets: 0, minHeight: null, creditMin: null };
   for (const frame of document.querySelectorAll(".frame")) {
     const unit = frame.querySelector(".sm-ad");
     if (!unit) continue;
     const label = `${unit.dataset.adFormat} @ ${frame.style.width}${tag}`;
     if (unit.scrollWidth > unit.clientWidth + 1) out.overflow.push(`${label} (client ${unit.clientWidth}, scroll ${unit.scrollWidth})`);
-    for (const t of unit.querySelectorAll(".sm-ad-bar summary, .sm-ad-hide, .sm-ad-cta")) {
+    // Every actual clickable thing: the creative anchor in every format, the bar
+    // controls, and the controls inside OPEN panels. Collapsed panel content is
+    // not clickable and is skipped; decorative CTA text is not counted as the target.
+    for (const t of unit.querySelectorAll("a, button, summary, select")) {
+      const details = t.closest("details");
+      if (details && !details.open && t.tagName !== "SUMMARY") continue;
       const r = t.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
       out.targets++;
+      out.minHeight = Math.min(out.minHeight ?? Infinity, Math.round(r.height));
+      if (unit.classList.contains("sm-ad--credit_line") && t.classList.contains("sm-ad-creative")) out.creditMin = Math.min(out.creditMin ?? Infinity, Math.round(r.height));
       if (r.height < 44 || r.width < 44) out.smallTargets.push(`${label} ${t.className || t.tagName} ${Math.round(r.width)}x${Math.round(r.height)}`);
     }
   }
@@ -85,8 +93,14 @@ const measure = (tag) => {
 };
 const reports = [await page.evaluate(measure, "")];
 for (const f of page.frames()) if (f !== page.mainFrame()) reports.push(await f.evaluate(measure, " (200%)"));
-const report = reports.reduce((a, b) => ({ overflow: a.overflow.concat(b.overflow), smallTargets: a.smallTargets.concat(b.smallTargets), targets: a.targets + b.targets }));
-console.log(`targets measured ${report.targets} (main + ${reports.length - 1} iframe), under 44px: ${report.smallTargets.length}; overflowing units: ${report.overflow.length}`);
+const report = reports.reduce((a, b) => ({
+  overflow: a.overflow.concat(b.overflow),
+  smallTargets: a.smallTargets.concat(b.smallTargets),
+  targets: a.targets + b.targets,
+  minHeight: Math.min(a.minHeight ?? Infinity, b.minHeight ?? Infinity),
+  creditMin: Math.min(a.creditMin ?? Infinity, b.creditMin ?? Infinity),
+}));
+console.log(`targets measured ${report.targets} (main + ${reports.length - 1} iframe), under 44px: ${report.smallTargets.length}; min target height ${report.minHeight}px (credit-line advertiser anchor min ${report.creditMin}px); overflowing units: ${report.overflow.length}`);
 if (report.overflow.length) fail("overflow: " + [...new Set(report.overflow)].slice(0, 10).join(", "));
 if (report.smallTargets.length) fail(`control targets under 44px: ` + [...new Set(report.smallTargets)].slice(0, 10).join(", "));
 await browser.close();

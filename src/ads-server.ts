@@ -109,7 +109,8 @@ export async function sealAdPlan(apiKey: string, wire: ReturnType<typeof normali
     const sealed: AdDelivery = { ...rest, href };
     deliveries[placement] = sealed;
   }
-  return { status: wire.status, plan_id: wire.plan_id, policy_snapshot_at: wire.policy_snapshot_at, deliveries, empty: [...empty] };
+  const { deliveries: _wire, empty: _empty, ...rest } = wire;
+  return { ...rest, deliveries, empty: [...empty] };
 }
 
 /** One Map per React request; outside a request React's cache is a pass-through. */

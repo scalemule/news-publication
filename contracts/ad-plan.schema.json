@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://scalemule.com/contracts/ads/ad-plan.schema.json",
   "title": "ScaleMule Ads plan response (wire)",
-  "description": "What scalemule-ads returns from POST /v1/ads/plan inside the {success,data} envelope. The SDK (getAdPlan) signs each delivery's fallback href from destination_url and strips destination_url and tier before the plan reaches a page. ADR-2026-10-29 sections 6.1 and 7.5.2.",
+  "description": "What scalemule-ads returns from POST /v1/ads/plan inside the {success,data} envelope. The SDK (getAdPlan) signs each delivery's fallback href from destination_url and strips destination_url and tier before the plan reaches a page. ADR-2026-10-29 sections 6.1 and 7.5.2. This file is the single contract: scalemule-ads vendors it verbatim and validates its serialized responses against it; the SDK validates contracts/fixtures/service-wire/*.json written from the service's real serializer.",
   "type": "object",
   "required": [
     "status",
@@ -44,6 +44,32 @@
         "$ref": "#/$defs/placementKey"
       },
       "uniqueItems": true
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "policy_stale",
+        "sensitive",
+        "blocked",
+        "no_inventory",
+        "preview"
+      ],
+      "description": "Why the plan has no (or forced) deliveries. Optional; informational only."
+    },
+    "page_sponsor": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uuidv7"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The flight that won page exclusivity, or null."
+    },
+    "preview": {
+      "type": "boolean",
+      "description": "True when a preview token forced the creative; deliveries are logged preview=true and excluded from stats."
     }
   },
   "$defs": {

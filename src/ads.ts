@@ -113,12 +113,20 @@ export type AdWireDelivery = AdDelivery & {
 /** "ok" is a real answer (possibly with no deliveries); "unavailable" means the service could not be asked. */
 export type AdPlanStatus = "ok" | "unavailable";
 
+export type AdPlanReason = "policy_stale" | "sensitive" | "blocked" | "no_inventory" | "preview";
+
 export type AdPlan = {
   status: AdPlanStatus;
   plan_id: string;
   policy_snapshot_at: string;
   deliveries: Partial<Record<AdPlacementKey, AdDelivery>>;
   empty: AdPlacementKey[];
+  /** Why the service returned no (or forced) deliveries; informational. */
+  reason?: AdPlanReason;
+  /** The flight that won page exclusivity, or null. */
+  page_sponsor?: string | null;
+  /** A preview token forced the creative; not counted anywhere. */
+  preview?: boolean;
 };
 
 export type AdBox = { width: number; height?: number; minHeight?: number };
@@ -325,6 +333,7 @@ export function unavailableAdPlan(): AdPlan {
 }
 
 const LABELS = new Set<string>(["advertisement", "sponsored"]);
+const REASONS = new Set<string>(["policy_stale", "sensitive", "blocked", "no_inventory", "preview"]);
 const TIERS = new Set<string>(["cookieless", "performance", "advertising"]);
 const FORMATS = new Set<string>(AD_FORMAT_KEYS);
 const isString = (v: unknown): v is string => typeof v === "string";
@@ -411,7 +420,17 @@ export function normalizeAdPlan(value: unknown): AdPlan & { deliveries: Partial<
     if (delivery) deliveries[placement] = delivery;
     else empty.add(placement);
   }
-  return { status: "ok", plan_id: plan.plan_id, policy_snapshot_at: plan.policy_snapshot_at, deliveries, empty: [...empty] };
+  const out: AdPlan & { deliveries: Partial<Record<AdPlacementKey, AdWireDelivery>> } = {
+    status: "ok",
+    plan_id: plan.plan_id,
+    policy_snapshot_at: plan.policy_snapshot_at,
+    deliveries,
+    empty: [...empty],
+  };
+  if (isString(plan.reason) && REASONS.has(plan.reason)) out.reason = plan.reason as AdPlanReason;
+  if (plan.page_sponsor === null || isUuid7(plan.page_sponsor)) out.page_sponsor = plan.page_sponsor === null ? null : (plan.page_sponsor as string).toLowerCase();
+  if (typeof plan.preview === "boolean") out.preview = plan.preview;
+  return out;
 }
 
 /** True when every delivery in `value` is structurally valid. */
