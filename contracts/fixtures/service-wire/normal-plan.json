@@ -5,6 +5,28 @@
         "advertiser": "NapSite",
         "policy_path": "/advertising"
       },
+      "brand": {
+        "accent": "#f1d8a7",
+        "context": "Tri-Valley Weekly is built on napsite.com",
+        "eyebrow": "Our website partner",
+        "footer": {
+          "ink": "#173d32",
+          "ink_muted": "#435b50",
+          "surface": "#edf1ed"
+        },
+        "ink": "#ffffff",
+        "ink_muted": "#d6e5dd",
+        "on_accent": "#173d32",
+        "secondary": {
+          "label": "See plans & pricing",
+          "url": "https://napsite.com/pricing"
+        },
+        "surface": "#173d32",
+        "wordmark": {
+          "mark": ".",
+          "text": "NapSite"
+        }
+      },
       "content": {
         "advertiser": "NapSite",
         "cta": "Explore NapSite",
@@ -16,7 +38,8 @@
           "height": 240,
           "url": "https://cdn.example.com/logo.webp",
           "width": 240
-        }
+        },
+        "mode": "typographic"
       },
       "creative_id": "0192f3c0-0000-7000-8000-0000000007d1",
       "delivery_id": "0192f3c0-0000-7000-8000-000000001b58",
@@ -34,6 +57,28 @@
         "advertiser": "NapSite",
         "policy_path": "/advertising"
       },
+      "brand": {
+        "accent": "#f1d8a7",
+        "context": "Tri-Valley Weekly is built on napsite.com",
+        "eyebrow": "Our website partner",
+        "footer": {
+          "ink": "#173d32",
+          "ink_muted": "#435b50",
+          "surface": "#edf1ed"
+        },
+        "ink": "#ffffff",
+        "ink_muted": "#d6e5dd",
+        "on_accent": "#173d32",
+        "secondary": {
+          "label": "See plans & pricing",
+          "url": "https://napsite.com/pricing"
+        },
+        "surface": "#173d32",
+        "wordmark": {
+          "mark": ".",
+          "text": "NapSite"
+        }
+      },
       "content": {
         "advertiser": "NapSite",
         "cta": "Explore NapSite",
@@ -45,7 +90,8 @@
           "height": 240,
           "url": "https://cdn.example.com/logo.webp",
           "width": 240
-        }
+        },
+        "mode": "typographic"
       },
       "creative_id": "0192f3c0-0000-7000-8000-0000000007d1",
       "delivery_id": "0192f3c0-0000-7000-8000-000000001b59",

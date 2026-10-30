@@ -22,6 +22,8 @@ const validate = ajv.compile(schema);
 const KINDS: Array<[RegExp, { deliveries: "some" | "none"; reason?: string; preview?: boolean }]> = [
   [/^preview/, { deliveries: "some", preview: true }],
   [/^normal/, { deliveries: "some" }],
+  [/^photo/, { deliveries: "some" }],
+  [/^artwork/, { deliveries: "some" }],
   [/^sensitive/, { deliveries: "none", reason: "sensitive" }],
   [/^blocked/, { deliveries: "none", reason: "blocked" }],
   [/^cold/, { deliveries: "none", reason: "policy_stale" }],

@@ -1,26 +1,39 @@
 /* ScaleMule Ads units (ADR-2026-10-29, section 5). Load once per property.
    Units are server-rendered, so nothing is injected after paint; the reserved
-   minimum heights below keep the box stable while images and fonts arrive.
-   Colors come from the publication tokens so light and dark both pass 4.5:1. */
+   minimum heights keep every box stable while images and fonts arrive.
+
+   Colors: the unit root carries the advertiser's brand kit as inline custom
+   properties (--sm-ad-bg, --sm-ad-fg, --sm-ad-fg-muted, --sm-ad-accent,
+   --sm-ad-cta-bg, --sm-ad-cta-fg, ...). Every text element inside the creative
+   is colored explicitly by a three-class rule below, so no publication
+   stylesheet, element rule or theme can recolor an advertisement. Only the
+   disclosure row and the open panels use the publication's own tokens. */
 .sm-ad {
-  --sm-ad-bg: var(--pub-sponsor, #173d32);
+  --sm-ad-bg: #173d32;
   --sm-ad-fg: #ffffff;
   --sm-ad-fg-muted: #d6e5dd;
+  --sm-ad-accent: #f1d8a7;
   --sm-ad-cta-bg: #f1d8a7;
   --sm-ad-cta-fg: #173d32;
   --sm-ad-focus: #f1d8a7;
+  --sm-ad-rule: #f1d8a7;
+  --sm-ad-scrim: rgba(23, 61, 50, 0.94);
+  --sm-ad-scrim-clear: rgba(23, 61, 50, 0);
   --sm-ad-logo-field: #ffffff;
   --sm-ad-control-fg: var(--pub-muted, #545c55);
   --sm-ad-control-rule: var(--pub-rule, #d7dcd7);
+  --sm-ad-serif: var(--font-display, var(--pub-serif, Georgia, "Times New Roman", serif));
+  --sm-ad-sans: var(--pub-sans, Arial, Helvetica, sans-serif);
   container-type: inline-size;
   display: block;
   min-width: 0;
   margin: 0;
   color: var(--pub-ink, #171917);
-  font-family: var(--pub-sans, Arial, Helvetica, sans-serif);
+  font-family: var(--sm-ad-sans);
   overflow-wrap: anywhere;
 }
 .sm-ad *, .sm-ad *::before, .sm-ad *::after { box-sizing: border-box; }
+
 /* Disclosure row: label left, "About · Hide · Report" right, one line. */
 .sm-ad-bar {
   position: relative;
@@ -32,7 +45,7 @@
   column-gap: 12px;
   min-height: 44px;
   color: var(--sm-ad-control-fg);
-  font: 600 0.625rem/1.5 var(--pub-sans, Arial, sans-serif);
+  font: 600 0.625rem/1.5 var(--sm-ad-sans);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   overflow-wrap: normal;
@@ -47,32 +60,65 @@
 .sm-ad-links > :not(:first-child) > summary::before,
 .sm-ad-links > button:not(:first-child)::before { content: "\00b7"; display: inline-block; margin: 0 6px; text-decoration: none; }
 
-/* The creative: one link, block layout. */
-.sm-ad-creative {
+/* The box: the brand surface. Row 1 is the creative (one link), row 2 the
+   optional secondary link (a second, separately signed link). */
+.sm-ad .sm-ad-box {
   display: grid;
-  gap: 24px;
-  align-items: center;
-  padding: 32px;
-  background: var(--sm-ad-bg);
-  color: var(--sm-ad-fg);
-  text-decoration: none;
-  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto;
-  grid-template-areas: "brand copy cta";
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  background: var(--sm-ad-bg, #173d32);
+  color: var(--sm-ad-fg, #ffffff);
 }
-.sm-ad-creative:focus-visible { outline: 3px solid var(--sm-ad-focus); outline-offset: 4px; }
-.sm-ad--with-image .sm-ad-creative {
-  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto auto;
-  grid-template-areas: "brand copy image cta";
+.sm-ad .sm-ad-box .sm-ad-creative {
+  display: grid;
+  min-width: 0;
+  gap: 40px;
+  align-items: center;
+  padding: 40px;
+  background: var(--sm-ad-bg, #173d32);
+  color: var(--sm-ad-fg, #ffffff);
+  text-decoration: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  grid-template-areas: "brand copy actions";
+}
+.sm-ad .sm-ad-box .sm-ad-creative:focus-visible { outline: 3px solid var(--sm-ad-focus, #f1d8a7); outline-offset: 4px; }
+.sm-ad .sm-ad-box .sm-ad-creative:hover .sm-ad-cta { background: var(--sm-ad-fg, #ffffff); color: var(--sm-ad-bg, #173d32); }
+.sm-ad--with-image .sm-ad-box .sm-ad-creative {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto auto;
+  grid-template-areas: "brand copy image actions";
 }
 /* Every grid child may shrink below its min-content; copy breaks anywhere. */
-.sm-ad-creative > * { min-width: 0; max-width: 100%; }
-.sm-ad-brand { grid-area: brand; display: grid; justify-items: start; gap: 10px; overflow-wrap: anywhere; }
-.sm-ad-copy { grid-area: copy; display: grid; gap: 10px; overflow-wrap: anywhere; }
-.sm-ad-image { grid-area: image; display: block; width: 180px; background: var(--sm-ad-logo-field); overflow: hidden; }
-.sm-ad-image img { display: block; width: 100%; height: auto; }
-.sm-ad-cta { grid-area: cta; }
+.sm-ad .sm-ad-creative > * { min-width: 0; max-width: 100%; }
+.sm-ad .sm-ad-creative .sm-ad-brand { grid-area: brand; display: grid; justify-items: start; align-content: center; gap: 16px; overflow-wrap: anywhere; }
+.sm-ad .sm-ad-creative .sm-ad-copy { grid-area: copy; display: grid; gap: 16px; overflow-wrap: anywhere; }
+.sm-ad .sm-ad-creative .sm-ad-image { grid-area: image; display: block; width: 180px; background: var(--sm-ad-logo-field); overflow: hidden; }
+.sm-ad .sm-ad-creative .sm-ad-image img { display: block; width: 100%; height: auto; }
+.sm-ad .sm-ad-creative .sm-ad-actions { grid-area: actions; display: grid; justify-items: center; gap: 12px; min-width: 0; }
 
-.sm-ad-logo {
+/* Brand block. */
+.sm-ad .sm-ad-creative .sm-ad-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 0.6875rem/1.5 var(--sm-ad-sans);
+  letter-spacing: 0.01em;
+  color: var(--sm-ad-fg-muted, #d6e5dd);
+}
+.sm-ad .sm-ad-creative .sm-ad-wordmark {
+  display: block;
+  font: 400 4.5rem/1 var(--sm-ad-serif);
+  letter-spacing: -0.035em;
+  color: var(--sm-ad-fg, #ffffff);
+  overflow-wrap: anywhere;
+}
+.sm-ad .sm-ad-creative .sm-ad-wordmark .sm-ad-wordmark-mark { color: var(--sm-ad-accent, #f1d8a7); }
+.sm-ad .sm-ad-creative .sm-ad-context {
+  display: block;
+  max-width: 28ch;
+  font: 400 0.75rem/1.6 var(--sm-ad-sans);
+  color: var(--sm-ad-fg-muted, #d6e5dd);
+}
+.sm-ad .sm-ad-creative .sm-ad-logo {
   display: inline-grid;
   place-items: center;
   width: 64px;
@@ -81,33 +127,35 @@
   background: var(--sm-ad-logo-field);
   border-radius: 4px;
 }
-.sm-ad-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.sm-ad-logo--wide { width: 160px; }
-.sm-ad-logo--mark {
-  color: var(--sm-ad-cta-fg);
-  font: 700 1.75rem/1 var(--pub-serif, Georgia, serif);
-}
-.sm-ad-advertiser {
-  font: 600 0.75rem/1.4 var(--pub-sans, Arial, sans-serif);
+.sm-ad .sm-ad-creative .sm-ad-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.sm-ad .sm-ad-creative .sm-ad-logo--wide { width: 160px; }
+.sm-ad .sm-ad-creative .sm-ad-logo--mark { color: var(--sm-ad-cta-fg, #173d32); font: 700 1.75rem/1 var(--sm-ad-serif); }
+.sm-ad .sm-ad-creative .sm-ad-eyebrow .sm-ad-logo { width: 24px; height: 24px; padding: 2px; border-radius: 2px; }
+.sm-ad .sm-ad-creative .sm-ad-advertiser {
+  font: 600 0.75rem/1.4 var(--sm-ad-sans);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--sm-ad-fg-muted);
+  color: var(--sm-ad-fg-muted, #d6e5dd);
 }
-.sm-ad-headline {
+
+/* Copy. */
+.sm-ad .sm-ad-creative .sm-ad-headline {
   display: block;
-  font: 400 clamp(1.375rem, 2.4cqi, 1.875rem)/1.15 var(--pub-serif, Georgia, serif);
-  letter-spacing: -0.02em;
+  font: 400 clamp(1.75rem, 3cqi, 2.625rem)/1.1 var(--sm-ad-serif);
+  letter-spacing: -0.035em;
   text-wrap: pretty;
-  max-width: 24ch;
+  max-width: 22ch;
+  color: var(--sm-ad-fg, #ffffff);
 }
-.sm-ad-description {
+.sm-ad .sm-ad-creative .sm-ad-description {
   display: block;
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: var(--sm-ad-fg-muted);
+  font: 400 0.875rem/1.6 var(--sm-ad-sans);
+  color: var(--sm-ad-fg-muted, #d6e5dd);
   max-width: 48ch;
 }
-.sm-ad-cta {
+
+/* Actions. */
+.sm-ad .sm-ad-creative .sm-ad-cta {
   max-width: 100%;
   display: inline-flex;
   align-items: center;
@@ -115,57 +163,124 @@
   min-height: 48px;
   min-width: 44px;
   padding: 12px 24px;
-  background: var(--sm-ad-cta-bg);
-  color: var(--sm-ad-cta-fg);
-  font-size: 0.875rem;
-  font-weight: 700;
+  background: var(--sm-ad-cta-bg, #f1d8a7);
+  color: var(--sm-ad-cta-fg, #173d32);
+  font: 700 0.875rem/1.3 var(--sm-ad-sans);
   text-align: center;
   overflow-wrap: anywhere;
 }
-.sm-ad-creative:hover .sm-ad-cta { background: #ffffff; }
+.sm-ad .sm-ad-box .sm-ad-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  min-height: 44px;
+  padding: 0 40px 16px;
+  font: 400 0.75rem/1.4 var(--sm-ad-sans);
+  color: var(--sm-ad-fg, #ffffff);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  max-width: 100%;
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.sm-ad .sm-ad-box .sm-ad-secondary:focus-visible { outline: 3px solid var(--sm-ad-focus, #f1d8a7); outline-offset: -3px; }
+@media (prefers-reduced-motion: no-preference) { .sm-ad .sm-ad-creative .sm-ad-cta { transition: background 120ms ease, color 120ms ease; } }
 
-/* Format boxes. */
-.sm-ad--band .sm-ad-creative { min-height: 280px; }
-.sm-ad--column .sm-ad-creative {
+/* Format boxes (typographic). */
+.sm-ad--band .sm-ad-box .sm-ad-creative { min-height: 280px; }
+.sm-ad--column .sm-ad-box .sm-ad-creative {
   min-height: 520px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "brand" "copy" "image" "cta";
+  grid-template-areas: "brand" "copy" "image" "actions";
+  gap: 32px;
   align-content: space-between;
   padding: 28px;
 }
-.sm-ad--column .sm-ad-image { width: 100%; }
-.sm-ad--column .sm-ad-cta { justify-self: stretch; }
-.sm-ad--inline_card .sm-ad-creative {
-  min-height: 320px;
+.sm-ad--column .sm-ad-creative .sm-ad-wordmark { font-size: 4rem; }
+.sm-ad--column .sm-ad-creative .sm-ad-headline { font-size: 2.125rem; }
+.sm-ad--column .sm-ad-creative .sm-ad-image { width: 100%; }
+.sm-ad--column .sm-ad-creative .sm-ad-actions { justify-items: stretch; text-align: center; }
+.sm-ad--column .sm-ad-box .sm-ad-secondary { justify-self: center; padding: 0 28px 20px; }
+.sm-ad--inline_card .sm-ad-box .sm-ad-creative {
+  min-height: 350px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "brand" "copy" "cta";
+  grid-template-areas: "brand" "copy" "actions";
+  gap: 24px;
   align-content: start;
+  padding: 32px;
 }
-.sm-ad--inline_card.sm-ad--with-image .sm-ad-creative {
+.sm-ad--inline_card.sm-ad--with-image .sm-ad-box .sm-ad-creative {
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  grid-template-areas: "image brand" "image copy" "image cta";
+  grid-template-areas: "image brand" "image copy" "image actions";
 }
-.sm-ad--inline_card .sm-ad-image { width: 100%; align-self: start; }
-.sm-ad--inline_card .sm-ad-cta { justify-self: start; }
-.sm-ad--partner_footer {
-  --sm-ad-bg: var(--pub-soft, #edf1ed);
-  --sm-ad-fg: var(--pub-ink, #173d32);
-  --sm-ad-fg-muted: var(--pub-muted, #435b50);
-  --sm-ad-cta-bg: var(--pub-sponsor, #173d32);
-  --sm-ad-cta-fg: #ffffff;
-  --sm-ad-focus: var(--pub-sponsor, #173d32);
-}
-.sm-ad--partner_footer .sm-ad-creative { min-height: 240px; border-top: 3px solid var(--pub-sponsor, #173d32); }
-.sm-ad--partner_footer .sm-ad-creative:hover .sm-ad-cta { background: #28624e; }
-.sm-ad--partner_footer .sm-ad-logo--mark { color: var(--pub-sponsor, #173d32); }
-.sm-ad--showcase .sm-ad-creative {
+.sm-ad--inline_card .sm-ad-creative .sm-ad-wordmark { font-size: 3.5rem; }
+.sm-ad--inline_card .sm-ad-creative .sm-ad-image { width: 100%; align-self: start; }
+.sm-ad--inline_card .sm-ad-creative .sm-ad-actions { justify-items: start; }
+.sm-ad--inline_card .sm-ad-box .sm-ad-secondary { justify-self: start; padding: 0 32px 20px; }
+.sm-ad--partner_footer .sm-ad-box { border-top: 3px solid var(--sm-ad-rule, #173d32); }
+.sm-ad--partner_footer .sm-ad-box .sm-ad-creative { min-height: 240px; }
+.sm-ad--partner_footer .sm-ad-creative .sm-ad-logo--mark { color: var(--sm-ad-fg, #173d32); }
+.sm-ad--partner_footer .sm-ad-box .sm-ad-creative:hover .sm-ad-cta { background: var(--sm-ad-accent, #f1d8a7); color: var(--sm-ad-fg, #173d32); }
+.sm-ad--showcase .sm-ad-box .sm-ad-creative {
   min-height: 390px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-  grid-template-areas: "brand image" "copy image" "cta image";
+  grid-template-areas: "brand image" "copy image" "actions image";
   gap: 32px 48px;
 }
-.sm-ad--showcase .sm-ad-image { width: 100%; border: 1px solid #6a887b; }
-.sm-ad--showcase .sm-ad-cta { justify-self: start; }
+.sm-ad--showcase .sm-ad-creative .sm-ad-image { width: 100%; border: 1px solid var(--sm-ad-fg-muted, #d6e5dd); }
+.sm-ad--showcase .sm-ad-creative .sm-ad-actions { justify-items: start; }
+
+/* Photo mode: the photograph fills the unit; copy sits on a scrim at the
+   bottom, or beside the photograph on a wide band. */
+.sm-ad--photo .sm-ad-box .sm-ad-creative {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "panel";
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.sm-ad--photo .sm-ad-creative .sm-ad-photo { position: absolute; inset: 0; display: block; aspect-ratio: auto; }
+.sm-ad--photo .sm-ad-creative .sm-ad-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.sm-ad--photo .sm-ad-creative .sm-ad-panel-copy {
+  grid-area: panel;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "brand" "copy" "actions";
+  gap: 16px;
+  align-self: end;
+  padding: 120px 28px 28px;
+  background: linear-gradient(to top, var(--sm-ad-scrim, rgba(23, 61, 50, 0.94)) 0%, var(--sm-ad-scrim, rgba(23, 61, 50, 0.94)) 62%, var(--sm-ad-scrim-clear, rgba(23, 61, 50, 0)) 100%);
+}
+.sm-ad--photo .sm-ad-creative .sm-ad-wordmark { font-size: 3rem; }
+.sm-ad--photo .sm-ad-creative .sm-ad-headline { font-size: clamp(1.5rem, 2.6cqi, 2.25rem); max-width: 18ch; }
+.sm-ad--photo .sm-ad-creative .sm-ad-actions { justify-items: start; }
+.sm-ad--photo.sm-ad--band .sm-ad-box .sm-ad-creative { min-height: 280px; }
+.sm-ad--photo.sm-ad--column .sm-ad-box .sm-ad-creative { min-height: 520px; }
+.sm-ad--photo.sm-ad--inline_card .sm-ad-box .sm-ad-creative { min-height: 350px; }
+.sm-ad--photo.sm-ad--partner_footer .sm-ad-box .sm-ad-creative { min-height: 240px; }
+.sm-ad--photo.sm-ad--column .sm-ad-box .sm-ad-secondary { justify-self: center; padding: 0 28px 20px; }
+
+/* Artwork mode: finished art fills the reserved box; nothing is drawn over it. */
+.sm-ad--artwork .sm-ad-box .sm-ad-creative { display: block; padding: 0; gap: 0; }
+.sm-ad--artwork .sm-ad-creative .sm-ad-artwork { display: block; min-width: 0; }
+.sm-ad--artwork .sm-ad-creative .sm-ad-art { display: block; width: 100%; height: auto; }
+.sm-ad--artwork .sm-ad-creative .sm-ad-art--mobile { display: none; }
+.sm-ad--artwork .sm-ad-creative .sm-ad-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  background: var(--sm-ad-cta-bg, #f1d8a7);
+  color: var(--sm-ad-cta-fg, #173d32);
+  font: 700 0.875rem/1.3 var(--sm-ad-sans);
+  text-align: center;
+}
 
 /* Credit line: text only, sits in a masthead. */
 /* Inline in a masthead: no container queries here, since inline-size containment
@@ -174,7 +289,7 @@
 .sm-ad--credit_line .sm-ad-bar { font-size: 0.5625rem; }
 /* A 44px target in a 30px masthead line: the link box is 44px tall, the
    7px of extra height on each side is pulled back out of the flow. */
-.sm-ad--credit_line .sm-ad-creative {
+.sm-ad.sm-ad--credit_line .sm-ad-creative {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -183,11 +298,12 @@
   margin-block: -7px;
   background: none;
   color: var(--pub-ink, #171917);
-  font: 0.75rem/1.5 var(--pub-sans, Arial, sans-serif);
+  font: 0.75rem/1.5 var(--sm-ad-sans);
+  text-decoration: none;
 }
-.sm-ad--credit_line .sm-ad-creative:focus-visible { outline-color: var(--pub-sponsor, #173d32); }
-.sm-ad--credit_line .sm-ad-logo { width: 20px; height: 20px; padding: 0; background: none; }
-.sm-ad--credit_line .sm-ad-credit { text-decoration: underline; text-underline-offset: 3px; }
+.sm-ad.sm-ad--credit_line .sm-ad-creative:focus-visible { outline: 3px solid var(--sm-ad-bg, #173d32); outline-offset: 2px; }
+.sm-ad--credit_line .sm-ad-creative .sm-ad-logo { width: 20px; height: 20px; padding: 0; background: none; }
+.sm-ad--credit_line .sm-ad-creative .sm-ad-credit { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Control links: 44px targets by padding, not by stacking. */
 .sm-ad-links summary,
@@ -228,7 +344,7 @@
   color: var(--pub-ink, #171917);
   border: 1px solid var(--sm-ad-control-rule);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  font: 400 0.8125rem/1.5 var(--pub-sans, Arial, sans-serif);
+  font: 400 0.8125rem/1.5 var(--sm-ad-sans);
   letter-spacing: 0;
   text-transform: none;
   white-space: normal;
@@ -243,6 +359,7 @@ form.sm-ad-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12
 .sm-ad-panel select,
 .sm-ad-panel button[type="submit"] {
   min-height: 44px;
+  height: 44px;
   padding: 0 12px;
   font: inherit;
   color: var(--pub-ink, #171917);
@@ -250,99 +367,128 @@ form.sm-ad-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12
   border: 1px solid var(--sm-ad-control-rule);
   border-radius: 4px;
 }
+/* WebKit ignores the height of a native menulist: draw the select ourselves, chevron included. */
+.sm-ad-panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23545c55' stroke-width='1.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
 .sm-ad-panel button[type="submit"] { cursor: pointer; }
-@media (prefers-reduced-motion: no-preference) { .sm-ad-cta { transition: background 120ms ease; } }
 
 /* Narrow containers (phones, and any column under 600px). */
 @container (max-width: 600px) {
-  .sm-ad .sm-ad-creative,
-  .sm-ad--inline_card.sm-ad--with-image .sm-ad-creative,
-  .sm-ad--showcase .sm-ad-creative {
+  .sm-ad .sm-ad-box .sm-ad-creative,
+  .sm-ad--inline_card.sm-ad--with-image .sm-ad-box .sm-ad-creative,
+  .sm-ad--showcase .sm-ad-box .sm-ad-creative {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "brand" "copy" "image" "cta";
-    gap: 20px;
-    padding: 24px 20px;
-    align-content: start;
+    grid-template-areas: "brand" "copy" "image" "actions";
+    gap: 24px;
+    padding: 28px 24px;
+    align-content: center;
   }
-  /* Band, column and footer: the 1:1 image sits in the brand row as a 96px square. */
-  .sm-ad--band.sm-ad--with-image .sm-ad-creative,
-  .sm-ad--column.sm-ad--with-image .sm-ad-creative,
-  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-creative {
+  /* Band, column and footer with a 1:1 image: the image sits in the brand row as a 96px square. */
+  .sm-ad--band.sm-ad--with-image .sm-ad-box .sm-ad-creative,
+  .sm-ad--column.sm-ad--with-image .sm-ad-box .sm-ad-creative,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-box .sm-ad-creative {
     grid-template-columns: 96px minmax(0, 1fr);
-    grid-template-areas: "image brand" "copy copy" "cta cta";
+    grid-template-areas: "image brand" "copy copy" "actions actions";
     gap: 16px;
   }
-  .sm-ad--band.sm-ad--with-image .sm-ad-image,
-  .sm-ad--column.sm-ad--with-image .sm-ad-image,
-  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-image { width: 96px; height: 96px; }
-  .sm-ad--band.sm-ad--with-image .sm-ad-brand,
-  .sm-ad--column.sm-ad--with-image .sm-ad-brand,
-  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    align-self: center;
-  }
-  .sm-ad--band.sm-ad--with-image .sm-ad-logo,
-  .sm-ad--column.sm-ad--with-image .sm-ad-logo,
-  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-logo { width: 24px; height: 24px; padding: 2px; border-radius: 2px; }
-  .sm-ad--band.sm-ad--with-image .sm-ad-logo--wide,
-  .sm-ad--column.sm-ad--with-image .sm-ad-logo--wide { width: 60px; }
-  .sm-ad--band.sm-ad--with-image .sm-ad-logo--mark,
-  .sm-ad--column.sm-ad--with-image .sm-ad-logo--mark { font-size: 0.875rem; }
-  .sm-ad--band .sm-ad-creative { min-height: 320px; }
-  .sm-ad--column .sm-ad-creative { min-height: 320px; }
-  .sm-ad--inline_card .sm-ad-creative { min-height: 360px; }
-  .sm-ad--partner_footer .sm-ad-creative { min-height: 300px; }
-  .sm-ad--showcase .sm-ad-creative { min-height: 560px; }
-  .sm-ad--inline_card .sm-ad-image, .sm-ad--showcase .sm-ad-image { width: 100%; }
-  .sm-ad .sm-ad-logo { width: 48px; height: 48px; }
-  .sm-ad .sm-ad-logo--wide { width: 120px; }
-  .sm-ad .sm-ad-headline { font-size: 1.375rem; max-width: 20ch; }
-  .sm-ad .sm-ad-description { font-size: 0.875rem; }
-  .sm-ad .sm-ad-cta { justify-self: stretch; }
+  .sm-ad--band.sm-ad--with-image .sm-ad-creative .sm-ad-image,
+  .sm-ad--column.sm-ad--with-image .sm-ad-creative .sm-ad-image,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-creative .sm-ad-image { width: 96px; height: 96px; }
+  .sm-ad .sm-ad-creative .sm-ad-wordmark { font-size: 3rem; }
+  .sm-ad .sm-ad-creative .sm-ad-headline { font-size: 1.875rem; max-width: 20ch; }
+  .sm-ad .sm-ad-creative .sm-ad-logo { width: 48px; height: 48px; }
+  .sm-ad .sm-ad-creative .sm-ad-logo--wide { width: 120px; }
+  .sm-ad .sm-ad-creative .sm-ad-actions { justify-items: stretch; text-align: center; }
+  .sm-ad .sm-ad-box .sm-ad-secondary { justify-self: center; padding: 0 24px 20px; }
+  .sm-ad--band .sm-ad-box .sm-ad-creative { min-height: 320px; }
+  .sm-ad--column .sm-ad-box .sm-ad-creative { min-height: 320px; }
+  .sm-ad--inline_card .sm-ad-box .sm-ad-creative { min-height: 360px; }
+  .sm-ad--partner_footer .sm-ad-box .sm-ad-creative { min-height: 300px; }
+  .sm-ad--showcase .sm-ad-box .sm-ad-creative { min-height: 560px; }
+  .sm-ad--inline_card .sm-ad-creative .sm-ad-image, .sm-ad--showcase .sm-ad-creative .sm-ad-image { width: 100%; }
+  /* Photo mode on a phone: the photograph fills the box, copy on the scrim. */
+  .sm-ad--photo .sm-ad-box .sm-ad-creative { grid-template-columns: minmax(0, 1fr); grid-template-areas: "panel"; padding: 0; }
+  .sm-ad--photo .sm-ad-creative .sm-ad-panel-copy { padding: 140px 24px 24px; }
+  .sm-ad--photo.sm-ad--band .sm-ad-box .sm-ad-creative { min-height: 360px; }
+  .sm-ad--photo.sm-ad--column .sm-ad-box .sm-ad-creative { min-height: 360px; }
+  .sm-ad--photo.sm-ad--partner_footer .sm-ad-box .sm-ad-creative { min-height: 300px; }
+  /* Artwork: the mobile art replaces the desktop art. */
+  .sm-ad--artwork .sm-ad-artwork--responsive .sm-ad-art--desktop { display: none; }
+  .sm-ad--artwork .sm-ad-artwork--responsive .sm-ad-art--mobile { display: block; }
 }
 /* Wide containers: a column collapses to a band. */
 @container (min-width: 601px) {
-  .sm-ad--column .sm-ad-creative {
+  .sm-ad--column .sm-ad-box .sm-ad-creative {
     min-height: 280px;
-    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto;
-    grid-template-areas: "brand copy cta";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
+    grid-template-areas: "brand copy actions";
+    gap: 40px;
+    padding: 40px;
     align-content: center;
   }
-  .sm-ad--column.sm-ad--with-image .sm-ad-creative {
-    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto auto;
-    grid-template-areas: "brand copy image cta";
+  .sm-ad--column.sm-ad--with-image .sm-ad-box .sm-ad-creative {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto auto;
+    grid-template-areas: "brand copy image actions";
   }
-  .sm-ad--column .sm-ad-image { width: 180px; }
-  .sm-ad--column .sm-ad-cta { justify-self: auto; }
+  .sm-ad--column .sm-ad-creative .sm-ad-image { width: 180px; }
+  .sm-ad--column .sm-ad-creative .sm-ad-actions { justify-items: center; }
+  .sm-ad--column .sm-ad-box .sm-ad-secondary { justify-self: end; padding: 0 40px 20px; }
 }
 /* Tablet containers (601–959px): two rows so the headline keeps a real measure.
-   Row 1: brand (logo + name) and copy. Row 2: the optional 1:1 image as a
-   120px square on the left, the CTA on the right. Showcase keeps its own grid. */
+   Row 1: brand and copy. Row 2: the optional 1:1 image as a 120px square on
+   the left, the CTA on the right. Showcase keeps its own grid. */
 @container (min-width: 601px) and (max-width: 959px) {
-  .sm-ad--band .sm-ad-creative,
-  .sm-ad--column .sm-ad-creative,
-  .sm-ad--partner_footer .sm-ad-creative {
+  .sm-ad--band .sm-ad-box .sm-ad-creative,
+  .sm-ad--column .sm-ad-box .sm-ad-creative,
+  .sm-ad--partner_footer .sm-ad-box .sm-ad-creative {
     min-height: 240px;
-    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
-    grid-template-areas: "brand copy" "cta cta";
-    gap: 20px 24px;
-    padding: 28px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    grid-template-areas: "brand copy" "actions actions";
+    gap: 24px 32px;
+    padding: 32px;
     align-content: space-between;
   }
-  .sm-ad--band.sm-ad--with-image .sm-ad-creative,
-  .sm-ad--column.sm-ad--with-image .sm-ad-creative,
-  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-creative {
-    grid-template-areas: "brand copy" "image cta";
+  .sm-ad--band.sm-ad--with-image .sm-ad-box .sm-ad-creative,
+  .sm-ad--column.sm-ad--with-image .sm-ad-box .sm-ad-creative,
+  .sm-ad--partner_footer.sm-ad--with-image .sm-ad-box .sm-ad-creative {
+    grid-template-areas: "brand copy" "image actions";
   }
-  .sm-ad--band .sm-ad-image,
-  .sm-ad--column .sm-ad-image,
-  .sm-ad--partner_footer .sm-ad-image { width: 120px; height: 120px; align-self: end; }
-  .sm-ad--band .sm-ad-headline,
-  .sm-ad--column .sm-ad-headline,
-  .sm-ad--partner_footer .sm-ad-headline { max-width: 22ch; }
-  .sm-ad--band .sm-ad-cta,
-  .sm-ad--column .sm-ad-cta,
-  .sm-ad--partner_footer .sm-ad-cta { justify-self: end; align-self: end; }
+  .sm-ad--band .sm-ad-creative .sm-ad-image,
+  .sm-ad--column .sm-ad-creative .sm-ad-image,
+  .sm-ad--partner_footer .sm-ad-creative .sm-ad-image { width: 120px; height: 120px; align-self: end; }
+  .sm-ad--band .sm-ad-creative .sm-ad-wordmark,
+  .sm-ad--column .sm-ad-creative .sm-ad-wordmark,
+  .sm-ad--partner_footer .sm-ad-creative .sm-ad-wordmark { font-size: 3.5rem; }
+  .sm-ad--band .sm-ad-creative .sm-ad-headline,
+  .sm-ad--column .sm-ad-creative .sm-ad-headline,
+  .sm-ad--partner_footer .sm-ad-creative .sm-ad-headline { max-width: 22ch; }
+  .sm-ad--band .sm-ad-creative .sm-ad-actions,
+  .sm-ad--column .sm-ad-creative .sm-ad-actions,
+  .sm-ad--partner_footer .sm-ad-creative .sm-ad-actions { justify-self: end; align-self: end; }
+  .sm-ad--band .sm-ad-box .sm-ad-secondary,
+  .sm-ad--column .sm-ad-box .sm-ad-secondary,
+  .sm-ad--partner_footer .sm-ad-box .sm-ad-secondary { justify-self: end; padding: 0 32px 20px; }
+  .sm-ad--photo .sm-ad-box .sm-ad-creative { grid-template-columns: minmax(0, 1fr); grid-template-areas: "panel"; padding: 0; }
+}
+/* Wide band and footer in photo mode: the photograph on the left (55%), copy on the brand surface. */
+@container (min-width: 960px) {
+  .sm-ad--photo.sm-ad--band .sm-ad-box .sm-ad-creative,
+  .sm-ad--photo.sm-ad--partner_footer .sm-ad-box .sm-ad-creative {
+    grid-template-columns: 55% minmax(0, 1fr);
+    grid-template-areas: "photo panel";
+  }
+  .sm-ad--photo.sm-ad--band .sm-ad-creative .sm-ad-photo,
+  .sm-ad--photo.sm-ad--partner_footer .sm-ad-creative .sm-ad-photo { grid-area: photo; position: relative; inset: auto; height: 100%; }
+  .sm-ad--photo.sm-ad--band .sm-ad-creative .sm-ad-panel-copy,
+  .sm-ad--photo.sm-ad--partner_footer .sm-ad-creative .sm-ad-panel-copy {
+    align-self: center;
+    padding: 40px 48px;
+    background: none;
+  }
 }

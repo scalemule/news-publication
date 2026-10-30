@@ -20,7 +20,8 @@
           "height": 256,
           "alt": "MergeYard"
         },
-        "image": null
+        "image": null,
+        "mode": "typographic"
       },
       "href": "/go/0192f8a0-1234-7abc-8def-0123456789ab",
       "label": "advertisement",
@@ -29,7 +30,23 @@
         "policy_path": "/advertising-policy"
       },
       "destination_url": "https://mergeyard.com/?utm_source=trivalleyweekly&utm_medium=house",
-      "tier": "cookieless"
+      "tier": "cookieless",
+      "brand": {
+        "surface": "#0b1d33",
+        "ink": "#ffffff",
+        "ink_muted": "#c9d3e3",
+        "accent": "#f4ecdf",
+        "on_accent": "#0b1d33",
+        "wordmark": {
+          "text": "MergeYard"
+        },
+        "eyebrow": "Customer support",
+        "context": "Lazy Tensor readers get 30 days free",
+        "secondary": {
+          "label": "See pricing",
+          "url": "https://mergeyard.com/pricing"
+        }
+      }
     },
     "article_inline": {
       "delivery_id": "0192f8a0-1234-7abc-8def-0123456789ba",

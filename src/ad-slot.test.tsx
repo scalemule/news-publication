@@ -64,7 +64,11 @@ describe("AdSlot", () => {
       const showsImage = withImage && !["partner_footer", "credit_line"].includes(format);
       expect(html.includes("sm-ad-image")).toBe(showsImage);
       if (showsImage) expect(html).toContain('width="900" height="600"');
-      expect(html.includes("sm-ad--typographic")).toBe(!showsImage);
+      expect(html.includes("sm-ad--with-image")).toBe(showsImage);
+      // Without a brand kit the unit is typographic in the default (NapSite) palette, written inline.
+      expect(html).toContain("sm-ad--typographic");
+      // The footer is the light variant of the same kit: light field, brand surface as ink.
+      expect(html).toContain(format === "partner_footer" ? "--sm-ad-bg:#edf1ed;--sm-ad-fg:#173d32" : "--sm-ad-bg:#173d32;--sm-ad-fg:#ffffff");
     }
   });
   it("uses a typographic mark when there is no logo and marks wide logos", () => {
@@ -160,5 +164,91 @@ describe("ad measurement", () => {
     expect(track).toHaveBeenCalledTimes(1);
     (document.querySelector("[data-ad-hide]") as HTMLButtonElement).click();
     expect(document.querySelector("[data-ad-delivery]")).toBeNull();
+  });
+});
+
+describe("brand kit rendering", () => {
+  const kit = {
+    surface: "#0b1d33", ink: "#ffffff", ink_muted: "#c9d3e3", accent: "#f4ecdf", on_accent: "#0b1d33",
+    wordmark: { text: "MergeYard", mark: "." }, eyebrow: "Customer support", context: "Lazy Tensor readers get 30 days free",
+  };
+  const sealedSecondary = { label: "See pricing", href: `/go/${DELIVERY}?to=aHR0cHM6Ly9tZXJnZXlhcmQuY29tL3ByaWNpbmc&s=c2ln&direct=1` };
+  const render = (d: AdDelivery) => renderToStaticMarkup(<AdUnit delivery={d} placement="leaderboard" />);
+  it("draws the wordmark, eyebrow with a 24px mark, context and the inline palette", () => {
+    const html = render({ ...delivery("band", false), brand: kit });
+    expect(html).toContain("sm-ad--wordmark");
+    expect(html).toContain('class="sm-ad-wordmark">MergeYard<span class="sm-ad-wordmark-mark">.</span>');
+    expect(html).toContain('class="sm-ad-eyebrow"');
+    expect(html).toContain('width="24" height="24"');
+    expect(html).toContain(">Customer support<");
+    expect(html).toContain(">Lazy Tensor readers get 30 days free<");
+    expect(html).not.toContain("sm-ad-logo--tile");
+    expect(html).toContain("--sm-ad-bg:#0b1d33;--sm-ad-fg:#ffffff;--sm-ad-fg-muted:#c9d3e3;--sm-ad-accent:#f4ecdf;--sm-ad-cta-bg:#f4ecdf;--sm-ad-cta-fg:#0b1d33");
+    expect(html).toContain("--sm-ad-scrim:rgba(11, 29, 51, 0.94)");
+  });
+  it("uses the light footer palette for partner_footer: brand surface as ink, accent CTA inverted", () => {
+    const html = render({ ...delivery("partner_footer", false), brand: kit });
+    expect(html).toContain("--sm-ad-bg:#edf1ed;--sm-ad-fg:#0b1d33;");
+    expect(html).toContain("--sm-ad-cta-bg:#0b1d33;--sm-ad-cta-fg:#ffffff");
+  });
+  it("renders the secondary link only as the sealed direct route, never a raw URL", () => {
+    const html = render({ ...delivery("band", false), brand: { ...kit, secondary: sealedSecondary } });
+    expect(html).toContain(`class="sm-ad-secondary" href="/go/${DELIVERY}?to=aHR0cHM6Ly9tZXJnZXlhcmQuY29tL3ByaWNpbmc&amp;s=c2ln&amp;direct=1"`);
+    expect(html).toContain(">See pricing</a>");
+    expect(html).not.toContain("mergeyard.com");
+    expect(render({ ...delivery("band", false), brand: { ...kit, secondary: { label: "See pricing", url: "https://mergeyard.com/pricing" } } })).not.toContain("sm-ad-secondary");
+    expect(render({ ...delivery("band", false), brand: { ...kit, secondary: { label: "See pricing", href: `/go/${DELIVERY}?to=x&s=y` } } })).not.toContain("sm-ad-secondary");
+    expect(render({ ...delivery("band", false), brand: { ...kit, secondary: { label: "See pricing", href: "https://evil.example/" } } })).not.toContain("sm-ad-secondary");
+  });
+  it("falls back to the logo tile and advertiser name without a wordmark", () => {
+    const html = render({ ...delivery("band", false), brand: { ...kit, wordmark: null } });
+    expect(html).toContain("sm-ad--logo");
+    expect(html).toContain("sm-ad-logo--tile");
+    expect(html).toContain('class="sm-ad-advertiser">MergeYard<');
+  });
+});
+
+describe("photo and artwork modes", () => {
+  const img = (width: number, height: number, name: string) => ({ url: `https://cdn.example.com/${name}`, width, height, alt: "" });
+  const photoContent = (format: AdFormatKey) => ({
+    ...delivery(format, false),
+    content: { ...delivery(format, false).content, mode: "photo" as const, image: img(900, 600, "sq.jpg"), image_wide: img(1200, 420, "wide.jpg"), image_tall: img(300, 400, "tall.jpg"), focal: { x: 0.25, y: 0.8 } },
+  });
+  const render = (d: AdDelivery, eager = false) => renderToStaticMarkup(<AdUnit delivery={d} placement="leaderboard" eager={eager} />);
+  it("photo mode: the format's photograph fills the unit with the focal point, copy on the panel, one link", () => {
+    const band = render(photoContent("band"), true);
+    expect(band).toContain("sm-ad--photo");
+    expect(band).toContain('class="sm-ad-photo"');
+    expect(band).toContain("wide.jpg");
+    expect(band).toContain('loading="eager"');
+    expect(band).toContain("object-position:25% 80%");
+    expect(band).toContain("sm-ad-panel-copy");
+    expect(band.match(/<a /g)?.length).toBe(2); // the creative and the policy link in the About panel
+    expect(render(photoContent("column"))).toContain("tall.jpg");
+    expect(render(photoContent("inline_card"))).toContain("sq.jpg");
+    const noPhoto = { ...delivery("band", false), content: { ...delivery("band", false).content, mode: "photo" as const } };
+    expect(render(noPhoto)).toContain("sm-ad--typographic");
+  });
+  it("artwork mode: finished art at the box with the headline as alt, a mobile variant, an optional CTA strip, and fallbacks", () => {
+    const art = {
+      ...delivery("band", false),
+      content: {
+        ...delivery("band", false).content, mode: "artwork" as const, artwork_cta: true,
+        artwork: { band: img(1200, 280, "band.png"), band_mobile: img(360, 360, "band-m.png"), column: img(300, 520, "col.png") },
+      },
+    };
+    const html = render(art, true);
+    expect(html).toContain("sm-ad--artwork");
+    expect(html).toContain('class="sm-ad-art sm-ad-art--desktop" src="https://cdn.example.com/band.png" alt="Support that lives inside Zendesk &amp; Slack" width="1200" height="280" loading="eager"');
+    expect(html).toContain('class="sm-ad-art sm-ad-art--mobile" src="https://cdn.example.com/band-m.png"');
+    expect(html).toContain("sm-ad-artwork--responsive");
+    expect(html).toContain('class="sm-ad-strip">See MergeYard<');
+    expect(html).not.toContain("sm-ad-headline");
+    expect(render({ ...art, content: { ...art.content, artwork_cta: false } })).not.toContain("sm-ad-strip");
+    // Column has art; inline_card has none and no photo → typographic; with a photo → photo.
+    expect(render({ ...art, format: "column" })).toContain("col.png");
+    expect(render({ ...art, format: "inline_card" })).toContain("sm-ad--typographic");
+    expect(render({ ...art, format: "inline_card", content: { ...art.content, image: img(900, 600, "sq.jpg") } })).toContain("sm-ad--photo");
+    expect(render({ ...art, format: "credit_line" })).toContain("sm-ad--typographic");
   });
 });

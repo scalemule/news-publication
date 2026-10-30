@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  AD_COPY_LIMITS,
-  adInsertionPoints,
-  emptyAdPlan,
-  isAdPlan,
-  lengthClass,
-  validateCreativeContent,
-  type AdCreativeDraft,
-  adSensitivity,
-} from "./ads";
+import { AD_COPY_LIMITS, adInsertionPoints, emptyAdPlan, isAdPlan, lengthClass, validateCreativeContent, type AdCreativeDraft, adSensitivity, validateAdBrand, validateAdDelivery, mixHex, footerPalette, artworkFits } from "./ads";
 import { measurementTier } from "./ads-tier";
 import { measurementConsent } from "./measurement-consent";
 
@@ -133,5 +124,71 @@ describe("adSensitivity", () => {
   it("passes the platform classification through", () => {
     expect(adSensitivity({ content_safety: { classification: "clear", reviewed: false } })).toBe("clear");
     expect(adSensitivity({ content_safety: { classification: "sensitive", reviewed: true, rules: ["topic-death-fatality"] } })).toBe("sensitive");
+  });
+});
+
+describe("brand kit and creative modes", () => {
+  const kit = { surface: "#173d32", ink: "#ffffff", ink_muted: "#d6e5dd", accent: "#f1d8a7", on_accent: "#173d32" };
+  it("validates a brand kit: hex colors, bounded text, https secondary; anything wrong is null", () => {
+    expect(validateAdBrand(kit)).toEqual(kit);
+    expect(validateAdBrand({ ...kit, wordmark: { text: "NapSite", mark: "." }, eyebrow: "Our website partner", context: "Lazy Tensor is built on napsite.com", secondary: { label: "See plans & pricing", url: "https://napsite.com/pricing" } })?.secondary?.label).toBe("See plans & pricing");
+    expect(validateAdBrand({ ...kit, surface: "#17 3d32" })).toBeNull();
+    expect(validateAdBrand({ ...kit, surface: "#FFFFFF" })).toBeNull();
+    expect(validateAdBrand({ ...kit, surface: "green" })).toBeNull();
+    expect(validateAdBrand({ ...kit, eyebrow: "x".repeat(41) })).toBeNull();
+    expect(validateAdBrand({ ...kit, context: "<b>hi</b>" })).toBeNull();
+    expect(validateAdBrand({ ...kit, wordmark: { text: "" } })).toBeNull();
+    // An unusable secondary is dropped on its own; the kit survives.
+    expect(validateAdBrand({ ...kit, secondary: { label: "Go", url: "http://x.example/" } })).toEqual(kit);
+    expect(validateAdBrand({ ...kit, secondary: { label: "Go" } })).toEqual(kit);
+    expect(validateAdBrand({ ...kit, secondary: "pricing" })).toEqual(kit);
+    expect(validateAdBrand({ ...kit, footer: { surface: "#edf1ed", ink: "#173d32" } })).toBeNull();
+    expect(validateAdBrand({ ...kit, eyebrow: null, wordmark: null, secondary: null, footer: null })).toEqual(kit);
+    expect(validateAdBrand(null)).toBeNull();
+    expect(validateAdBrand([])).toBeNull();
+  });
+  it("mixes hex colors and derives the light footer palette", () => {
+    expect(mixHex("#000000", "#ffffff", 0.5)).toBe("#808080");
+    expect(mixHex("#173d32", "#edf1ed", 0)).toBe("#173d32");
+    expect(mixHex("#173d32", "#edf1ed", 1)).toBe("#edf1ed");
+    expect(footerPalette(kit)).toEqual({ surface: "#edf1ed", ink: "#173d32", ink_muted: mixHex("#173d32", "#edf1ed", 0.35) });
+    expect(footerPalette({ ...kit, footer: { surface: "#fafafa", ink: "#111111", ink_muted: "#555555" } })).toEqual({ surface: "#fafafa", ink: "#111111", ink_muted: "#555555" });
+  });
+  const base = {
+    delivery_id: "0192f8a0-1234-7abc-8def-0123456789ab", flight_id: "0192f8a0-1234-7abc-8def-0123456789ac", creative_id: "0192f8a0-1234-7abc-8def-0123456789ad",
+    revision: 1, format: "band", href: "/go/0192f8a0-1234-7abc-8def-0123456789ab", label: "advertisement", about: { advertiser: "A" },
+    content: { advertiser: "A", headline: "H", description: "D", cta: "Go", logo: null, image: null },
+  };
+  it("keeps a delivery whose brand kit is malformed, in the default palette", () => {
+    expect(validateAdDelivery({ ...base, brand: { surface: "green" } })?.brand).toBeUndefined();
+    expect(validateAdDelivery({ ...base, brand: null })?.brand).toBeUndefined();
+    expect(validateAdDelivery({ ...base, brand: kit })?.brand).toEqual(kit);
+  });
+  it("parses creative modes, photo images, focal point and box-exact artwork", () => {
+    const img = (width: number, height: number) => ({ url: "https://cdn.example.com/a.jpg", width, height });
+    const d = validateAdDelivery({ ...base, content: { ...base.content, mode: "photo", image_wide: img(1200, 420), image_tall: img(300, 400), focal: { x: 0.3, y: 0.6 } } });
+    expect(d?.content.mode).toBe("photo");
+    expect(d?.content.image_wide?.width).toBe(1200);
+    expect(d?.content.image_tall?.height).toBe(400);
+    expect(d?.content.focal).toEqual({ x: 0.3, y: 0.6 });
+    expect(validateAdDelivery({ ...base, content: { ...base.content, mode: "collage" } })).toBeNull();
+    expect(validateAdDelivery({ ...base, content: { ...base.content, focal: { x: 2, y: 0 } } })).toBeNull();
+    expect(validateAdDelivery({ ...base, content: { ...base.content, image_wide: img(0, 10) } })).toBeNull();
+    const art = validateAdDelivery({
+      ...base,
+      content: {
+        ...base.content, mode: "artwork", artwork_cta: true,
+        artwork: { band: img(1200, 280), band_mobile: img(360, 361), column: img(300, 520), inline_card_mobile: img(720, 480), partner_footer: img(1199, 240) },
+      },
+    });
+    expect(art?.content.mode).toBe("artwork");
+    expect(art?.content.artwork_cta).toBe(true);
+    expect(Object.keys(art?.content.artwork ?? {}).sort()).toEqual(["band", "column", "inline_card_mobile"]);
+    expect(artworkFits("inline_card_mobile", img(900, 600))).toBe(true);
+    expect(artworkFits("inline_card_mobile", img(900, 650))).toBe(false);
+    expect(artworkFits("band", img(1200, 280))).toBe(true);
+    expect(artworkFits("band", img(1200, 281))).toBe(false);
+    const none = validateAdDelivery({ ...base, content: { ...base.content, mode: "artwork", artwork: { band: img(10, 10) } } });
+    expect(none?.content.artwork).toBeUndefined();
   });
 });

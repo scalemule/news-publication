@@ -6,6 +6,8 @@
  * answer, the route falls back to the destination the property itself signed
  * into the link at render time (`?to=` + `?s=`, see ./ads-signing.ts); a bad
  * or missing signature goes to `/`. It never redirects to a referrer.
+ * With `&direct=1` (the brand kit's secondary link) the route only verifies
+ * the property's own signature and redirects; the service is not asked.
  *
  * `/api/ads/report`: "Report this ad", a plain HTML form that works without
  * JavaScript, proxied to `POST /v1/ads/reports`. The reader is told the
@@ -44,6 +46,7 @@ export function createAdClickHandler(options: {
     let scope: AdScope | null = null;
     try {
       scope = await options.resolve(request);
+      if (new URL(request.url).searchParams.get("direct") === "1") return fallback(request, scope, id);
       const gateway = adGateway(scope);
       if (!gateway) return fallback(request, scope, id);
       const response = await fetcher(gateway + "/v1/ads/clicks", {
