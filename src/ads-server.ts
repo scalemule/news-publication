@@ -9,7 +9,7 @@
  */
 import { cache } from "react";
 import { buildClientContextHeaders, type ClientContext } from "@scalemule/sdk";
-import { emptyAdPlan, normalizeAdPlan, unavailableAdPlan, type AdDelivery, type AdPlan, type AdPlanRequest } from "./ads";
+import { emptyAdPlan, normalizeAdPlan, unavailableAdPlan, type AdBrand, type AdDelivery, type AdPlan, type AdPlanRequest } from "./ads";
 import { base64url, signClickFallback } from "./ads-signing";
 
 export type AdScope = {
@@ -78,6 +78,30 @@ export async function fetchAdPlan(
 
 const encoder = new TextEncoder();
 
+function httpsOnly(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The brand kit for the page: the secondary link's URL becomes a second,
+ * separately signed `/go/{id}?to=…&s=…&direct=1` route and the raw URL is
+ * removed; an unusable secondary is dropped, the rest of the kit kept.
+ */
+async function sealBrand(apiKey: string, deliveryId: string, brand: AdBrand | undefined): Promise<AdBrand | undefined> {
+  if (!brand) return undefined;
+  const { secondary, ...rest } = brand;
+  if (!secondary) return { ...rest };
+  if (!secondary.url || !httpsOnly(secondary.url)) return { ...rest };
+  const s = await signClickFallback(apiKey, deliveryId, secondary.url);
+  const href = `/go/${deliveryId}?to=${base64url(encoder.encode(secondary.url))}&s=${s}&direct=1`;
+  return { ...rest, secondary: { label: secondary.label, href } };
+}
+
 /**
  * Turns the wire plan into the page plan: every delivery's href becomes the
  * property's `/go/{id}` route carrying the signed fallback destination, and
@@ -89,24 +113,18 @@ export async function sealAdPlan(apiKey: string, wire: ReturnType<typeof normali
   const empty = new Set(wire.empty);
   for (const [placement, delivery] of Object.entries(wire.deliveries)) {
     if (!delivery) continue;
-    const { destination_url, tier: _tier, ...rest } = delivery;
+    const { destination_url, tier: _tier, brand, ...rest } = delivery;
     let href = `/go/${rest.delivery_id}`;
     if (destination_url) {
-      let ok = false;
-      try {
-        const url = new URL(destination_url);
-        ok = url.protocol === "https:" && !url.username && !url.password;
-      } catch {
-        ok = false;
-      }
-      if (!ok) {
+      if (!httpsOnly(destination_url)) {
         empty.add(placement);
         continue;
       }
       const s = await signClickFallback(apiKey, rest.delivery_id, destination_url);
       href += `?to=${base64url(encoder.encode(destination_url))}&s=${s}`;
     }
-    const sealed: AdDelivery = { ...rest, href };
+    const sealedBrand = await sealBrand(apiKey, rest.delivery_id, brand);
+    const sealed: AdDelivery = sealedBrand ? { ...rest, href, brand: sealedBrand } : { ...rest, href };
     deliveries[placement] = sealed;
   }
   const { deliveries: _wire, empty: _empty, ...rest } = wire;

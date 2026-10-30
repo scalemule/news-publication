@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://scalemule.com/contracts/ads/ad-plan.schema.json",
   "title": "ScaleMule Ads plan response (wire)",
-  "description": "What scalemule-ads returns from POST /v1/ads/plan inside the {success,data} envelope. The SDK (getAdPlan) signs each delivery's fallback href from destination_url and strips destination_url and tier before the plan reaches a page. ADR-2026-10-29 sections 6.1 and 7.5.2. This file is the single contract: scalemule-ads vendors it verbatim and validates its serialized responses against it; the SDK validates contracts/fixtures/service-wire/*.json written from the service's real serializer.",
+  "description": "What scalemule-ads returns from POST /v1/ads/plan inside the {success,data} envelope. The SDK (getAdPlan) signs each delivery's fallback href from destination_url and strips destination_url and tier before the plan reaches a page. ADR-2026-10-29 sections 6.1 and 7.5.2. This file is the single contract: scalemule-ads vendors it verbatim and validates its serialized responses against it; the SDK validates contracts/fixtures/service-wire/*.json written from the service's real serializer. Revision 9 adds the advertiser brand kit (delivery.brand) and the photo and artwork creative modes (content.mode, image_wide, image_tall, focal, artwork, artwork_cta).",
   "type": "object",
   "required": [
     "status",
@@ -186,6 +186,62 @@
               "type": "null"
             }
           ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "typographic",
+            "photo",
+            "artwork"
+          ],
+          "description": "How the creative is drawn; default typographic. artwork falls back to photo, then typographic, for a format without art."
+        },
+        "image_wide": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "photo mode: wide photograph (about 1200x420) for band and partner_footer."
+        },
+        "image_tall": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "photo mode: tall photograph (about 300x400) for column."
+        },
+        "focal": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/focal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "photo mode: subject position 0-1 from the top-left; drives object-position."
+        },
+        "artwork": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artwork"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artwork_cta": {
+          "type": "boolean",
+          "description": "artwork mode: draw a 44px CTA strip under the art when cta is set."
         }
       }
     },
@@ -259,6 +315,248 @@
         },
         "tier": {
           "$ref": "#/$defs/tier"
+        },
+        "brand": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/brand"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "hex": {
+      "type": "string",
+      "pattern": "^#[0-9a-f]{6}$"
+    },
+    "brand": {
+      "type": "object",
+      "required": [
+        "surface",
+        "ink",
+        "ink_muted",
+        "accent",
+        "on_accent"
+      ],
+      "additionalProperties": false,
+      "description": "The advertiser's brand kit (revision 9): plain hex colors, a text wordmark drawn in the paper's display serif, an eyebrow, a resolved context line and an optional secondary link. The SDK signs secondary.url into its own /go route.",
+      "properties": {
+        "surface": {
+          "$ref": "#/$defs/hex"
+        },
+        "ink": {
+          "$ref": "#/$defs/hex"
+        },
+        "ink_muted": {
+          "$ref": "#/$defs/hex"
+        },
+        "accent": {
+          "$ref": "#/$defs/hex"
+        },
+        "on_accent": {
+          "$ref": "#/$defs/hex"
+        },
+        "footer": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "surface",
+                "ink",
+                "ink_muted"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "surface": {
+                  "$ref": "#/$defs/hex"
+                },
+                "ink": {
+                  "$ref": "#/$defs/hex"
+                },
+                "ink_muted": {
+                  "$ref": "#/$defs/hex"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wordmark": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 24
+                },
+                "mark": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eyebrow": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secondary": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "label",
+                "url"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "url": {
+                  "type": "string",
+                  "pattern": "^https://",
+                  "maxLength": 2048
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "focal": {
+      "type": "object",
+      "required": [
+        "x",
+        "y"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "artwork": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Finished art per format at the exact box: band 1200x280, band_mobile 360x360, column 300x520, inline_card 680x350, inline_card_mobile any 3:2, partner_footer 1200x240, partner_footer_mobile 360x300. The SDK drops an entry whose size does not match.",
+      "properties": {
+        "band": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "band_mobile": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "column": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inline_card": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inline_card_mobile": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partner_footer": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partner_footer_mobile": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/image"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }

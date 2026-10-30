@@ -72,6 +72,38 @@ export type AdImage = {
   alt?: string;
 };
 
+/**
+ * How a creative is drawn. `typographic` (default): the brand kit, wordmark and
+ * copy on the brand surface. `photo`: a brand photograph fills the unit and the
+ * copy sits beside it or on a scrim. `artwork`: finished art per format at the
+ * exact box, nothing drawn over it; falls back to `photo`, then `typographic`,
+ * for a format without art.
+ */
+export type AdCreativeMode = "typographic" | "photo" | "artwork";
+
+export type AdArtworkKey =
+  | "band"
+  | "band_mobile"
+  | "column"
+  | "inline_card"
+  | "inline_card_mobile"
+  | "partner_footer"
+  | "partner_footer_mobile";
+
+/** Exact boxes for finished art; `inline_card_mobile` is any 3:2 image. */
+export const AD_ARTWORK_BOXES: Record<AdArtworkKey, { width: number; height: number } | { ratio: number }> = {
+  band: { width: 1200, height: 280 },
+  band_mobile: { width: 360, height: 360 },
+  column: { width: 300, height: 520 },
+  inline_card: { width: 680, height: 350 },
+  inline_card_mobile: { ratio: 1.5 },
+  partner_footer: { width: 1200, height: 240 },
+  partner_footer_mobile: { width: 360, height: 300 },
+};
+export const AD_ARTWORK_KEYS = Object.keys(AD_ARTWORK_BOXES) as AdArtworkKey[];
+
+export type AdArtwork = Partial<Record<AdArtworkKey, AdImage>>;
+
 export type AdCreativeContent = {
   advertiser: string;
   headline: string;
@@ -81,10 +113,77 @@ export type AdCreativeContent = {
   image?: AdImage | null;
   /** `credit_line` only. */
   link_label?: string;
+  mode?: AdCreativeMode;
+  /** `photo` mode: a wide photograph (about 1200×420) for band and partner_footer. */
+  image_wide?: AdImage | null;
+  /** `photo` mode: a tall photograph (about 300×400) for column. */
+  image_tall?: AdImage | null;
+  /** `photo` mode: where the photograph's subject is, 0–1 from the top-left; drives object-position. */
+  focal?: { x: number; y: number } | null;
+  /** `artwork` mode: finished art per format at the exact box (AD_ARTWORK_BOXES). */
+  artwork?: AdArtwork | null;
+  /** `artwork` mode: draw a 44 px CTA strip under the art when `cta` is set. */
+  artwork_cta?: boolean;
 };
 
 /** What an advertiser submits; `destination_url` never reaches a page. */
 export type AdCreativeDraft = AdCreativeContent & { destination_url?: string };
+
+/** `#rrggbb`, lowercase. */
+export type AdHex = string;
+
+export type AdBrandFooter = { surface: AdHex; ink: AdHex; ink_muted: AdHex };
+
+export type AdBrandSecondary = {
+  label: string;
+  /** Wire only: the advertiser's https URL. `sealAdPlan` replaces it with `href`. */
+  url?: string;
+  /** Page only: the property's own `/go/{id}?to=…&s=…&direct=1` link. */
+  href?: string;
+};
+
+/**
+ * The advertiser's brand kit (ADR section 5, revision 9): every unit is drawn
+ * in the advertiser's own surface, ink and accent, with a typographic wordmark
+ * in the paper's display serif, an eyebrow above it, a context line beneath it
+ * and an optional secondary link. Colors are plain hex so the unit never depends
+ * on the publication's tokens or on modern color functions.
+ */
+export type AdBrand = {
+  surface: AdHex;
+  ink: AdHex;
+  ink_muted: AdHex;
+  accent: AdHex;
+  on_accent: AdHex;
+  /** Light variant for `partner_footer`; computed from `surface` when absent. */
+  footer?: AdBrandFooter | null;
+  /** Text wordmark; `mark` (for example ".") is drawn in `accent` after the text. */
+  wordmark?: { text: string; mark?: string } | null;
+  /** Above the wordmark, for example "Our website partner". */
+  eyebrow?: string | null;
+  /** Beneath the wordmark, already resolved by the service ("Lazy Tensor is built on napsite.com"). */
+  context?: string | null;
+  secondary?: AdBrandSecondary | null;
+};
+
+export const AD_BRAND_LIMITS = {
+  wordmark: 24,
+  mark: 2,
+  eyebrow: 40,
+  context: 80,
+  secondary_label: 32,
+} as const;
+
+/** The NapSite palette: what a unit uses when the delivery carries no brand. */
+export const DEFAULT_AD_BRAND: AdBrand = {
+  surface: "#173d32",
+  ink: "#ffffff",
+  ink_muted: "#d6e5dd",
+  accent: "#f1d8a7",
+  on_accent: "#173d32",
+};
+
+export const AD_FOOTER_SURFACE = "#edf1ed";
 
 export type AdDelivery = {
   delivery_id: string;
@@ -98,6 +197,8 @@ export type AdDelivery = {
   label: AdLabelKey;
   about: { advertiser: string; policy_path?: string };
   insertion_point?: string;
+  /** The advertiser's brand kit; absent means the default (NapSite) palette. */
+  brand?: AdBrand;
 };
 
 /**
@@ -336,6 +437,15 @@ const LABELS = new Set<string>(["advertisement", "sponsored"]);
 const REASONS = new Set<string>(["policy_stale", "sensitive", "blocked", "no_inventory", "preview"]);
 const TIERS = new Set<string>(["cookieless", "performance", "advertising"]);
 const FORMATS = new Set<string>(AD_FORMAT_KEYS);
+const MODES = new Set<string>(["typographic", "photo", "artwork"]);
+const isUnit = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+
+/** True when `art` is exactly the box for `key` (or the 3:2 ratio for the mobile card). */
+export function artworkFits(key: AdArtworkKey, art: AdImage): boolean {
+  const box = AD_ARTWORK_BOXES[key];
+  if ("ratio" in box) return art.height > 0 && Math.abs(art.width / art.height - box.ratio) <= 0.02;
+  return art.width === box.width && art.height === box.height;
+}
 const isString = (v: unknown): v is string => typeof v === "string";
 const isUuid7 = (v: unknown): v is string => isString(v) && UUID_V7.test(v);
 const isCount = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v > 0;
@@ -348,6 +458,73 @@ function image(value: unknown): AdImage | null | undefined {
   if (v.alt !== undefined && !isString(v.alt)) return undefined;
   const out: AdImage = { url: v.url, width: v.width, height: v.height };
   if (isString(v.alt)) out.alt = v.alt;
+  return out;
+}
+
+export const AD_HEX = /^#[0-9a-f]{6}$/;
+const isHex = (v: unknown): v is AdHex => isString(v) && AD_HEX.test(v);
+
+function shortLine(value: unknown, max: number): string | null | undefined {
+  if (value === null || value === undefined) return value;
+  if (!isString(value)) return undefined;
+  const str = value.trim();
+  if (!str || MARKUP.test(str) || Array.from(str).length > max) return undefined;
+  return str;
+}
+
+/** Mixes two hex colors (`t` toward `b`) and returns plain hex; no CSS color functions on the page. */
+export function mixHex(a: AdHex, b: AdHex, t: number): AdHex {
+  const ch = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+  const out = [0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t));
+  return "#" + out.map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0")).join("");
+}
+
+/** The light footer palette for a brand: light field, the brand surface as ink. */
+export function footerPalette(brand: AdBrand): AdBrandFooter {
+  if (brand.footer) return brand.footer;
+  return { surface: AD_FOOTER_SURFACE, ink: brand.surface, ink_muted: mixHex(brand.surface, AD_FOOTER_SURFACE, 0.35) };
+}
+
+function validateAdSecondary(value: unknown): AdBrandSecondary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const sec = value as Record<string, unknown>;
+  const label = shortLine(sec.label, AD_BRAND_LIMITS.secondary_label);
+  if (!label) return null;
+  const secondary: AdBrandSecondary = { label };
+  if (isString(sec.url) && /^https:\/\//i.test(sec.url)) secondary.url = sec.url;
+  if (isString(sec.href) && sec.href.startsWith("/go/")) secondary.href = sec.href;
+  return secondary.url || secondary.href ? secondary : null;
+}
+
+/** A structurally valid brand kit, or null when anything about it is wrong. */
+export function validateAdBrand(value: unknown): AdBrand | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const b = value as Record<string, unknown>;
+  if (!isHex(b.surface) || !isHex(b.ink) || !isHex(b.ink_muted) || !isHex(b.accent) || !isHex(b.on_accent)) return null;
+  const out: AdBrand = { surface: b.surface, ink: b.ink, ink_muted: b.ink_muted, accent: b.accent, on_accent: b.on_accent };
+  if (b.footer !== undefined && b.footer !== null) {
+    const f = b.footer as Record<string, unknown>;
+    if (!f || typeof f !== "object" || !isHex(f.surface) || !isHex(f.ink) || !isHex(f.ink_muted)) return null;
+    out.footer = { surface: f.surface, ink: f.ink, ink_muted: f.ink_muted };
+  }
+  if (b.wordmark !== undefined && b.wordmark !== null) {
+    const w = b.wordmark as Record<string, unknown>;
+    if (!w || typeof w !== "object") return null;
+    const text = shortLine(w.text, AD_BRAND_LIMITS.wordmark);
+    if (!text) return null;
+    const mark = w.mark === undefined ? undefined : shortLine(w.mark, AD_BRAND_LIMITS.mark);
+    if (mark === undefined && w.mark !== undefined) return null;
+    out.wordmark = mark ? { text, mark } : { text };
+  }
+  const eyebrow = shortLine(b.eyebrow, AD_BRAND_LIMITS.eyebrow);
+  if (eyebrow === undefined && b.eyebrow !== undefined) return null;
+  if (eyebrow) out.eyebrow = eyebrow;
+  const context = shortLine(b.context, AD_BRAND_LIMITS.context);
+  if (context === undefined && b.context !== undefined) return null;
+  if (context) out.context = context;
+  // An unusable secondary link is dropped on its own; the rest of the kit is kept.
+  const secondary = validateAdSecondary(b.secondary);
+  if (secondary) out.secondary = secondary;
   return out;
 }
 
@@ -371,6 +548,30 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
   const picture = image(c.image);
   if (logo === undefined && c.logo !== undefined) return null;
   if (picture === undefined && c.image !== undefined) return null;
+  const wide = image(c.image_wide);
+  const tall = image(c.image_tall);
+  if (wide === undefined && c.image_wide !== undefined) return null;
+  if (tall === undefined && c.image_tall !== undefined) return null;
+  if (c.mode !== undefined && !(isString(c.mode) && MODES.has(c.mode))) return null;
+  if (c.artwork_cta !== undefined && typeof c.artwork_cta !== "boolean") return null;
+  let focal: { x: number; y: number } | null | undefined;
+  if (c.focal !== undefined && c.focal !== null) {
+    const f = c.focal as Record<string, unknown>;
+    if (!f || typeof f !== "object" || !isUnit(f.x) || !isUnit(f.y)) return null;
+    focal = { x: f.x, y: f.y };
+  }
+  // Finished art must match its format box exactly; a wrong size drops that entry only.
+  let artwork: AdArtwork | null | undefined;
+  if (c.artwork !== undefined && c.artwork !== null) {
+    if (!c.artwork || typeof c.artwork !== "object" || Array.isArray(c.artwork)) return null;
+    artwork = {};
+    for (const key of AD_ARTWORK_KEYS) {
+      const raw = (c.artwork as Record<string, unknown>)[key];
+      if (raw === undefined || raw === null) continue;
+      const art = image(raw);
+      if (art && artworkFits(key, art)) artwork[key] = art;
+    }
+  }
   if (d.insertion_point !== undefined && !isString(d.insertion_point)) return null;
   if (d.destination_url !== undefined && !isString(d.destination_url)) return null;
   if (d.tier !== undefined && (!isString(d.tier) || !TIERS.has(d.tier))) return null;
@@ -383,6 +584,12 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
     image: picture ?? null,
   };
   if (isString(c.link_label)) content.link_label = c.link_label;
+  if (isString(c.mode)) content.mode = c.mode as AdCreativeMode;
+  if (wide) content.image_wide = wide;
+  if (tall) content.image_tall = tall;
+  if (focal) content.focal = focal;
+  if (artwork && Object.keys(artwork).length) content.artwork = artwork;
+  if (typeof c.artwork_cta === "boolean") content.artwork_cta = c.artwork_cta;
   const out: AdWireDelivery = {
     delivery_id: d.delivery_id.toLowerCase(),
     flight_id: d.flight_id.toLowerCase(),
@@ -397,6 +604,11 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
       : { advertiser: about.advertiser },
   };
   if (isString(d.insertion_point)) out.insertion_point = d.insertion_point;
+  // A malformed brand kit falls back to the default palette; it never costs the delivery.
+  if (d.brand !== undefined && d.brand !== null) {
+    const brand = validateAdBrand(d.brand);
+    if (brand) out.brand = brand;
+  }
   if (isString(d.destination_url)) out.destination_url = d.destination_url;
   if (isString(d.tier)) out.tier = d.tier as AdMeasurementTier;
   return out;

@@ -3,7 +3,11 @@
  * Measures the gallery the way the ADR section 5 review does: real text
  * enlargement at 200% (description ≥ 28px, headline ≥ 44px), control targets
  * ≥ 44px, and no horizontal overflow at 320/390/768/1280.
- * Usage: PLAYWRIGHT_ROOT=<dir with playwright installed> node scripts/ads-gallery-check.mjs <gallery.html>
+ * Also proves the brand kit survives the publication's stylesheet: in every unit
+ * (including the hostile-CSS and dark-theme section and the 200% frame) the
+ * computed colors of the wordmark, headline, description, eyebrow, context, CTA
+ * and secondary link equal the kit written inline on the unit root.
+ * Usage: PLAYWRIGHT_ROOT=<dir with playwright installed> [BROWSER=chromium|webkit] node scripts/ads-gallery-check.mjs <gallery.html>
  */
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -14,9 +18,12 @@ if (!gallery) {
   process.exit(1);
 }
 const root = process.env.PLAYWRIGHT_ROOT || process.cwd();
-const { chromium } = createRequire(resolve(root, "package.json"))("playwright");
+const playwright = createRequire(resolve(root, "package.json"))("playwright");
+const engine = process.env.BROWSER || "chromium";
+if (!playwright[engine]) throw new Error(`unknown browser ${engine}`);
 
-const browser = await chromium.launch();
+const browser = await playwright[engine].launch();
+console.log(`browser: ${engine}`);
 const page = await browser.newPage({ viewport: { width: 1500, height: 1200 } });
 await page.goto("file://" + resolve(gallery), { waitUntil: "load" });
 let failures = 0;
@@ -103,6 +110,48 @@ const report = reports.reduce((a, b) => ({
 console.log(`targets measured ${report.targets} (main + ${reports.length - 1} iframe), under 44px: ${report.smallTargets.length}; min target height ${report.minHeight}px (credit-line advertiser anchor min ${report.creditMin}px); overflowing units: ${report.overflow.length}`);
 if (report.overflow.length) fail("overflow: " + [...new Set(report.overflow)].slice(0, 10).join(", "));
 if (report.smallTargets.length) fail(`control targets under 44px: ` + [...new Set(report.smallTargets)].slice(0, 10).join(", "));
+// Brand colors: every text element inside every creative must compute to the
+// kit on its unit root, in the main document (light, dark, hostile) and at 200%.
+const colorCheck = () => {
+  const toRgb = (hex) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`;
+  const bad = [];
+  let checked = 0;
+  for (const unit of document.querySelectorAll(".sm-ad:not(.sm-ad--credit_line)")) {
+    const v = (name) => unit.style.getPropertyValue(name).trim();
+    const fg = toRgb(v("--sm-ad-fg")), muted = toRgb(v("--sm-ad-fg-muted")), accent = toRgb(v("--sm-ad-accent"));
+    const ctaBg = toRgb(v("--sm-ad-cta-bg")), ctaFg = toRgb(v("--sm-ad-cta-fg")), bg = toRgb(v("--sm-ad-bg"));
+    const where = `${unit.dataset.adFormat}/${unit.dataset.adMode} in ${unit.closest("section")?.id || unit.closest("section")?.querySelector("h1")?.textContent?.slice(0, 24)}`;
+    const expectations = [
+      [".sm-ad-creative", "backgroundColor", bg, unit.dataset.adMode !== "photo"],
+      [".sm-ad-wordmark", "color", fg, true],
+      [".sm-ad-wordmark-mark", "color", accent, true],
+      [".sm-ad-headline", "color", fg, true],
+      [".sm-ad-description", "color", muted, true],
+      [".sm-ad-eyebrow", "color", muted, true],
+      [".sm-ad-context", "color", muted, true],
+      [".sm-ad-advertiser", "color", muted, true],
+      [".sm-ad-cta", "backgroundColor", ctaBg, true],
+      [".sm-ad-cta", "color", ctaFg, true],
+      [".sm-ad-strip", "backgroundColor", ctaBg, true],
+      [".sm-ad-secondary", "color", fg, true],
+    ];
+    for (const [sel, prop, want, enabled] of expectations) {
+      if (!enabled) continue;
+      for (const el of unit.querySelectorAll(sel)) {
+        checked++;
+        const got = getComputedStyle(el)[prop];
+        if (got !== want) bad.push(`${where} ${sel} ${prop} ${got} != ${want}`);
+      }
+    }
+  }
+  return { checked, bad };
+};
+const colors = [await page.evaluate(colorCheck)];
+for (const f of page.frames()) if (f !== page.mainFrame()) colors.push(await f.evaluate(colorCheck));
+const colorBad = colors.flatMap((c) => c.bad);
+console.log(`brand color assertions: ${colors.reduce((n, c) => n + c.checked, 0)} checked, ${colorBad.length} wrong`);
+if (colorBad.length) fail("brand colors overridden: " + [...new Set(colorBad)].slice(0, 8).join("; "));
+
 await browser.close();
 console.log(failures ? `${failures} check(s) failed` : "all gallery checks passed");
 process.exit(failures ? 1 : 0);

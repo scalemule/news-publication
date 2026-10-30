@@ -205,3 +205,68 @@ describe("report route", () => {
     expect((await handler(form({ delivery_id: DELIVERY, reason: "other" }, ip))).status).toBe(200);
   });
 });
+
+describe("brand kit sealing", () => {
+  const brand = {
+    surface: "#0b1d33", ink: "#ffffff", ink_muted: "#c9d3e3", accent: "#f4ecdf", on_accent: "#0b1d33",
+    wordmark: { text: "MergeYard" }, eyebrow: "Customer support", context: "Lazy Tensor readers get 30 days free",
+    secondary: { label: "See pricing", url: "https://mergeyard.com/pricing" },
+  };
+  const withBrand = (secondary: unknown) => ({
+    ...plan,
+    deliveries: { leaderboard: { ...plan.deliveries.leaderboard, brand: { ...brand, secondary } } },
+  });
+  it("signs the secondary link into the property's own direct route and strips the raw URL", async () => {
+    const fetcher = vi.fn(async () => ok({ data: withBrand(brand.secondary) }));
+    const sealed = await fetchAdPlan(scope, request, fetcher as unknown as typeof fetch);
+    const d = sealed.deliveries.leaderboard!;
+    expect(d.brand?.wordmark).toEqual({ text: "MergeYard" });
+    expect(d.brand?.eyebrow).toBe("Customer support");
+    const href = d.brand?.secondary?.href ?? "";
+    expect(href.startsWith(`/go/${DELIVERY}?to=`)).toBe(true);
+    expect(href.endsWith("&direct=1")).toBe(true);
+    expect(d.brand?.secondary).not.toHaveProperty("url");
+    expect(JSON.stringify(sealed)).not.toContain("mergeyard.com/pricing");
+    const q = new URLSearchParams(href.slice(href.indexOf("?") + 1));
+    expect(await verifyClickFallback(scope.apiKey, DELIVERY, q.get("to"), q.get("s"))).toBe("https://mergeyard.com/pricing");
+  });
+  it("drops an http or malformed secondary but keeps the rest of the kit; a malformed kit keeps the delivery", async () => {
+    for (const secondary of [{ label: "Pricing", url: "http://mergeyard.com/pricing" }, { label: "", url: "https://mergeyard.com/" }, { url: "https://x.example/" }]) {
+      const fetcher = vi.fn(async () => ok({ data: withBrand(secondary) }));
+      const sealed = await fetchAdPlan(scope, request, fetcher as unknown as typeof fetch);
+      const d = sealed.deliveries.leaderboard!;
+      expect(d.brand?.surface).toBe("#0b1d33");
+      expect(d.brand?.wordmark).toEqual({ text: "MergeYard" });
+      expect(d.brand?.secondary).toBeUndefined();
+      expect(d.delivery_id).toBe(DELIVERY);
+    }
+    const bad = vi.fn(async () => ok({ data: { ...plan, deliveries: { leaderboard: { ...plan.deliveries.leaderboard, brand: { surface: "green" } } } } }));
+    const sealed = await fetchAdPlan(scope, request, bad as unknown as typeof fetch);
+    expect(sealed.deliveries.leaderboard?.brand).toBeUndefined();
+    expect(sealed.empty).toEqual(["article_inline"]);
+  });
+});
+
+describe("direct (secondary) clicks", () => {
+  const resolve = async () => scope;
+  const url = "https://mergeyard.com/pricing";
+  it("verifies the property's signature and redirects without asking the service", async () => {
+    const fetcher = vi.fn(async () => { throw new Error("must not be called"); });
+    const handler = createAdClickHandler({ resolve, fetch: fetcher as unknown as typeof fetch });
+    const s = await signClickFallback(scope.apiKey, DELIVERY, url);
+    const res = await handler(new Request(`https://paper.example/go/${DELIVERY}?to=${encoded(url)}&s=${s}&direct=1`), DELIVERY);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(url);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("sends a tampered or http direct link to / and still never calls the service", async () => {
+    const fetcher = vi.fn(async () => { throw new Error("must not be called"); });
+    const handler = createAdClickHandler({ resolve, fetch: fetcher as unknown as typeof fetch });
+    const s = await signClickFallback(scope.apiKey, DELIVERY, url);
+    const swapped = `https://paper.example/go/${DELIVERY}?to=${encoded("https://evil.example/")}&s=${s}&direct=1`;
+    expect((await handler(new Request(swapped), DELIVERY)).headers.get("location")).toBe("/");
+    const http = `https://paper.example/go/${DELIVERY}?to=${encoded("http://mergeyard.com/pricing")}&s=${await signClickFallback(scope.apiKey, DELIVERY, "http://mergeyard.com/pricing")}&direct=1`;
+    expect((await handler(new Request(http), DELIVERY)).headers.get("location")).toBe("/");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
