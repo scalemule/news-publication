@@ -1,0 +1,68 @@
+{
+  "deliveries": {
+    "article_inline": {
+      "about": {
+        "advertiser": "NapSite",
+        "policy_path": "/advertising"
+      },
+      "content": {
+        "advertiser": "NapSite",
+        "cta": "Explore NapSite",
+        "description": "Designed, hosted and managed for you.",
+        "headline": "Your business deserves a better website",
+        "image": null,
+        "logo": {
+          "alt": "NapSite",
+          "height": 240,
+          "url": "https://cdn.example.com/logo.webp",
+          "width": 240
+        }
+      },
+      "creative_id": "0192f3c0-0000-7000-8000-0000000007d1",
+      "delivery_id": "0192f3c0-0000-7000-8000-000000001b58",
+      "destination_url": "https://napsite.com/",
+      "flight_id": "0192f3c0-0000-7000-8000-000000000005",
+      "format": "inline_card",
+      "href": "/go/0192f3c0-0000-7000-8000-000000001b58",
+      "insertion_point": "p6",
+      "label": "advertisement",
+      "revision": 1,
+      "tier": "performance"
+    },
+    "leaderboard": {
+      "about": {
+        "advertiser": "NapSite",
+        "policy_path": "/advertising"
+      },
+      "content": {
+        "advertiser": "NapSite",
+        "cta": "Explore NapSite",
+        "description": "Designed, hosted and managed for you.",
+        "headline": "Your business deserves a better website",
+        "image": null,
+        "logo": {
+          "alt": "NapSite",
+          "height": 240,
+          "url": "https://cdn.example.com/logo.webp",
+          "width": 240
+        }
+      },
+      "creative_id": "0192f3c0-0000-7000-8000-0000000007d1",
+      "delivery_id": "0192f3c0-0000-7000-8000-000000001b59",
+      "destination_url": "https://napsite.com/",
+      "flight_id": "0192f3c0-0000-7000-8000-000000000005",
+      "format": "band",
+      "href": "/go/0192f3c0-0000-7000-8000-000000001b59",
+      "label": "advertisement",
+      "revision": 1,
+      "tier": "performance"
+    }
+  },
+  "empty": [
+    "sidebar"
+  ],
+  "page_sponsor": "0192f3c0-0000-7000-8000-000000000005",
+  "plan_id": "0192f3c0-0000-7000-8000-000000000384",
+  "policy_snapshot_at": "2026-10-29T12:00:00.000Z",
+  "status": "ok"
+}

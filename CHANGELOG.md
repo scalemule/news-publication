@@ -1,3 +1,7 @@
+## 0.0.98
+
+- ScaleMule Ads slots (ADR-2026-10-29): the page-plan contract and format catalog (`ads`), the three-valued measurement tier (`measurementTier`), the server-only `getAdPlan` (one plan per React request, 150 ms timeout, empty plan on any failure), `<AdSlot>` rendering six formats as structured content behind `/go/{delivery}` with "About this ad", a no-JavaScript "Report this ad" form and "Hide on this page", `ads.css`, `<AdsMetrics>` (`ad_impression`, `ad_viewed`), and the property click and report route handlers. Plans are deep-validated against `contracts/ad-plan.schema.json` (invalid deliveries drop into `empty`, never throw); the fallback destination is signed into `/go` links by the property server and verified on click; impressions carry `measurable`; the report proxy acknowledges only accepted reports. Nothing serves yet: the `scalemule-ads` service, the attribution click path and the paper cut-over are separate rollout gates, and the rendered gallery still needs its visual review.
+
 ## 0.0.92
 
 - A click-driven network handoff ignores the old five-minute negative-cache cookie. A reader who signed in on another paper can retry the destination immediately; explicit sign-out still suppresses automatic re-entry there. Wider site activation and signed-in browser acceptance remain rollout gates.
