@@ -62,21 +62,25 @@
   display: flex;
   min-width: 0;
 }
-.sm-newsletter-bar__field input {
+/* Stronger than a host's base input rule (e.g. the broadsheet `.publication input:not(...)`). */
+.sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] {
   flex: 1 1 auto;
   width: 15rem;
   min-width: 0;
   min-height: 44px;
+  margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--sm-bar-rule, rgba(255, 255, 255, 0.35));
   border-right: 0;
   border-radius: 4px 0 0 4px;
   background: rgba(255, 255, 255, 0.08);
-  color: inherit;
+  color: var(--sm-bar-ink, #ffffff);
   font: 16px / 1.2 var(--sm-bar-font);
+  box-shadow: none;
 }
-.sm-newsletter-bar__field input::placeholder {
+.sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"]::placeholder {
   color: var(--sm-bar-muted, rgba(255, 255, 255, 0.7));
+  opacity: 1;
 }
 .sm-newsletter-bar__field button {
   appearance: none;
@@ -95,7 +99,7 @@
   background: rgba(255, 255, 255, 0.12);
 }
 .sm-newsletter-bar__field button:disabled,
-.sm-newsletter-bar__field input:disabled {
+.sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"]:disabled {
   opacity: 0.7;
   cursor: wait;
 }
@@ -132,9 +136,9 @@
 /* Mid-width screens: give the actions room by letting the description go. */
 @media (min-width: 761px) and (max-width: 1080px) {
   .sm-newsletter-bar .sm-conversion-bar__description { display: none; }
-  .sm-newsletter-bar__field input { width: 11rem; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] { width: 11rem; }
 }
 @media (max-width: 760px) {
-  .sm-newsletter-bar__field input { width: auto; }
+  .sm-conversion-bar.sm-newsletter-bar .sm-newsletter-bar__field .sm-newsletter-bar__input[type="email"] { width: auto; }
   .sm-newsletter-bar__google-button { min-height: 48px; font-size: 16px; }
 }

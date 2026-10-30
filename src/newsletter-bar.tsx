@@ -260,6 +260,7 @@ function EmailForm({ endpoint, policyVersion, cadence, path, state, compact, onS
       <div className="sm-newsletter-bar__field">
         <input
           id={inputId}
+          className="sm-newsletter-bar__input"
           name="email"
           type="email"
           inputMode="email"
