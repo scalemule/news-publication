@@ -42,6 +42,16 @@
       "import": "./dist/meet-forms.js",
       "require": "./dist/meet-forms.cjs"
     },
+    "./neighbors": {
+      "types": "./dist/neighbors-view.d.ts",
+      "import": "./dist/neighbors-view.js",
+      "require": "./dist/neighbors-view.cjs"
+    },
+    "./neighbors-forms": {
+      "types": "./dist/neighbors-forms.d.ts",
+      "import": "./dist/neighbors-forms.js",
+      "require": "./dist/neighbors-forms.cjs"
+    },
     "./cookie-consent-banner": {
       "types": "./dist/cookie-consent-banner.d.ts",
       "import": "./dist/cookie-consent-banner.js",

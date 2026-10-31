@@ -105,6 +105,7 @@ export const NETWORK_NAVIGATION: NavigationDestination[] = [
   // More — Local life.
   { id: "pets", label: "Pets", href: "/pets", kind: "product", group: "local-life", order: 10, more: true },
   { id: "toys", label: "Toy Swap", href: "/toys", kind: "product", group: "local-life", order: 15, more: true },
+  { id: "neighbors", label: "Neighbors", href: "/neighbors", kind: "product", group: "local-life", order: 18, more: true, feature: "neighbors" },
   { id: "celebrations", label: "Celebrations", href: "/sections/celebrations", kind: "product", group: "local-life", order: 20, more: true, enabled: false },
   { id: "community-maps", label: "Community maps", href: "/community-maps", kind: "product", group: "local-life", order: 30, more: true },
   { id: "town-chat", label: "Town chat", href: "/chat", kind: "product", group: "local-life", order: 40, more: true, feature: "chat" },

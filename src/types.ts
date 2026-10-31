@@ -9,6 +9,7 @@ export const FEATURE_NAMES = [
   "classifieds",
   "referrals",
   "coupons",
+  "neighbors",
 ] as const;
 
 export type FeatureName = (typeof FEATURE_NAMES)[number];

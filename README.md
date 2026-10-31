@@ -42,6 +42,7 @@ Code hooks such as `matchTag` are attached in the site after the snapshot loads.
 | `comments` | off | Article discussion thread |
 | `chat` | off | Town room, same discussions service |
 | `jobs`, `classifieds` | off | Boards for that paper |
+| `neighbors` | off | Neighbor & local business nominations feed (`/neighbors`) |
 | `referrals` | off | Read a `ref` code (or `referrals.queryParam`) into analytics |
 | `coupons` | off | Resolve `coupons.offers` or a paper-supplied `coupons.resolve` |
 

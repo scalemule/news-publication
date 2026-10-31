@@ -4,6 +4,7 @@ import { join } from "node:path";
 const targeted = new Set([
   "marketplace-forms.js", "marketplace-forms.cjs",
   "meet-forms.js", "meet-forms.cjs",
+  "neighbors-forms.js", "neighbors-forms.cjs",
   "cookie-consent-banner.js", "cookie-consent-banner.cjs",
   "cookie-settings-view.js", "cookie-settings-view.cjs",
   "theme-toggle.js", "theme-toggle.cjs",

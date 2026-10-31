@@ -52,6 +52,16 @@ describe("network navigation defaults", () => {
     expect(primary.map(item => item.label)).not.toContain("Meet");
     expect(primary.map(item => item.label)).not.toContain("Jokes");
     expect(groups.find(group => group.id === "marketplace")).toBeUndefined();
+    expect(groups.find(group => group.id === "local-life")?.links.map(link => link.label)).not.toContain("Neighbors");
+  });
+
+  it("shows Neighbors in Local life when the neighbors feature is enabled", () => {
+    const { groups } = paper(undefined, {
+      featureEnabled: feature => ["chat", "smile", "jobs", "classifieds", "neighbors"].includes(feature),
+    });
+    expect(groups.find(group => group.id === "local-life")?.links.map(link => link.label)).toEqual([
+      "Pets", "Toy Swap", "Neighbors", "Community maps", "Town chat", "Poll",
+    ]);
   });
 
   it("limits the poll to the Walnut Creek Times", () => {

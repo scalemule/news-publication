@@ -1,3 +1,8 @@
+## 0.0.102
+
+- Add Neighbor & Local Business Nominations (`neighbors`, `./neighbors`, `./neighbors-forms`): readers can nominate a neighbor, local business or community group for positive community stories (awards & milestones, fascinating neighbors, behind-the-counter local business stories, quiet community impact), follow their town's Neighbors feed (`NeighborFollowBar`, `NeighborsBoard`, `NeighborNominationDetail`, `NeighborSpotlightCallout`), flag or request removal of posts (`NeighborFlagForm`, `prepareNeighborFlag`, `applyNeighborModeration`), and editors can promote nominations into newsroom article drafts (`nominationToArticleDraft`).
+- Enforce strict no-links screening (`containsDisallowedLink`, `screenNeighborText`) across every submission field and report note, and require explicit submitter agreement to `NEIGHBOR_REMOVAL_TERMS` before any nomination is accepted.
+
 ## 0.0.99
 
 - Advertiser brand kits (ADR-2026-10-29 revision 9): every unit is drawn in the advertiser's own surface, ink and accent with a display-serif wordmark, an eyebrow, a context line and a separately signed secondary link (`/go/{id}?…&direct=1`, verified by the property without asking the service). Colors are inline on the unit root and written explicitly on every text element at three-class specificity, so a publication stylesheet or theme can no longer recolor an advertisement (the gallery check now proves this against hostile paper rules, the dark theme and 200% text in Chromium and WebKit). The layouts follow the original NapSite promotion: three-column band, stacked column and in-story card, light footer variant.
