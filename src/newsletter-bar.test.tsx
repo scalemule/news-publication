@@ -127,14 +127,18 @@ describe("NewsletterBar", () => {
     expect(NEWSLETTER_BAR_EXCLUDED_PATHS.some((rule) => rule.test("/news/the-story"))).toBe(false);
   });
 
-  it("the 'Use email instead' link opens the email form on a phone and focuses it", async () => {
+  it("'Or sign up with email' sits under the Google button and opens the email form on a phone", async () => {
     const events: NewsletterBarEvent[] = [];
     render(<NewsletterBar publicationName="Lazy Tensor" trigger={immediate} onEvent={(e) => events.push(e)} />);
-    fireEvent.click(screen.getByRole("button", { name: "Use email instead" }));
+    const choice = screen.getByRole("button", { name: "Or sign up with email" });
+    // Directly under the Google button, not inside the fine print.
+    expect(choice.closest(".sm-newsletter-bar__primary")?.querySelector(".sm-newsletter-bar__google-button")).toBeTruthy();
+    expect(choice.closest(".sm-conversion-bar__fine")).toBeNull();
+    fireEvent.click(choice);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
     expect(document.activeElement).toBe(screen.getByLabelText("Email address"));
     expect(document.querySelector(".sm-conversion-bar")?.getAttribute("data-expanded")).toBe("true");
-    expect(screen.queryByRole("button", { name: "Use email instead" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Or sign up with email" })).toBeNull();
     expect(events).toContainEqual({ name: "expanded" });
   });
 
