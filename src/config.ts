@@ -16,6 +16,7 @@ const DISABLED_FEATURES: Record<FeatureName, boolean> = {
   classifieds: false,
   referrals: false,
   coupons: false,
+  neighbors: false,
 };
 
 export function featureEnabled(publication: NewsPublication, feature: FeatureName): boolean {

@@ -31,6 +31,8 @@ export default defineConfig({
     "marketplace-forms": "src/marketplace-forms.tsx",
     "meet-view": "src/meet-view.tsx",
     "meet-forms": "src/meet-forms.tsx",
+    "neighbors-view": "src/neighbors-view.tsx",
+    "neighbors-forms": "src/neighbors-forms.tsx",
     "cookie-consent-banner": "src/cookie-consent-banner.tsx",
     "cookie-settings-view": "src/cookie-settings-view.tsx",
     "theme-toggle": "src/theme-toggle.tsx",
