@@ -46,7 +46,10 @@ export interface NewsletterBarLabels {
   /** Fine print after the frequency: the consent sentence. */
   consent(publicationName: string, withGoogle: boolean): ReactNode;
   privacy: string;
+  /** @deprecated Kept for compatibility; the phone email choice now uses `emailToggle`. */
   useEmailInstead: string;
+  /** Phone: the line under the Google button that opens the email field. */
+  emailToggle: string;
   sentTitle: string;
   sentMessage(publicationName: string): string;
   confirmation(publicationName: string): ReactNode;
@@ -67,6 +70,7 @@ export const NEWSLETTER_BAR_LABELS_EN: NewsletterBarLabels = {
   consent: (name, withGoogle) => `By subscribing you agree to receive ${name} emails${withGoogle ? "; with Google you also get a free reader account" : ""}. Unsubscribe anytime.`,
   privacy: "Privacy",
   useEmailInstead: "Use email instead",
+  emailToggle: "Or sign up with email",
   sentTitle: "Check your inbox.",
   sentMessage: (name) => `Open the email we just sent to confirm your ${name} subscription.`,
   confirmation: (name) => <>You’re in. The next {name} briefing is on its way to your inbox.</>,
@@ -239,11 +243,11 @@ export function NewsletterBar({
       title={sent ? labels.sentTitle : title ?? labels.title(publicationName)}
       description={sent ? undefined : description}
       brand={brand}
-      actions={sent ? null : google ?? form}
+      actions={sent ? null : google ? <div className="sm-newsletter-bar__primary">{google}{form && <EmailChoice label={labels.emailToggle} />}</div> : form}
       secondary={google ? form : null}
       fine={sent
         ? <Sent message={labels.sentMessage(publicationName)} />
-        : <Fine labels={labels} publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} emailToggle={Boolean(google && form)} />}
+        : <Fine labels={labels} publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} />}
       pathname={path || undefined}
       suppressed={suppressed}
       suppressWhen={() => readSubscribed(subscribedStorageKey)}
@@ -276,22 +280,26 @@ function Sent({ message }: { message: string }) {
   </>;
 }
 
-function Fine({ labels, publicationName, frequency, privacyHref, google, emailToggle }: { labels: NewsletterBarLabels; publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean; emailToggle: boolean }) {
+/** Phone only: a clear second choice right under the Google button; opens the email field and focuses it. */
+function EmailChoice({ label }: { label: string }) {
   const bar = useConversionBar();
+  if (bar.expanded) return null;
+  return (
+    <button type="button" className="sm-conversion-bar__phone-only sm-newsletter-bar__email-choice" onClick={() => {
+      bar.setExpanded(true);
+      // The choice goes away; focus the field it revealed.
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".sm-newsletter-bar .sm-newsletter-bar__input")?.focus());
+    }}>
+      {label}
+    </button>
+  );
+}
+
+function Fine({ labels, publicationName, frequency, privacyHref, google }: { labels: NewsletterBarLabels; publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean }) {
   return (
     <p>
       {frequency} {labels.consent(publicationName, google)}{" "}
       <a href={privacyHref}>{labels.privacy}</a>
-      {emailToggle && !bar.expanded && <>
-        <span className="sm-conversion-bar__phone-only"> · </span>
-        <button type="button" className="sm-conversion-bar__phone-only sm-newsletter-bar__link" onClick={() => {
-          bar.setExpanded(true);
-          // The link goes away; focus the field it revealed.
-          window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".sm-newsletter-bar .sm-newsletter-bar__input")?.focus());
-        }}>
-          {labels.useEmailInstead}
-        </button>
-      </>}
     </p>
   );
 }
