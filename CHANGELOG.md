@@ -1,3 +1,11 @@
+## 0.0.105
+
+- Community Maps proxy failures are no longer silent. Every failed write and server error logs one structured line (`community_maps_proxy_error`) with the route, status, upstream status and code, the real exception, the byte count, the file type and the duration. Reader content, contact details, coordinates and keys are never logged.
+- Error responses carry `retryable` and a `reference` (`cm_…`). The reader's form shows the reference and resends retryable failures automatically.
+- Server errors, and reports sent by readers' browsers to the new `POST /collections/{slug}/diagnostics` route (fields allow-listed and bounded), are forwarded to Knowledge (`…/community-maps/collections/{slug}/diagnostics`). Knowledge keeps them durably and alerts the guide's editors.
+- An upload body cut off mid-transfer now returns 400 "The upload was interrupted… send it again" (retryable) instead of a generic 503.
+- Requires `@scalemule/react` 0.0.28.
+
 ## 0.0.102
 
 - Add Neighbor & Local Business Nominations (`neighbors`, `./neighbors`, `./neighbors-forms`): readers can nominate a neighbor, local business or community group for positive community stories (awards & milestones, fascinating neighbors, behind-the-counter local business stories, quiet community impact), follow their town's Neighbors feed (`NeighborFollowBar`, `NeighborsBoard`, `NeighborNominationDetail`, `NeighborSpotlightCallout`), flag or request removal of posts (`NeighborFlagForm`, `prepareNeighborFlag`, `applyNeighborModeration`), and editors can promote nominations into newsroom article drafts (`nominationToArticleDraft`).

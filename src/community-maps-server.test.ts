@@ -116,7 +116,11 @@ describe("publication Community Maps boundary", () => {
     expect(calls).toHaveLength(3);
     // The reader's device position reaches the service as one JSON field with only the documented keys.
     const withPosition = new FormData();
-    withPosition.append("file", new Blob(["photo"], { type: "image/png" }), "photo.png");
+    withPosition.append(
+      "file",
+      new Blob(["photo"], { type: "image/png" }),
+      "photo.png",
+    );
     withPosition.append("rights_confirmed", "true");
     withPosition.append("consent_version", "current-policy");
     withPosition.append(
@@ -131,7 +135,11 @@ describe("publication Community Maps boundary", () => {
       }),
     );
     const positioned = await handler(
-      new Request("https://paper.example.test/api", { method: "POST", headers, body: withPosition }),
+      new Request("https://paper.example.test/api", {
+        method: "POST",
+        headers,
+        body: withPosition,
+      }),
       [...route, "submissions", reader, "media"],
     );
     expect(positioned.status).toBe(200);
@@ -149,7 +157,11 @@ describe("publication Community Maps boundary", () => {
     bad.append("consent_version", "current-policy");
     bad.append("device_position", JSON.stringify({ latitude: "north" }));
     const rejected = await handler(
-      new Request("https://paper.example.test/api", { method: "POST", headers, body: bad }),
+      new Request("https://paper.example.test/api", {
+        method: "POST",
+        headers,
+        body: bad,
+      }),
       [...route, "submissions", reader, "media"],
     );
     expect(rejected.status).toBe(400);
@@ -373,5 +385,234 @@ describe("private contributor routes", () => {
       ).toBe(404);
     }
     expect(fetch).not.toHaveBeenCalled();
+  });
+  describe("failures are visible and recoverable", () => {
+    const post = (path: string[], body: BodyInit, type = "application/json") =>
+      handler(
+        new Request("https://paper.example.test/api", {
+          method: "POST",
+          headers: {
+            origin: "https://paper.example.test",
+            "content-type": type,
+          },
+          body,
+        }),
+        path,
+      );
+    it("answers a server failure with a reference, a retry hint, a log line and a durable report", async () => {
+      const urls: string[] = [];
+      const bodies: string[] = [];
+      vi.stubGlobal("fetch", async (url: unknown, init: RequestInit) => {
+        urls.push(String(url));
+        bodies.push(String(init.body ?? ""));
+        return String(url).endsWith("/diagnostics")
+          ? Response.json({ data: { received: true } }, { status: 202 })
+          : Response.json(
+              { error: { code: "UNAVAILABLE", message: "db down" } },
+              { status: 501 },
+            );
+      });
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const response = await post(
+        [...route, "submissions"],
+        JSON.stringify({ area_id: "a" }),
+      );
+      expect(response.status).toBe(501);
+      const body = await response.json();
+      expect(body.error.retryable).toBe(true);
+      expect(body.error.reference).toMatch(/^cm_[0-9a-f]{8}$/);
+      expect(body.error.message).not.toContain("db down");
+      const logged = JSON.parse(String(error.mock.calls[0][0]));
+      expect(logged).toMatchObject({
+        event: "community_maps_proxy_error",
+        route: "submit",
+        status: 501,
+        upstream_status: 501,
+        upstream_code: "UNAVAILABLE",
+        reference: body.error.reference,
+      });
+      await vi.waitFor(() =>
+        expect(urls).toContain(
+          "https://api.example.test/v1/knowledge/community-maps/collections/halloween-2026/diagnostics",
+        ),
+      );
+      const report = JSON.parse(
+        bodies[urls.findIndex((u) => u.endsWith("/diagnostics"))],
+      );
+      expect(report).toMatchObject({
+        kind: "proxy_error",
+        source: "proxy",
+        stage: "submit",
+        status: 501,
+        reference: body.error.reference,
+        host: "paper.example.test",
+      });
+      expect(JSON.stringify(report)).not.toContain(secret);
+    });
+    it("tells the reader to resend when the upload was cut off mid-transfer", async () => {
+      vi.stubGlobal("fetch", vi.fn());
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const response = await post(
+        [
+          ...route,
+          "submissions",
+          "019a12ec-1234-7000-8000-123456789abc",
+          "media",
+        ],
+        '--x\r\nContent-Disposition: form-data; name="file"; filename="a.jpg"\r\nContent-Type: image/jpeg\r\n\r\nPARTIAL',
+        "multipart/form-data; boundary=x",
+      );
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.retryable).toBe(true);
+      expect(body.error.message).toMatch(/interrupted/);
+    });
+    it("logs the real exception instead of hiding it", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const broken = createPublicationCommunityMapsHandler({
+        resolve: async () => {
+          throw new TypeError("publication context missing — Ünïcode 🎄");
+        },
+      });
+      const response = await broken(
+        new Request("https://paper.example.test/api", { method: "POST" }),
+        [...route, "submissions"],
+      );
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.retryable).toBe(true);
+      expect(String(error.mock.calls[0][0])).toContain(
+        "TypeError: publication context missing — Ünïcode 🎄",
+      );
+    });
+    it("forwards a browser's failure report with only known, bounded fields", async () => {
+      const calls: { url: string; body: string; key: string | null }[] = [];
+      vi.stubGlobal("fetch", async (url: unknown, init: RequestInit) => {
+        calls.push({
+          url: String(url),
+          body: String(init.body),
+          key: new Headers(init.headers).get("x-api-key"),
+        });
+        return Response.json({ data: { received: true } }, { status: 202 });
+      });
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const response = await post(
+        [...route, "diagnostics"],
+        JSON.stringify({
+          kind: "upload_failed",
+          stage: "upload",
+          status: 503,
+          reference: "cm_1234abcd",
+          attempts: 4,
+          file_type: "image/jpeg",
+          file_size: 1310215,
+          browser: "Safari · iOS 18",
+          storage: "indexeddb",
+          online: true,
+          contact_email: "reader@example.test",
+          latitude: 37.9,
+        }),
+      );
+      expect(response.status).toBe(202);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].key).toBe(secret);
+      const forwarded = JSON.parse(calls[0].body);
+      expect(forwarded).toMatchObject({
+        kind: "upload_failed",
+        source: "browser",
+        status: 503,
+        attempts: 4,
+        host: "paper.example.test",
+      });
+      expect(calls[0].body).not.toContain("reader@example.test");
+      expect(calls[0].body).not.toContain("37.9");
+      expect(
+        (
+          await post(
+            [...route, "diagnostics"],
+            JSON.stringify({ kind: "anything" }),
+          )
+        ).status,
+      ).toBe(400);
+    });
+    it("refuses a failure report from another site", async () => {
+      vi.stubGlobal("fetch", vi.fn());
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const response = await handler(
+        new Request("https://paper.example.test/api", {
+          method: "POST",
+          headers: {
+            origin: "https://attacker.test",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ kind: "upload_failed" }),
+        }),
+        [...route, "diagnostics"],
+      );
+      expect(response.status).toBe(403);
+    });
+    it("bounds how many reports one reader can trigger", async () => {
+      const forwarded: string[] = [];
+      vi.stubGlobal("fetch", async (url: unknown) => {
+        forwarded.push(String(url));
+        return String(url).endsWith("/diagnostics")
+          ? Response.json({ data: { received: true } }, { status: 202 })
+          : Response.json({ data: { id: "c", slug: "bounded-guide" } });
+      });
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const guide = ["collections", "bounded-guide"];
+      const first = await handler(
+        new Request("https://paper.example.test/api"),
+        guide,
+      );
+      const cookie = first.headers.get("set-cookie")!.split(";")[0];
+      const report = () =>
+        handler(
+          new Request("https://paper.example.test/api", {
+            method: "POST",
+            headers: {
+              origin: "https://paper.example.test",
+              "content-type": "application/json",
+              cookie,
+            },
+            body: JSON.stringify({ kind: "upload_failed", stage: "upload" }),
+          }),
+          [...guide, "diagnostics"],
+        );
+      const answers = [];
+      for (let i = 0; i < 12; i++) answers.push(await (await report()).json());
+      expect(answers.filter((a) => a.data.received)).toHaveLength(10);
+      expect(forwarded.filter((u) => u.endsWith("/diagnostics"))).toHaveLength(
+        10,
+      );
+    });
+    it("does not forward map-viewing failures or repeat an outage report", async () => {
+      const forwarded: string[] = [];
+      vi.stubGlobal("fetch", async (url: unknown) => {
+        forwarded.push(String(url));
+        return String(url).endsWith("/diagnostics")
+          ? Response.json({ data: { received: true } }, { status: 202 })
+          : Response.json({ error: { message: "down" } }, { status: 501 });
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const guide = ["collections", "outage-guide"];
+      expect(
+        (await handler(new Request("https://paper.example.test/api"), guide))
+          .status,
+      ).toBe(501);
+      for (let i = 0; i < 3; i++)
+        expect(
+          (
+            await post(
+              [...guide, "submissions"],
+              JSON.stringify({ area_id: "a" }),
+            )
+          ).status,
+        ).toBe(501);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(forwarded.filter((u) => u.endsWith("/diagnostics"))).toHaveLength(
+        1,
+      );
+    });
   });
 });
