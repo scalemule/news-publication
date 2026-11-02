@@ -89,8 +89,105 @@ class ProxyProblem extends Error {
   constructor(
     public status: number,
     message: string,
+    public retryable = false,
   ) {
     super(message);
+  }
+}
+const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
+const DIAGNOSTIC_KINDS = new Set([
+  "upload_failed",
+  "submit_failed",
+  "storage_degraded",
+  "load_failed",
+]);
+const clip = (v: unknown, max: number) =>
+  typeof v === "string" && v ? Array.from(v).slice(0, max).join("") : null;
+const whole = (v: unknown, min: number, max: number) =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max
+    ? v
+    : null;
+/** A browser's own report of a failed send; only known, bounded fields pass. */
+function browserDiagnostic(body: unknown, host: string) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const v = body as Record<string, unknown>;
+  if (typeof v.kind !== "string" || !DIAGNOSTIC_KINDS.has(v.kind)) return null;
+  return {
+    kind: v.kind,
+    source: "browser",
+    stage: clip(v.stage, 32),
+    status: whole(v.status, 0, 599),
+    code: clip(v.code, 64),
+    reference: clip(v.reference, 80),
+    attempts: whole(v.attempts, 0, 20),
+    file_type: clip(v.file_type, 100),
+    file_size: whole(v.file_size, 0, 1024 * 1024 * 1024),
+    browser: clip(v.browser, 64),
+    storage:
+      v.storage === "memory" || v.storage === "indexeddb" ? v.storage : null,
+    online: typeof v.online === "boolean" ? v.online : null,
+    host: clip(host, 253),
+    submission_id:
+      typeof v.submission_id === "string" && UUID.test(v.submission_id)
+        ? v.submission_id
+        : null,
+  };
+}
+/**
+ * Bounds for reports, per process: a signed reader may send a few; readers
+ * without a cookie yet (their very first request failed) share a small budget;
+ * proxy-side forwards are throttled per slug, route and status during an outage.
+ */
+const budgets = new Map<string, { count: number; until: number }>();
+function allow(key: string, limit: number, windowMs: number) {
+  const now = Date.now();
+  if (budgets.size > 5000)
+    for (const [k, v] of budgets) if (v.until <= now) budgets.delete(k);
+  const entry = budgets.get(key);
+  if (!entry || entry.until <= now) {
+    budgets.set(key, { count: 1, until: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count++;
+  return true;
+}
+/** Durable record + editor alert in the Knowledge service; best effort, never blocks a reader. */
+async function sendDiagnostic(
+  gatewayOrigin: string,
+  apiKey: string,
+  slug: string,
+  event: Record<string, unknown>,
+) {
+  try {
+    const response = await fetch(
+      `${gatewayOrigin}${ROOT}/collections/${slug}/diagnostics`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": apiKey },
+        body: JSON.stringify(event),
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(3000),
+      },
+    );
+    await response.body?.cancel();
+    if (!response.ok)
+      console.error(
+        JSON.stringify({
+          event: "community_maps_diagnostic_rejected",
+          slug,
+          status: response.status,
+        }),
+      );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "community_maps_diagnostic_unsent",
+        slug,
+        error: error instanceof Error ? error.name : "unknown",
+      }),
+    );
   }
 }
 /** Only public collection routes are accepted. The URL never selects tenant credentials. */
@@ -98,6 +195,82 @@ export function createPublicationCommunityMapsHandler(
   options: PublicationCommunityMapServerOptions,
 ) {
   return async (request: Request, path: string[]): Promise<Response> => {
+    const started = Date.now();
+    // What a failure log needs; never reader content, contact details or coordinates.
+    const trace: {
+      route: string;
+      slug?: string;
+      bytes?: number;
+      fileType?: string;
+      upstreamStatus?: number;
+      upstreamCode?: string;
+      upstreamMessage?: string;
+      reference?: string;
+    } = { route: "unknown" };
+    let scope: PublicationCommunityMapScope | undefined;
+    const finish = (response: Response, error?: unknown) => {
+      if (request.method === "GET" && response.status < 500) return response;
+      const failed = response.status >= 400;
+      const record = {
+        event: failed ? "community_maps_proxy_error" : "community_maps_proxy",
+        route: trace.route,
+        slug: trace.slug,
+        method: request.method,
+        status: response.status,
+        upstream_status: trace.upstreamStatus,
+        upstream_code: trace.upstreamCode,
+        upstream_message: trace.upstreamMessage,
+        reference: trace.reference,
+        error:
+          error instanceof Error
+            ? `${error.name}: ${Array.from(error.message).slice(0, 200).join("")}`
+            : undefined,
+        bytes: trace.bytes,
+        file_type: trace.fileType,
+        duration_ms: Date.now() - started,
+      };
+      (response.status >= 500
+        ? console.error
+        : failed
+          ? console.warn
+          : console.info)(JSON.stringify(record));
+      if (
+        response.status >= 500 &&
+        request.method !== "GET" &&
+        scope?.apiKey &&
+        trace.slug &&
+        allow(
+          `forward:${trace.slug}:${trace.route}:${response.status}`,
+          1,
+          60_000,
+        )
+      )
+        void sendDiagnostic(
+          new URL(scope.gatewayUrl).origin,
+          scope.apiKey,
+          trace.slug,
+          {
+            kind: "proxy_error",
+            source: "proxy",
+            stage: trace.route,
+            status: response.status,
+            code: trace.upstreamCode ?? null,
+            reference: trace.reference ?? null,
+            file_type: trace.fileType ?? null,
+            file_size: trace.bytes ?? null,
+            host: clip(new URL(scope.origin).host, 253),
+            message: clip(record.error ?? trace.upstreamMessage, 300),
+          },
+        );
+      return response;
+    };
+    const problem = (status: number, message: string, retryable: boolean) => {
+      trace.reference ??= `cm_${randomUUID().slice(0, 8)}`;
+      return json(
+        { error: { message, retryable, reference: trace.reference } },
+        status,
+      );
+    };
     try {
       if (
         path[0] !== "collections" ||
@@ -106,6 +279,7 @@ export function createPublicationCommunityMapsHandler(
       )
         return json({ error: { message: "Guide not found" } }, 404);
       const slug = path[1];
+      trace.slug = slug;
       const rest = path.slice(2);
       const method = request.method;
       const discussion = rest.length === 1 && rest[0] === "comments";
@@ -155,23 +329,40 @@ export function createPublicationCommunityMapsHandler(
         UUID.test(rest[1]) &&
         ["reactions", "reports"].includes(rest[2]);
       const engagementWrite = method === "POST" && (discussion || voting);
+      const diagnostics =
+        method === "POST" && rest.length === 1 && rest[0] === "diagnostics";
+      trace.route = upload
+        ? "upload"
+        : submission
+          ? "submit"
+          : ownUpdate
+            ? "update"
+            : diagnostics
+              ? "diagnostics"
+              : action
+                ? rest[2]
+                : engagementWrite
+                  ? discussion
+                    ? "comment"
+                    : "vote"
+                  : "read";
       if (
         !read &&
         !upload &&
         !submission &&
         !ownUpdate &&
         !action &&
-        !engagementWrite
+        !engagementWrite &&
+        !diagnostics
       )
         return json({ error: { message: "Route not found" } }, 404);
-      const scope = await options.resolve(request);
+      scope = await options.resolve(request);
       if (
         method !== "GET" &&
         request.headers.get("origin") !== new URL(scope.origin).origin
       )
-        return json(
-          { error: { message: "Submit from this publication’s website." } },
-          403,
+        return finish(
+          problem(403, "Submit from this publication’s website.", false),
         );
       const gateway = new URL(scope.gatewayUrl);
       if (
@@ -184,6 +375,35 @@ export function createPublicationCommunityMapsHandler(
         throw new ProxyProblem(503, "The guide is unavailable.");
       if (!scope.apiKey)
         throw new ProxyProblem(503, "The guide is unavailable.");
+      if (diagnostics) {
+        let body: unknown;
+        try {
+          body = JSON.parse(
+            new TextDecoder().decode(await boundedBody(request, 4096)),
+          );
+        } catch (e) {
+          if (e instanceof ProxyProblem) throw e;
+          throw new ProxyProblem(400, "Invalid report.");
+        }
+        const event = browserDiagnostic(body, new URL(scope.origin).host);
+        if (!event) throw new ProxyProblem(400, "Invalid report.");
+        const reader = identity(request, scope.apiKey, scope.origin);
+        if (
+          !(reader.cookie
+            ? allow(`anonymous:${slug}`, 20, 60_000)
+            : allow(`reader:${reader.id}`, 10, 600_000))
+        )
+          return json({ data: { received: false } }, 202);
+        console.warn(
+          JSON.stringify({
+            event: "community_maps_reader_problem",
+            slug,
+            ...event,
+          }),
+        );
+        await sendDiagnostic(gateway.origin, scope.apiKey, slug, event);
+        return json({ data: { received: true } }, 202);
+      }
       const reader = identity(request, scope.apiKey, scope.origin);
       const clientContext = { ...scope.clientContext, anonymousId: reader.id };
       const sdk = new ScaleMule({
@@ -321,13 +541,31 @@ export function createPublicationCommunityMapsHandler(
           const contentType = request.headers.get("content-type") || "";
           if (!contentType.startsWith("multipart/form-data;"))
             throw new ProxyProblem(415, "Choose a photo, video or audio file.");
-          const bytes = await boundedBody(request, 26 * 1024 * 1024);
-          const form = await new Response(bytes as BodyInit, {
-            headers: { "content-type": contentType },
-          }).formData();
+          let bytes: Uint8Array;
+          let form: FormData;
+          try {
+            bytes = await boundedBody(request, 26 * 1024 * 1024);
+            trace.bytes = bytes.length;
+            form = await new Response(bytes as BodyInit, {
+              headers: { "content-type": contentType },
+            }).formData();
+          } catch (e) {
+            if (e instanceof ProxyProblem) throw e;
+            // A connection that drops mid-upload leaves a cut-off body.
+            trace.upstreamMessage =
+              e instanceof Error
+                ? `${e.name}: ${e.message}`
+                : "unreadable body";
+            throw new ProxyProblem(
+              400,
+              "The upload was interrupted before it finished. Please send it again.",
+              true,
+            );
+          }
           const file = form.get("file");
           if (!(file instanceof Blob))
             throw new ProxyProblem(400, "Media is required.");
+          trace.fileType = file.type || "unknown";
           result = await sdk.communityMaps.uploadMedia(
             slug,
             rest[1],
@@ -341,7 +579,11 @@ export function createPublicationCommunityMapsHandler(
                 ? { idempotency_key: String(form.get("idempotency_key")) }
                 : {}),
               ...(form.has("device_position")
-                ? { device_position: devicePosition(form.get("device_position")) }
+                ? {
+                    device_position: devicePosition(
+                      form.get("device_position"),
+                    ),
+                  }
                 : {}),
             },
             callOptions,
@@ -406,34 +648,50 @@ export function createPublicationCommunityMapsHandler(
             );
         }
         if (result.error) {
-          const error = result.error;
-          const status = typeof error.status === "number" ? error.status : 400;
-          response = json(
-            {
-              error: {
-                message:
-                  status >= 500
-                    ? "The guide is temporarily unavailable. Please try again."
-                    : error.message,
-              },
-            },
-            status,
-          );
+          const error = result.error as {
+            status?: number;
+            code?: string;
+            message?: string;
+          };
+          // The SDK reports a transport failure (no HTTP answer) as status 0.
+          const upstream =
+            typeof error.status === "number" ? error.status : 400;
+          const status = upstream === 0 ? 502 : upstream;
+          trace.upstreamStatus = upstream;
+          trace.upstreamCode = error.code;
+          trace.upstreamMessage = clip(error.message, 200) ?? undefined;
+          response =
+            status >= 500
+              ? problem(
+                  status,
+                  "The guide is temporarily unavailable. Please try again.",
+                  true,
+                )
+              : problem(
+                  status,
+                  error.message || "Request failed.",
+                  RETRYABLE.has(status),
+                );
         } else response = json({ data: result.data });
       }
       if (reader.cookie) response.headers.set("set-cookie", reader.cookie);
-      return response;
+      return finish(response);
     } catch (error) {
-      return json(
-        {
-          error: {
-            message:
-              error instanceof ProxyProblem
-                ? error.message
-                : "The guide is temporarily unavailable. Please try again.",
-          },
-        },
-        error instanceof ProxyProblem ? error.status : 503,
+      if (error instanceof ProxyProblem)
+        return finish(
+          problem(
+            error.status,
+            error.message,
+            error.retryable || RETRYABLE.has(error.status),
+          ),
+        );
+      return finish(
+        problem(
+          503,
+          "The guide is temporarily unavailable. Please try again.",
+          true,
+        ),
+        error,
       );
     }
   };
