@@ -130,8 +130,8 @@
 .sm-ad .sm-ad-creative .sm-ad-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .sm-ad .sm-ad-creative .sm-ad-logo--wide { width: 160px; }
 .sm-ad .sm-ad-creative .sm-ad-logo--mark { color: var(--sm-ad-cta-fg, #173d32); font: 700 1.75rem/1 var(--sm-ad-serif); }
-.sm-ad .sm-ad-creative .sm-ad-eyebrow .sm-ad-logo { width: auto; height: 26px; min-width: 24px; padding: 2px 3px; border-radius: 3px; }
-.sm-ad .sm-ad-creative .sm-ad-eyebrow .sm-ad-logo img { width: auto; height: 100%; }
+.sm-ad .sm-ad-creative .sm-ad-eyebrow .sm-ad-logo { display: inline-flex; align-items: center; justify-content: center; width: auto; height: 28px; min-width: 24px; padding: 0; background: transparent; border-radius: 0; }
+.sm-ad .sm-ad-creative .sm-ad-eyebrow .sm-ad-logo img { display: block; width: auto; height: 28px; max-height: 28px; object-fit: contain; }
 .sm-ad .sm-ad-creative .sm-ad-advertiser {
   font: 600 0.75rem/1.4 var(--sm-ad-sans);
   letter-spacing: 0.04em;

@@ -171,9 +171,9 @@ export function AdControls({ delivery, label }: { delivery: AdDelivery; label: s
                 <strong>About this advertisement</strong>
               </p>
               <p>{disclosure}</p>
+              <p>{AD_EDITORIAL_INDEPENDENCE_SENTENCE}</p>
               <p>
-                {AD_EDITORIAL_INDEPENDENCE_SENTENCE} {AD_ABOUT_SENTENCE}{" "}
-                <a href={policy}>Advertising &amp; editorial independence</a>
+                <a href={policy}>Advertising &amp; editorial independence →</a>
               </p>
             </div>
           ) : (
