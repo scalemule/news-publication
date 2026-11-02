@@ -206,6 +206,29 @@ describe("brand kit rendering", () => {
     expect(html).toContain("sm-ad-logo--tile");
     expect(html).toContain('class="sm-ad-advertiser">MergeYard<');
   });
+  it("renders two-level ownership disclosure inside the About panel for house advertisements", () => {
+    const html = render({
+      ...delivery("column", false),
+      about: {
+        advertiser: "ScaleMule",
+        kind: "house",
+        disclosure: "This is a house advertisement for ScaleMule, which shares common ownership with Lazy Tensor.",
+      },
+      brand: {
+        surface: "#0f172a",
+        ink: "#ffffff",
+        ink_muted: "#cbd5e1",
+        accent: "#f59e0b",
+        on_accent: "#0f172a",
+        wordmark: { text: "ScaleMule" },
+        eyebrow: "Production AI Infrastructure",
+      },
+    });
+    expect(html).toContain("<strong>About this advertisement</strong>");
+    expect(html).toContain("This is a house advertisement for ScaleMule, which shares common ownership with Lazy Tensor.");
+    expect(html).toContain("Advertising and editorial content are managed separately. This placement does not represent an editorial endorsement.");
+    expect(html).toContain("Advertising &amp; editorial independence");
+  });
 });
 
 describe("photo and artwork modes", () => {

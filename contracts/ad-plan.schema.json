@@ -161,7 +161,7 @@
         },
         "cta": {
           "type": "string",
-          "maxLength": 20
+          "maxLength": 28
         },
         "link_label": {
           "type": "string",
@@ -301,6 +301,18 @@
               "type": "string",
               "pattern": "^/",
               "maxLength": 200
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "house",
+                "direct",
+                "agency"
+              ]
+            },
+            "disclosure": {
+              "type": "string",
+              "maxLength": 280
             }
           }
         },
