@@ -22,7 +22,8 @@ describe("creative validation", () => {
     const emoji = "🙂".repeat(AD_COPY_LIMITS.headline + 1);
     const result = validateCreativeContent({ ...good, headline: emoji }, "band");
     expect(result.errors.map((e) => e.code)).toEqual(["too_long"]);
-    const cta = validateCreativeContent({ ...good, cta: "x".repeat(21) }, "band");
+    expect(validateCreativeContent({ ...good, cta: "Explore Context Fiber →" }, "band").ok).toBe(true);
+    const cta = validateCreativeContent({ ...good, cta: "x".repeat(AD_COPY_LIMITS.cta + 1) }, "band");
     expect(cta.errors[0]).toMatchObject({ field: "cta", code: "too_long" });
     const desc = validateCreativeContent({ ...good, description: "д".repeat(121) }, "band");
     expect(desc.errors[0]).toMatchObject({ field: "description", code: "too_long" });

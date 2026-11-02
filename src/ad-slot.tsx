@@ -1,6 +1,7 @@
 import React, { type CSSProperties } from "react";
 import {
   AD_ABOUT_SENTENCE,
+  AD_EDITORIAL_INDEPENDENCE_SENTENCE,
   AD_LABELS,
   AD_REPORT_REASONS,
   DEFAULT_AD_BRAND,
@@ -153,16 +154,34 @@ function Brand({ content, brand }: { content: AdCreativeContent; brand?: AdBrand
  */
 export function AdControls({ delivery, label }: { delivery: AdDelivery; label: string }) {
   const policy = delivery.about.policy_path || "/advertising-policy";
+  const disclosure =
+    delivery.about.disclosure ||
+    (delivery.about.kind === "house"
+      ? `This is a house advertisement for ${delivery.about.advertiser}, which shares common ownership with this publication.`
+      : undefined);
   return (
     <div className="sm-ad-bar">
       <span className="sm-ad-label">{label}</span>
       <span className="sm-ad-links">
         <details className="sm-ad-about">
           <summary aria-label="About this ad">About</summary>
-          <p className="sm-ad-panel">
-            <strong>{delivery.about.advertiser}</strong>. {AD_ABOUT_SENTENCE}{" "}
-            <a href={policy}>Advertising policy</a>
-          </p>
+          {disclosure ? (
+            <div className="sm-ad-panel sm-ad-panel--about">
+              <p className="sm-ad-panel-heading">
+                <strong>About this advertisement</strong>
+              </p>
+              <p>{disclosure}</p>
+              <p>
+                {AD_EDITORIAL_INDEPENDENCE_SENTENCE} {AD_ABOUT_SENTENCE}{" "}
+                <a href={policy}>Advertising &amp; editorial independence</a>
+              </p>
+            </div>
+          ) : (
+            <p className="sm-ad-panel">
+              <strong>{delivery.about.advertiser}</strong>. {AD_ABOUT_SENTENCE}{" "}
+              <a href={policy}>Advertising policy</a>
+            </p>
+          )}
         </details>
         <button type="button" className="sm-ad-hide" data-ad-hide={delivery.delivery_id} aria-label="Hide this ad on this page">
           Hide

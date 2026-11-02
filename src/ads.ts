@@ -185,6 +185,8 @@ export const DEFAULT_AD_BRAND: AdBrand = {
 
 export const AD_FOOTER_SURFACE = "#edf1ed";
 
+export type AdAdvertiserKind = "house" | "direct" | "agency";
+
 export type AdDelivery = {
   delivery_id: string;
   flight_id: string;
@@ -195,7 +197,12 @@ export type AdDelivery = {
   /** Always the property's own click route; the DOM never carries a destination. */
   href: string;
   label: AdLabelKey;
-  about: { advertiser: string; policy_path?: string };
+  about: {
+    advertiser: string;
+    policy_path?: string;
+    kind?: AdAdvertiserKind;
+    disclosure?: string;
+  };
   insertion_point?: string;
   /** The advertiser's brand kit; absent means the default (NapSite) palette. */
   brand?: AdBrand;
@@ -297,7 +304,7 @@ export const AD_COPY_LIMITS = {
   advertiser: 60,
   headline: 60,
   description: 120,
-  cta: 20,
+  cta: 28,
   link_label: 40,
 } as const;
 
@@ -308,6 +315,9 @@ export const AD_LABELS: Record<AdLabelKey, string> = {
 
 export const AD_ABOUT_SENTENCE =
   "Selected for this page's section and area, not for you.";
+
+export const AD_EDITORIAL_INDEPENDENCE_SENTENCE =
+  "Advertising and editorial content are managed separately. This placement does not represent an editorial endorsement.";
 
 export const AD_REPORT_REASONS = [
   ["inappropriate", "Inappropriate or offensive"],
@@ -434,6 +444,7 @@ export function unavailableAdPlan(): AdPlan {
 }
 
 const LABELS = new Set<string>(["advertisement", "sponsored"]);
+const ADVERTISER_KINDS = new Set<string>(["house", "direct", "agency"]);
 const REASONS = new Set<string>(["policy_stale", "sensitive", "blocked", "no_inventory", "preview"]);
 const TIERS = new Set<string>(["cookieless", "performance", "advertising"]);
 const FORMATS = new Set<string>(AD_FORMAT_KEYS);
@@ -540,6 +551,9 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
   const about = d.about as Record<string, unknown> | undefined;
   if (!about || typeof about !== "object" || !isString(about.advertiser)) return null;
   if (about.policy_path !== undefined && (!isString(about.policy_path) || !about.policy_path.startsWith("/"))) return null;
+  if (about.kind !== undefined && (!isString(about.kind) || !ADVERTISER_KINDS.has(about.kind))) return null;
+  const aboutDisclosure = shortLine(about.disclosure, 280);
+  if (about.disclosure !== undefined && !aboutDisclosure) return null;
   const c = d.content as Record<string, unknown> | undefined;
   if (!c || typeof c !== "object") return null;
   if (!isString(c.advertiser) || !isString(c.headline) || !isString(c.description) || !isString(c.cta)) return null;
@@ -590,6 +604,10 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
   if (focal) content.focal = focal;
   if (artwork && Object.keys(artwork).length) content.artwork = artwork;
   if (typeof c.artwork_cta === "boolean") content.artwork_cta = c.artwork_cta;
+  const normalizedAbout: AdDelivery["about"] = { advertiser: about.advertiser };
+  if (isString(about.policy_path)) normalizedAbout.policy_path = about.policy_path;
+  if (isString(about.kind)) normalizedAbout.kind = about.kind as AdAdvertiserKind;
+  if (aboutDisclosure) normalizedAbout.disclosure = aboutDisclosure;
   const out: AdWireDelivery = {
     delivery_id: d.delivery_id.toLowerCase(),
     flight_id: d.flight_id.toLowerCase(),
@@ -599,9 +617,7 @@ export function validateAdDelivery(value: unknown): AdWireDelivery | null {
     content,
     href: d.href,
     label: d.label as AdLabelKey,
-    about: isString(about.policy_path)
-      ? { advertiser: about.advertiser, policy_path: about.policy_path }
-      : { advertiser: about.advertiser },
+    about: normalizedAbout,
   };
   if (isString(d.insertion_point)) out.insertion_point = d.insertion_point;
   // A malformed brand kit falls back to the default palette; it never costs the delivery.
