@@ -41,6 +41,20 @@ export function adUnitProperties(element: Element, measurable: boolean): AdTrack
   };
 }
 
+/**
+ * Stamps `ci=1` onto a `/go/{delivery_id}` anchor when a trusted pointer,
+ * touch, or keyboard interaction occurs on the ad creative link. Crawlers
+ * following server-rendered HTML never trigger trusted DOM interaction events,
+ * whereas privacy-blocked browsers still execute this first-party listener.
+ */
+export function markTrustedAdClickIntent(anchor: Element | null): void {
+  if (!anchor || !anchor.closest("[data-ad-delivery]")) return;
+  const href = anchor.getAttribute("href");
+  if (!href || !href.startsWith("/go/")) return;
+  if (/[?&]ci=1(?:&|$)/.test(href)) return;
+  anchor.setAttribute("href", href.includes("?") ? `${href}&ci=1` : `${href}?ci=1`);
+}
+
 export function observeAdUnits(
   track: AdsMetricsProps["track"],
   root: Document = document,
@@ -118,6 +132,10 @@ export function observeAdUnits(
   }
   function onClick(event: Event) {
     const target = event.target as Element | null;
+    if (event.isTrusted) {
+      const link = target?.closest?.("[data-ad-delivery] a");
+      if (link) markTrustedAdClickIntent(link);
+    }
     const button = target?.closest?.("[data-ad-hide]");
     if (!button) return;
     const unit = button.closest("[data-ad-delivery]");
@@ -128,17 +146,41 @@ export function observeAdUnits(
       unit.remove();
     }
   }
+  function onInteract(event: Event) {
+    if (root.visibilityState !== "visible") return;
+    if (event.type === "keydown") {
+      const key = (event as KeyboardEvent).key;
+      if (key !== "Enter" && key !== " ") return;
+    } else if (event.type === "mousedown" || event.type === "pointerdown") {
+      if ((event as MouseEvent).button !== 0) return;
+    } else if (event.type === "auxclick" && !event.isTrusted) {
+      return;
+    }
+    const target = event.target as Element | null;
+    const link = target?.closest?.("[data-ad-delivery] a");
+    if (link) markTrustedAdClickIntent(link);
+  }
 
   observe();
   const mo = "MutationObserver" in window ? new MutationObserver(observe) : null;
   mo?.observe(root.body, { childList: true, subtree: true });
   root.addEventListener("visibilitychange", onVisibility);
+  root.addEventListener("pointerdown", onInteract, true);
+  root.addEventListener("mousedown", onInteract, true);
+  root.addEventListener("touchstart", onInteract, true);
+  root.addEventListener("keydown", onInteract, true);
+  root.addEventListener("auxclick", onInteract, true);
   root.addEventListener("click", onClick);
   return () => {
     mo?.disconnect();
     io?.disconnect();
     timers.forEach((_, el) => cancel(el));
     root.removeEventListener("visibilitychange", onVisibility);
+    root.removeEventListener("pointerdown", onInteract, true);
+    root.removeEventListener("mousedown", onInteract, true);
+    root.removeEventListener("touchstart", onInteract, true);
+    root.removeEventListener("keydown", onInteract, true);
+    root.removeEventListener("auxclick", onInteract, true);
     root.removeEventListener("click", onClick);
   };
 }

@@ -16,7 +16,7 @@
 import { buildClientContextHeaders } from "@scalemule/sdk";
 import { AD_REPORT_REASONS, UUID_V7, type AdReportReason } from "./ads";
 import { measurementTier } from "./ads-tier";
-import { adGateway, adPrivateHeaders, type AdScope } from "./ads-server";
+import { adGateway, adPrivateHeaders, looksAutomatedAdRequest, type AdScope } from "./ads-server";
 import { verifyClickFallback } from "./ads-signing";
 
 export const AD_CLICK_TIMEOUT_MS = 2000;
@@ -35,6 +35,66 @@ async function fallback(request: Request, scope: AdScope | null, deliveryId: str
   return redirect(destination ?? "/");
 }
 
+/**
+ * Prefetch, prerender, preview, or HEAD probes must never mint a click context
+ * or record an ad click.
+ */
+export function isPrefetchOrPreviewRequest(request: Request): boolean {
+  if (request.method === "HEAD") return true;
+  const h = request.headers;
+  const purpose = (
+    h.get("purpose") ||
+    h.get("sec-purpose") ||
+    h.get("x-purpose") ||
+    h.get("x-moz") ||
+    ""
+  ).toLowerCase();
+  if (purpose.includes("prefetch") || purpose.includes("preview") || purpose.includes("prerender")) {
+    return true;
+  }
+  if (h.get("next-router-prefetch") === "1" || h.get("x-middleware-prefetch") === "1") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Multi-signal check for whether a `/go/{delivery_id}` navigation carries a
+ * trusted browser click signal:
+ * - Rejects known crawlers, scrapers, headless browsers, and non-navigation
+ *   fetch modes (`cors`, `no-cors`, `same-origin`) even if `ci=1` or
+ *   `Sec-Fetch-User: ?1` is imitated.
+ * - Accepts `ci=1` stamped by `observeAdUnits` on a trusted DOM interaction
+ *   (which works on Mobile Safari where `Sec-Fetch-User` is omitted) or
+ *   `Sec-Fetch-User: ?1` sent by the browser on a user-activated navigation
+ *   (which works even when privacy blockers block analytics beacons).
+ */
+export function hasInteractiveClickSignal(request: Request, fallbackUserAgent?: string | null): boolean {
+  const ua = request.headers.get("user-agent") ?? fallbackUserAgent;
+  if (looksAutomatedAdRequest(ua)) {
+    return false;
+  }
+  const secFetchMode = (request.headers.get("sec-fetch-mode") || "").toLowerCase();
+  if (secFetchMode && secFetchMode !== "navigate" && secFetchMode !== "nested-navigate") {
+    return false;
+  }
+  const secFetchDest = (request.headers.get("sec-fetch-dest") || "").toLowerCase();
+  if (secFetchDest && secFetchDest !== "document" && secFetchDest !== "iframe" && secFetchDest !== "empty") {
+    return false;
+  }
+  try {
+    const url = new URL(request.url);
+    if (url.searchParams.get("ci") === "1") return true;
+  } catch {
+    // ignore URL parse error
+  }
+  const secFetchUser = request.headers.get("sec-fetch-user");
+  if (secFetchUser === "?1" && (secFetchMode === "" || secFetchMode === "navigate" || secFetchMode === "nested-navigate")) {
+    return true;
+  }
+  return false;
+}
+
 export function createAdClickHandler(options: {
   resolve(request: Request): Promise<AdScope>;
   fetch?: typeof fetch;
@@ -46,17 +106,30 @@ export function createAdClickHandler(options: {
     let scope: AdScope | null = null;
     try {
       scope = await options.resolve(request);
-      if (new URL(request.url).searchParams.get("direct") === "1") return fallback(request, scope, id);
+      const url = new URL(request.url);
+      if (url.searchParams.get("direct") === "1" || isPrefetchOrPreviewRequest(request)) {
+        return fallback(request, scope, id);
+      }
       const gateway = adGateway(scope);
       if (!gateway) return fallback(request, scope, id);
+      const clickIntent = hasInteractiveClickSignal(request, scope.clientContext?.userAgent);
+      const contextHeaders: Record<string, string> = {
+        ...buildClientContextHeaders(scope.clientContext),
+        "x-api-key": scope.apiKey,
+        "content-type": "application/json",
+      };
+      const reqUa = request.headers.get("user-agent");
+      if (reqUa && !contextHeaders["x-client-user-agent"] && !contextHeaders["user-agent"]) {
+        contextHeaders["x-client-user-agent"] = reqUa;
+      }
       const response = await fetcher(gateway + "/v1/ads/clicks", {
         method: "POST",
-        headers: {
-          ...buildClientContextHeaders(scope.clientContext),
-          "x-api-key": scope.apiKey,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ delivery_id: id, tier: measurementTier(request.headers) }),
+        headers: contextHeaders,
+        body: JSON.stringify({
+          delivery_id: id,
+          tier: measurementTier(request.headers),
+          ...(clickIntent ? { click_intent: true } : {}),
+        }),
         cache: "no-store",
         redirect: "error",
         signal: AbortSignal.timeout(AD_CLICK_TIMEOUT_MS),

@@ -165,6 +165,25 @@ describe("ad measurement", () => {
     (document.querySelector("[data-ad-hide]") as HTMLButtonElement).click();
     expect(document.querySelector("[data-ad-delivery]")).toBeNull();
   });
+  it("stamps ci=1 on the /go/ link only for interactive pointer/keyboard gestures, ignoring programmatic .click()", () => {
+    const track = vi.fn();
+    stop = observeAdUnits(track);
+    const link = document.querySelector("[data-ad-delivery] a.sm-ad-creative") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe(`/go/${DELIVERY}`);
+
+    // Programmatic .click() (isTrusted = false, no pointerdown/mousedown) does not stamp ci=1
+    link.click();
+    expect(link.getAttribute("href")).toBe(`/go/${DELIVERY}`);
+
+    // Interactive primary-button pointer/mouse down in a visible tab stamps ci=1 once
+    const trustedDown = new MouseEvent("mousedown", { bubbles: true, button: 0 });
+    link.dispatchEvent(trustedDown);
+    expect(link.getAttribute("href")).toBe(`/go/${DELIVERY}?ci=1`);
+
+    // Repeated interactions are idempotent
+    link.dispatchEvent(trustedDown);
+    expect(link.getAttribute("href")).toBe(`/go/${DELIVERY}?ci=1`);
+  });
 });
 
 describe("brand kit rendering", () => {

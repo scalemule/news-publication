@@ -21,6 +21,44 @@ export type AdScope = {
 
 export const AD_PLAN_TIMEOUT_MS = 150;
 
+const AUTOMATED_AD_UA_RE =
+  /\b(bot|crawler|spider|slurp|bingpreview|mediapartners-google|adsbot-google|apis-google|googleother|google-inspectiontool|facebookexternalhit|meta-externalagent|bytespider|gptbot|oai-searchbot|chatgpt-user|claudebot|anthropic-ai|perplexitybot|ccbot|amazonbot|applebot|yandex|baiduspider|duckduckbot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|awariobot|reflectionbot|dataforseo|barkrowler|blexbot|seekport|zoominfobot|censys|headlesschrome|phantomjs|playwright|puppeteer|lightpanda|selenium|webdriver|curl|wget|python-requests|python-urllib|aiohttp|httpx|go-http-client|java\/|okhttp|axios|node-fetch|undici|libwww-perl|scrapy)\b/i;
+
+const FROZEN_SCRAPER_UA_SIGNATURES = [
+  "Chrome/116.0.0.0",
+  "Chrome/118.0.0.0",
+  "Chrome/119.0.0.0",
+  "Chrome/120.0.0.0",
+  "Chrome/121.0.0.0",
+  "Chrome/122.0.0.0",
+  "Chrome/124 Safari/537.36",
+  "Firefox/119.0",
+  "Firefox/120.0",
+  "Firefox/121.0",
+  "CriOS/122.0.6261.89",
+  "FxiOS/123.0",
+  "CPU iPhone OS 16_0 like Mac OS X",
+  "Nexus 5X Build/MMB29P",
+  "CPU iPhone OS 13_2_3 like Mac OS X",
+];
+
+/**
+ * Returns true when an SSR page or click request carries a known crawler,
+ * scraper, headless automation, or frozen-UA scraper signature.
+ *
+ * When `userAgent` is undefined (e.g., server callers that do not pass a UA),
+ * returns false so intentional internal/test calls are not blocked.
+ */
+export function looksAutomatedAdRequest(userAgent?: string | null): boolean {
+  if (userAgent === undefined || userAgent === null) return false;
+  const trimmed = userAgent.trim();
+  if (trimmed.length === 0) return true;
+  if (AUTOMATED_AD_UA_RE.test(trimmed)) return true;
+  if (FROZEN_SCRAPER_UA_SIGNATURES.some((sig) => trimmed.includes(sig))) return true;
+  if (trimmed.includes("X11; Linux x86_64") && trimmed.includes("Chrome/155.0.0.0")) return true;
+  return false;
+}
+
 export const adPrivateHeaders = {
   "cache-control": "private, no-store",
   "x-robots-tag": "noindex, nofollow",
@@ -52,6 +90,9 @@ export async function fetchAdPlan(
 ): Promise<AdPlan> {
   const gateway = adGateway(scope);
   if (!gateway) return unavailableAdPlan();
+  if (!request.preview_token && looksAutomatedAdRequest(scope.clientContext?.userAgent)) {
+    return { ...emptyAdPlan(), empty: [...request.placements], reason: "blocked" };
+  }
   const body: AdPlanRequest = scope.publicationId
     ? { ...request, property: { ...request.property, publication_id: scope.publicationId } }
     : request;
