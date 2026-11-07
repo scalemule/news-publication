@@ -341,16 +341,24 @@ describe("forwarded family invitations", () => {
     render(<StoryReview sessionId="family" publicationName="Test publication" readerAccountUrl={google ? "/api/news/me" : undefined} renderSignIn={google ? next => <a href={`/sign-in?next=${encodeURIComponent(next)}`}>Continue with Google</a> : undefined} feedbackEmail={google ? "family@example.test" : undefined} />);
     return fetcher;
   }
-  it("upgrades old fragment invitations to a complete copyable address and preserves it after navigation", async () => {
+  it("preserves legacy fragment invitations exactly while navigating and copying", async () => {
     window.history.replaceState(null,"",`/review/family#${"a".repeat(64)}`);
     familySetup();
     await screen.findByRole("heading", { name: sampleDocument.title });
-    expect(window.location.hash).toBe("");
-    expect(new URL(window.location.href).searchParams.get("key")).toBe("a".repeat(64));
+    expect(window.location.hash).toBe(`#${"a".repeat(64)}`);
     fireEvent.click(screen.getByText("Review options"));
-    expect(new URL(window.location.href).searchParams.get("key")).toBe("a".repeat(64));
+    expect(window.location.hash).toBe(`#${"a".repeat(64)}`);
     fireEvent.click(screen.getByRole("button", { name: "Share private preview" }));
-    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toContain(`?key=${"a".repeat(64)}`);
+    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toContain(`#${"a".repeat(64)}`);
+  });
+  it("preserves a permanent article URL even when an older proxy suggests a different address", async () => {
+    const path = `/news/a/article-id?review=family&key=${"a".repeat(64)}`;
+    window.history.replaceState(null,"",path);
+    familySetup();
+    await screen.findByRole("heading", { name: sampleDocument.title });
+    expect(window.location.pathname + window.location.search).toBe(path);
+    fireEvent.click(screen.getByRole("button", { name: "Share private preview" }));
+    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toBe(window.location.origin + path);
   });
   it("lets forwarded readers open the story before asking who is contributing", async () => {
     const fetcher=familySetup();
@@ -830,4 +838,14 @@ it('preserves the invited revision after another version is published',async()=>
  render(<StoryReview sessionId="session" publicationName="Test publication" initialReview={{...initial,article_published:true}} />);
  expect(screen.getByText(/preserves the version you were invited to review/)).toBeTruthy();
  expect(screen.queryByText('Private preview · Not published')).toBeNull();
+});
+
+it("shows the stored display headline and kicker and requires a hero for every article", async () => {
+  const review = {...initial, celebration_type: undefined, revision: {...initial.revision, document:{...sampleDocument, headline:"The display headline", fly_title:"Community voices"}}, permissions:["VIEW_DRAFT"]};
+  vi.stubGlobal("fetch", vi.fn(async()=>({ok:true,json:async()=>({data:review})})));
+  render(<StoryReview sessionId="one" publicationName="Test publication"/>);
+  expect(await screen.findByRole("heading", {name:"The display headline"})).toBeTruthy();
+  expect(screen.getByText("Community voices")).toBeTruthy();
+  expect(screen.getByLabelText("Hero photograph required")).toBeTruthy();
+  expect(screen.queryByRole("button",{name:"+ Add a photograph"})).toBeNull();
 });

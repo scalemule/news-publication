@@ -3,6 +3,8 @@ import { articlePresentation, articleFormatLabel, type ArticleFormat, type Artic
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
+import { VerifiedCardSection } from "./verified-card";
+import type { VerifiedCard, ArticleCitation } from "./types";
 import { proseDiff } from "./story-diff";
 import { reviewEmailLink, reviewEmailText } from "./story-review-email";
 import {
@@ -44,6 +46,9 @@ export type Document = {
   community: string;
   media: Media[];
   blocks?: ContentBlock[];
+  cards?: VerifiedCard[];
+  citations?: ArticleCitation[];
+  excerpt?: string;
 };
 type Editorial = {
   content_kind?: string;
@@ -79,6 +84,7 @@ export type StoryReviewData = {
   participant?: boolean;
   response_drafts?: Record<string, Draft>;
   publication: { name: string };
+  author?: { display_name?: string | null };
   reviewer: string;
   revision: Revision;
   history: Revision[];
@@ -254,6 +260,7 @@ export function StoryReview({
       method: body === undefined ? "GET" : "POST",
       credentials: "same-origin",
       cache: "no-store",
+      signal: AbortSignal.timeout(form ? 100000 : 30000),
       headers:
         body === undefined || form
           ? {}
@@ -282,7 +289,7 @@ export function StoryReview({
     try {
       await request("/account", {}); await load(); setPanelState(target); setReturnPanel("");
       const url = new URL(window.location.href); url.searchParams.delete("respond");
-      window.history.replaceState(null, "", url.pathname + url.search);
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
     } catch (e) { setError((e as Error).message); setPanelState("identity"); }
     finally { setBusy(false); }
   }
@@ -302,19 +309,17 @@ export function StoryReview({
           setRequestedPanel(respond); setReturnPanel(respond); setPanelState("identity");
         }
         const token = new URL(window.location.href).searchParams.get("key") || (/^[a-f0-9]{64}$/.test(window.location.hash.slice(1)) ? window.location.hash.slice(1) : undefined);
-        // Keep a complete copyable invitation in the address bar. A legacy
-        // fragment invitation (or an existing cookie-only visit) upgrades here.
+        // A review never changes the address the newsroom sent. In particular,
+        // fragment capabilities must survive copying and returning from sign-in.
         let exchange: { share_url?: string; can_share?: boolean; review?: Review | { verification_required: true } } = {};
         try { exchange = await request("/session", { ...(token ? { token } : {}), include_review: true }); }
-        catch (e) { if (token) throw e; /* Older publication proxies can still open their existing cookie session. */ }
-        const address = exchange.share_url || (token ? `/review/${encodeURIComponent(sessionId)}?key=${encodeURIComponent(token)}` : undefined);
+        catch (e) { if (token) throw e; }
+        const address = token ? window.location.href : exchange.share_url;
         if (address) {
-          const canonical = new URL(address, window.location.origin);
-          if (canonical.origin === window.location.origin) {
-            const address = new URL(canonical);
-            if (respond) address.searchParams.set("respond", respond);
-            window.history.replaceState(null, "", address.pathname + address.search);
-            if (active) { setShareUrl(canonical.href); setCanShare(exchange.can_share === true); }
+          const shared = new URL(address, window.location.origin);
+          if (shared.origin === window.location.origin) {
+            shared.searchParams.delete("respond"); shared.searchParams.delete("signin");
+            if (active) { setShareUrl(shared.href); setCanShare(exchange.can_share === true); }
           }
         }
         // New proxies return the already-authorized snapshot with the exchange.
@@ -471,7 +476,14 @@ export function StoryReview({
   const emailLink = review ? reviewEmailLink(feedbackEmail, review.revision.document.title, reviewEmailText(review)) : undefined;
   const questionText = review ? reviewEmailText(review, answers) : "";
   const questionsEmail = review ? reviewEmailLink(feedbackEmail, review.revision.document.title, questionText) : undefined;
-  const signInReturn = shareUrl ? new URL(shareUrl).pathname + new URL(shareUrl).search + `&respond=${encodeURIComponent(requestedPanel)}` : "";
+  const signInReturn = (() => {
+    if (!shareUrl) return "";
+    const url = new URL(shareUrl); url.searchParams.set("respond", requestedPanel);
+    // OAuth returns do not carry fragments to the server. Encode the legacy
+    // capability in the validated local return path for this round trip only.
+    if (/^#[a-f0-9]{64}$/.test(url.hash)) { url.searchParams.set("key", url.hash.slice(1)); url.hash = ""; }
+    return url.pathname + url.search;
+  })();
   const emailAlternative = emailLink && <p className="sm-review-email-alternative">Prefer email? <a href={emailLink}>Email the newsroom</a>. Your email app will open; send your message there.</p>;
   const presentation = articlePresentation(review?.presentation);
   const formatLabel = articleFormatLabel(presentation.format);
@@ -664,32 +676,31 @@ export function StoryReview({
             data-wide-body={presentation.layout.wide_body} data-hero-aspect={presentation.layout.hero_aspect}>
             {heroBeforeHeadline && <div className="sm-review-hero">{hero}</div>}
             <p className="sm-review-category">
-              <span>{review.revision.document.section}</span>
+              <span>{review.revision.document.fly_title?.trim() || review.revision.document.section}</span>
               {formatLabel && <span>{formatLabel}</span>}
               {celebration && (
                 <span>{human(review.celebration_type || "")}</span>
               )}
             </p>
-            <h1>{review.revision.document.title}</h1>
-            <p className="sm-review-dek">{review.revision.document.subtitle}</p>
+            <h1>{review.revision.document.headline?.trim() || review.revision.document.title}</h1>
+            <p className="sm-review-dek">{review.revision.document.subtitle || review.revision.document.excerpt}</p>
+            {review.author?.display_name && <p className="sm-review-byline">By {review.author.display_name}</p>}
             <EditorialNotices editorial={review.revision.editorial} />
             {!heroBeforeHeadline && <div className="sm-review-hero">{hero}</div>}
-            {celebration &&
-              !review.revision.document.media.some(
-                (m) => m.position === "hero",
-              ) &&
-              can("UPLOAD_MEDIA") && (
+            {!review.revision.document.media.some(
+                (m) => m.position === "hero" && (m.kind || "image") === "image",
+              ) && (
                 <aside
                   className="sm-review-photo-invitation"
-                  aria-label="Family photograph"
+                  aria-label="Hero photograph required"
                 >
                   <div>
-                    <strong>A photograph makes it yours.</strong>
-                    <p>Family photograph may be added before publication.</p>
+                    <strong>A hero photograph is required before publication.</strong>
+                    <p>The newsroom must review and select a photograph before this article can be published.</p>
                   </div>
-                  <button onClick={() => openMedia()}>
+                  {can("UPLOAD_MEDIA") && <button onClick={() => openMedia()}>
                     + Add a photograph
-                  </button>
+                  </button>}
                 </aside>
               )}
             {(() => {
@@ -803,6 +814,8 @@ export function StoryReview({
                   disabled={busy}
                 />
               ))}
+            <VerifiedCardSection cards={review.revision.document.cards}/>
+            {!!review.revision.document.citations?.length && <section aria-label="Sources"><h2>Sources</h2><ul>{review.revision.document.citations.filter(c => /^https?:\/\//.test(c.url)).map((c,i) => <li key={i}><a href={c.url} target="_blank" rel="noopener noreferrer">{c.title || c.publisher || c.url}</a></li>)}</ul></section>}
           </article>
           {celebration && (
             <section id="review-options" className="sm-review-welcome">
