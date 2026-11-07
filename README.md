@@ -489,3 +489,32 @@ This helper does not source or ingest a new photograph. Use managed asset intake
 for that phase, preserving source rights and private capture information.
 Reported elapsed time covers the API operation; verify the real public page and
 homepage allocation separately before claiming the replacement is visible.
+
+## Stable article review links
+
+`StoryReview` keeps the invitation's pathname, query and legacy fragment intact;
+there must be no second history/redirect wrapper around it. The copy control uses
+the complete invitation, and sign-in must return to the same local article path
+with its `review`, `key`, `respond` and optional `workspace=review` fields.
+Do not strip the access key while the article is private.
+
+The publication proxy can return `{share_url, can_share, review}` from the token
+exchange (`include_review: true`), avoiding a second initial read. That snapshot
+must use the verified contributor identity when available. Keep proof tokens in
+HttpOnly cookies and return the snapshot only with `private, no-store` headers.
+
+New publication runtimes advertise `GET /api/news/review-capabilities`. Only after
+that publication reports contract 2 and its matching publication ID should the
+newsroom request `stable_article_url: true`. Blog then issues
+`/news/a/<article-id>?review=<session-id>&key=<capability>`. The identity route
+renders without redirects, including after slug changes. Published content is
+available at old links even after the invitation expires or is revoked; only
+`workspace=review` explicitly opens the private correction workspace. Older
+runtimes continue receiving their supported `/review/<session>#<capability>` form.
+
+Private review routes must bypass public analytics, ads, subscription prompts and
+silent sign-in. They are never publicly cached or indexed. Selected history,
+permissions, identity verification, approvals and media decisions remain enforced
+by Blog; hiding a UI control is not an authorization boundary. A preview with no
+selected hero photograph displays a publication blocker and an upload action only
+when the reviewer has that permission.
