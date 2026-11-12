@@ -16,12 +16,19 @@ function fixture(){
 }
 describe('preview operation',()=>{
  it('issues once and updates the existing link without replacing its secret or permissions',async()=>{
-  const f=fixture();const first=await f.run();expect(first.state).toBe('preview_ready');
+  const f=fixture();const first=await f.run();expect(first.state).toBe('preview_ready');expect(first.readiness).toBeNull();
   expect(f.checkpoint?.stage).toBe('issued');expect((await f.run()).url).toBe(first.url);
   f.current.current_revision_id='r2';f.current.generation=4;expect((await f.run()).url).toBe(first.url);
   const commands=f.request.mock.calls.filter(c=>c[1]==='POST').map(c=>c[2]);
   expect(commands.map(c=>c.action)).toEqual(['INVITE','SHARE_REVISION']);
   expect(commands[1]).toMatchObject({expected_generation:4,revision_id:'r2',session_id:'session'});
+ });
+ it.each(['INVITE','SHARE_REVISION'])('reports committed readiness after %s without an extra history read',async(action)=>{
+  const f=fixture();if(action==='SHARE_REVISION'){await f.run();f.current.current_revision_id='r2';}
+  f.current.readiness={approval_blockers:[{code:'subject_approval',message:'Previous gate'}]};
+  const committed={approval_blockers:[{code:'subject_approval',message:'Named reviewer has not approved'}]};
+  f.request.mockClear();f.request.mockImplementationOnce(async()=>structuredClone(f.current)).mockImplementationOnce(async()=>({generation:5,readiness:committed,session_id:'session',url:'https://paper.test/news/readable-story?review=session&key=secret'}));
+  const result=await f.run();expect(result.readiness).toEqual(committed);expect(f.request.mock.calls.filter(c=>c[1]==='GET')).toHaveLength(1);
  });
  it('never retries an invitation whose response was lost',async()=>{
   const f=fixture();f.request.mockImplementationOnce(async()=>structuredClone(f.current)).mockImplementationOnce(async()=>{throw Error('Connection lost');});
