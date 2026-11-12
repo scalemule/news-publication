@@ -199,12 +199,17 @@ function resolve(config: ReaderSsoConfig): Resolved {
   const origin = new URL(config.origin);
   if (origin.protocol !== "https:" || origin.origin !== config.origin) throw new Error("Reader SSO origin must be a bare https origin");
   if (!config.key) throw new Error("Reader SSO key is required");
+  // The server's OAuth callback may be an API route; reader return destinations may not.
+  const callbackPath = config.callbackPath ?? "/api/news/ledvery-callback";
+  if (!/^\/[A-Za-z0-9._~/-]+$/.test(callbackPath) || callbackPath.startsWith("//") || callbackPath.length > 500 || new URL(callbackPath, origin).pathname !== callbackPath) {
+    throw new Error("Reader SSO callback must be a local pathname");
+  }
   const accountPath = localReturnPath(config.accountPath ?? "/account") || "/account";
   const returnPath = config.returnPath ?? ((next) => localReturnPath(next));
   return {
     ...config,
     names: readerSsoCookieNames(config.prefix),
-    callbackPath: localReturnPath(config.callbackPath ?? "/api/news/ledvery-callback") || "/api/news/ledvery-callback",
+    callbackPath,
     accountPath,
     issuerOrigin: new URL(config.issuerOrigin ?? LEDVERY_ISSUER_ORIGIN).origin,
     returnPath,
