@@ -38,7 +38,7 @@ Unspecified fields and media are retained. Default: save for review.
 APPROVE or changes a policy. Legacy onboarding requires an explicit
 --enable-review-policy value. Scheduled legacy articles stop before onboarding.
 Use --expected-generation when coordinating an edit with another editor.
-Default edit deadline: 10000 ms (--timeout-ms, API work). The public page check after --release
+Default edit deadline: 30000 ms (--timeout-ms, API work). The public page check after --release
 has its own --page-timeout-ms (default 60000). Reuse the same patch/key/checkpoint on retry.
 RELEASE_HELD means the revision is saved and existing review gates remain.
 
@@ -78,7 +78,7 @@ try {
   } else {
     const [command, ...extra] = positionals;
     const commandStarted = performance.now();
-    const budget = Number(values['timeout-ms'] ?? (command==='edit'?10000:30000));
+    const budget = Number(values['timeout-ms'] ?? 30000);
     if (!Number.isFinite(budget) || budget < 100 || budget > 120000) throw Error('--timeout-ms must be between 100 and 120000');
     const remaining = () => { const ms = Math.floor(budget - (performance.now()-commandStarted)); if (ms < 1) throw Error('Operation deadline reached; resume the same operation'); return ms; };
     // The public page check has its own deadline: caches and rolling pods make it slower than the API, and

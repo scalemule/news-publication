@@ -404,9 +404,9 @@ Scheduled legacy articles stop before onboarding. Normal API-key/member grants
 remain authoritative; the deployed server must advertise
 `versioned_editorial_fields`.
 
-From 0.0.114, deployed command receipts avoid a redundant full-history read after release. Older servers fall back to read-back verification. Results include `request_timings` (stage, method and elapsed milliseconds), separately from public-page verification. These timings are measured per operation; no fixed production latency is promised.
+From 0.0.114, deployed command receipts avoid a redundant full-history read after release. Older servers fall back to read-back verification. Results include `request_timings` (stage, method and elapsed milliseconds), separately from public-page verification. These timings are measured per operation; no fixed production latency is promised. The deadline is a failure limit, not a required wait: commands return as soon as their work finishes.
 
-The 10-second default deadline bounds the operation; `--timeout-ms` may raise it
+The 30-second default deadline bounds the operation; `--timeout-ms` may raise it
 to at most 120 seconds. Keep the same patch/key and private checkpoint
 (`--state` or `~/.scalemule/newsroom/operations`) on retries. The checkpoint
 contains the submitted document and private provenance: never publish it.

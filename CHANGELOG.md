@@ -1,5 +1,7 @@
 ## 0.0.114
 
+- Align the edit deadline with the CLI’s bounded 30-second API budget to avoid interrupting ordinary production writes at 10 seconds. Operations still return immediately on completion; checkpoints and explicit timeout overrides remain supported.
+
 - Use the committed release receipt to avoid fetching all article history again after publication. Older servers retain read-back verification; uncertain releases reconcile once without issuing a second release. Exact revision, permanent identity and published content checks remain in place.
 - Include per-request stage timings in successful edit results without logging URLs, article content or credentials. This is not a claim that production publishing meets a 2–3 second target.
 

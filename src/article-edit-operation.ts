@@ -219,7 +219,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
   validate(input);
   const started = performance.now();
   let stage = "preflight";
-  const timeout = input.timeoutMs ?? 10000;
+  const timeout = input.timeoutMs ?? 30000;
   if (!Number.isFinite(timeout) || timeout < 100 || timeout > 120000)
     throw Error("Edit deadline must be between 100 and 120000 milliseconds");
   const signal = AbortSignal.timeout(timeout);
