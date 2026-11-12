@@ -141,6 +141,93 @@ describe("click route", () => {
   it("derives a different key per property", async () => {
     expect(await signClickFallback("key-a", DELIVERY, DESTINATION)).not.toBe(await signClickFallback("key-b", DELIVERY, DESTINATION));
   });
+  it("forwards click_intent: true when ci=1 or Sec-Fetch-User: ?1 is present (including privacy-blocked browsers)", async () => {
+    const bodies: unknown[] = [];
+    const fetcher = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return ok({ data: { location: "https://attribution.example/r/tok?d=ctx" } });
+    });
+    const handler = createAdClickHandler({ resolve, fetch: fetcher as unknown as typeof fetch });
+    const urlWithCi = `${await signedUrl()}&ci=1`;
+    const res1 = await handler(new Request(urlWithCi), DELIVERY);
+    expect(res1.status).toBe(302);
+    expect(bodies[0]).toEqual({ delivery_id: DELIVERY, tier: "cookieless", click_intent: true });
+
+    const res2 = await handler(
+      new Request(await signedUrl(), { headers: { "sec-fetch-user": "?1", "sec-fetch-mode": "navigate" } }),
+      DELIVERY,
+    );
+    expect(res2.status).toBe(302);
+    expect(bodies[1]).toEqual({ delivery_id: DELIVERY, tier: "cookieless", click_intent: true });
+  });
+  it("rejects spoofed ci=1 or Sec-Fetch-User when the request has a crawler/scraper User-Agent or non-navigation fetch mode", async () => {
+    const bodies: unknown[] = [];
+    const fetcher = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return ok({ data: { location: "https://attribution.example/r/tok?d=ctx" } });
+    });
+    const handler = createAdClickHandler({ resolve, fetch: fetcher as unknown as typeof fetch });
+    const urlWithCi = `${await signedUrl()}&ci=1`;
+    await handler(
+      new Request(urlWithCi, { headers: { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } }),
+      DELIVERY,
+    );
+    await handler(
+      new Request(urlWithCi, { headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" } }),
+      DELIVERY,
+    );
+    await handler(
+      new Request(urlWithCi, { headers: { "sec-fetch-user": "?1", "sec-fetch-mode": "cors" } }),
+      DELIVERY,
+    );
+    expect(bodies).toEqual([
+      { delivery_id: DELIVERY, tier: "cookieless" },
+      { delivery_id: DELIVERY, tier: "cookieless" },
+      { delivery_id: DELIVERY, tier: "cookieless" },
+    ]);
+  });
+  it("skips calling /v1/ads/plan on SSR requests from known crawlers and scrapers", async () => {
+    const fetcher = vi.fn();
+    for (const ua of [
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    ]) {
+      const result = await fetchAdPlan(
+        { ...scope, clientContext: { userAgent: ua } },
+        request,
+        fetcher as unknown as typeof fetch,
+      );
+      expect(result).toEqual({
+        status: "ok",
+        plan_id: "",
+        policy_snapshot_at: "",
+        deliveries: {},
+        empty: ["leaderboard", "article_inline"],
+        reason: "blocked",
+      });
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("short-circuits HEAD and prefetch/preview requests without calling the ads click service", async () => {
+    const fetcher = vi.fn(async () => {
+      throw new Error("must not call ads click service on prefetch/HEAD");
+    });
+    const handler = createAdClickHandler({ resolve, fetch: fetcher as unknown as typeof fetch });
+    const url = await signedUrl();
+    for (const req of [
+      new Request(url, { method: "HEAD" }),
+      new Request(url, { headers: { purpose: "prefetch" } }),
+      new Request(url, { headers: { "sec-purpose": "prefetch;prerender" } }),
+      new Request(url, { headers: { "x-purpose": "preview" } }),
+      new Request(url, { headers: { "next-router-prefetch": "1" } }),
+    ]) {
+      const res = await handler(req, DELIVERY);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe(DESTINATION);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
 
 describe("report route", () => {
