@@ -1,3 +1,8 @@
+## 0.0.107
+
+- Preserve configured local OAuth API callback paths through authorization and code exchange. Reader return destinations still reject API routes; invalid callback configuration fails closed.
+- Publication staff workflows still require deployed publication ACL and invitation APIs; this SDK patch alone does not provide a network administration UI.
+
 ## 0.0.105
 
 - Community Maps proxy failures are no longer silent. Every failed write and server error logs one structured line (`community_maps_proxy_error`) with the route, status, upstream status and code, the real exception, the byte count, the file type and the duration. Reader content, contact details, coordinates and keys are never logged.

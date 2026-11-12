@@ -557,3 +557,28 @@ it("retaining a legacy account suppresses renewal only for its validated credent
     expect((await startSignIn(h.config, { mode: "silent", cookies })).ok).toBe(true);
   }
 });
+
+
+describe("configured OAuth callback", () => {
+  it("preserves a publication-specific API callback through authorize and code exchange", async () => {
+    const callback = `${ORIGIN}/api/admin/paper/callback`;
+    const h = harness({authorize:{status:200,body:{data:{state:"st-1",url:`https://api.ledvery.com/authorize?client_id=napsite-paper&response_type=code&scope=openid&nonce=n&state=st-1&redirect_uri=${encodeURIComponent(callback)}&code_challenge_method=S256&code_challenge=c`}}}});
+    h.config.callbackPath = "/api/admin/paper/callback";
+    const start = await startSignIn(h.config, {mode:"interactive",next:"/account",cookies:jar({})});
+    expect(start.ok).toBe(true);
+    expect(new URL(h.calls[0].path, ORIGIN).searchParams.get("redirect_uri")).toBe(callback);
+    const cookies = jar(Object.fromEntries(start.cookies.map(c=>[c.name,c.value])));
+    const completed = await completeSignIn(h.config, {url:callback+"?code=one-time&state=st-1",cookies});
+    expect(completed.location).toBe("/account");
+    const exchange = h.calls.find(c=>c.path.startsWith("/v1/auth/oauth/ledvery/callback"));
+    expect(completed.kind).toBe("signed-in");
+    expect(new URL(exchange!.path, ORIGIN).searchParams.get("code")).toBe("one-time");
+    expect(new URL(exchange!.path, ORIGIN).searchParams.get("state")).toBe("st-1");
+    expect(localReturnPath("/api/admin/paper/callback")).toBe("");
+  });
+  it.each(["https://evil.test/callback", "//evil.test/callback", "/api/../callback", "/api/callback?next=evil", "/api/callback#token", "/api/\\evil", "/api/callback\n"])("rejects unsafe configured callback %s", async callbackPath => {
+    const h=harness();h.config.callbackPath=callbackPath;
+    await expect(startSignIn(h.config,{mode:"interactive",cookies:jar({})})).rejects.toThrow("local pathname");
+    expect(h.calls).toHaveLength(0);
+  });
+});
