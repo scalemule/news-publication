@@ -29,3 +29,12 @@ it('shows subject blockers before the editor clicks and does not silently change
  await waitFor(()=>expect(calls).toHaveLength(2));
  expect(calls.some(c=>c[1].method==='POST')).toBe(false);
 });
+
+it('explains the move to manual publication and leaves policy unchanged when cancelled',async()=>{
+ const calls=setup(true);await screen.findByText('A named subject reviewer is required');
+ fireEvent.change(screen.getByLabelText('Review policy'),{target:{value:'FACT_CHECK'}});
+ vi.mocked(window.confirm).mockReturnValueOnce(false);
+ fireEvent.click(screen.getByText('Save review policy'));
+ expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Automatic publication will be turned off'));
+ expect(calls.some(c=>c[1].method==='POST')).toBe(false);
+});

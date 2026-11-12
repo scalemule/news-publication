@@ -33,7 +33,7 @@ export function EditorialControls({base,post,previewRevision,showDocument=false,
  async function command(action:string,extra:object={}){
   if(!record)return;
   if(['RELEASE','APPROVE_AND_RELEASE'].includes(action)&&!window.confirm(`Publish “${current?.document.title}” revision ${current?.number}?`))return;
-  if(action==='CONFIGURE_POLICY'&&!window.confirm(`Change this article’s review policy to “${policies.find(p=>p[0]===policy)?.[1]}”? Existing reviewer feedback is retained. This does not publish the article.`))return;
+  if(action==='CONFIGURE_POLICY'&&!window.confirm(`Change this article’s review policy to “${policies.find(p=>p[0]===policy)?.[1]}”? Existing reviewer feedback is retained. Automatic publication will be turned off; you will publish manually. This does not publish the article.`))return;
   setBusy(true);setError('');setNotice('');const started=performance.now();
   try{
    const result=await request(base,`articles/${post}/collaboration`,{expected_generation:record.generation,action,sensitivity_review:null,...extra,...(action==='RELEASE'?{scheduled_at:null}:{})});
