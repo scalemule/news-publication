@@ -18,7 +18,11 @@ export type ArticleEditPatch = Partial<
     | "citations"
     | "tag_ids"
   >
->;
+> & {
+  /** Move already selected supporting photographs into the body. Block indexes
+   * are one-based, after removing the requested photos' existing directives. */
+  photo_placements?: { file_id: string; after_block: number }[];
+};
 export type ArticleEditCheckpoint = {
   version: 1;
   identity: string;
@@ -126,6 +130,7 @@ const patchKeys = new Set([
   "cards",
   "citations",
   "tag_ids",
+  "photo_placements",
 ]);
 function validate(input: ArticleEditInput) {
   if (
@@ -142,7 +147,15 @@ function validate(input: ArticleEditInput) {
     );
   for (const [key, value] of Object.entries(input.patch)) {
     if (!patchKeys.has(key)) throw Error("Unsupported edit field: " + key);
-    if (key === "tag_ids") {
+    if (key === "photo_placements") {
+      if (!Array.isArray(value) || !value.length || value.length > 30 ||
+          value.some((v: any) => !v || typeof v !== "object" ||
+            Object.keys(v).some(k => !["file_id", "after_block"].includes(k)) ||
+            typeof v.file_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(v.file_id) ||
+            !Number.isSafeInteger(v.after_block) || v.after_block < 1) ||
+          new Set(value.map((v: any) => uuidIdentity(v.file_id))).size !== value.length)
+        throw Error("photo_placements requires distinct managed file UUIDs and positive after_block indexes");
+    } else if (key === "tag_ids") {
       if (!Array.isArray(value) || value.length > 32 || new Set(value).size !== value.length || value.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id) || /^0{8}-0{4}-0{4}-0{4}-0{12}$/u.test(id)))
         throw Error("tag_ids must contain at most 32 distinct, nonempty UUIDs");
     } else if (["cards", "citations"].includes(key)) {
@@ -179,6 +192,27 @@ function validate(input: ArticleEditInput) {
     throw Error("Select an explicit supported review policy");
   if (new TextEncoder().encode(JSON.stringify(input.patch)).length > 128 * 1024)
     throw Error("Editorial patch exceeds 128 KiB");
+}
+function placePhotos(document: ArticleDocument, placements: NonNullable<ArticleEditPatch["photo_placements"]>) {
+  const requested = new Set(placements.map(p => uuidIdentity(p.file_id)));
+  for (const placement of placements) {
+    const photos = document.media?.filter(m => uuidIdentity(m.file_id) === uuidIdentity(placement.file_id)) ?? [];
+    if (photos.length !== 1 || (photos[0].kind && photos[0].kind !== "image") || photos[0].position === "hero")
+      throw Error("Each placement must identify one already selected supporting photograph; the hero stays in place");
+  }
+  const blocks = document.content_markdown.replaceAll("\r\n", "\n").split("\n\n").filter(block => {
+    if (!block.trim()) return false;
+    const id = block.trim().match(/^::inline_media\{id="([0-9a-f-]+)"\}$/iu)?.[1];
+    return !id || !requested.has(uuidIdentity(id));
+  });
+  if (placements.some(p => p.after_block > blocks.length))
+    throw Error("Photo after_block must name an existing one-based body block");
+  return {
+    content_markdown: blocks.flatMap((block, index) => [block,
+      ...placements.filter(p => p.after_block === index + 1).map(p => `::inline_media{id="${p.file_id.toLowerCase()}"}`),
+    ]).join("\n\n"),
+    media: document.media!.map(m => requested.has(uuidIdentity(m.file_id)) ? { ...m, position: "inline" as const } : m),
+  };
 }
 /** Bounded, checkpointed revision save using the existing Blog workflow and release gates. */
 export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
@@ -280,6 +314,8 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
       );
     if (input.patch.tag_ids !== undefined && options.capabilities?.versioned_editorial_tags !== true)
       throw new ArticleEditOperationError("CAPABILITY_UNAVAILABLE", stage, "The server must expose versioned_editorial_tags before changing tags; no article was changed");
+    if (input.patch.photo_placements !== undefined && options.capabilities?.inline_media_directives_version !== 1)
+      throw new ArticleEditOperationError("CAPABILITY_UNAVAILABLE", stage, "The server must expose inline_media_directives_version: 1 before placing photos; no article was changed");
     if (!identityMatches(source))
       throw new ArticleEditOperationError(
         "ARTICLE_IDENTITY_CHANGED",
@@ -362,7 +398,12 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
           source.excerpt !== undefined
         )
           effective.excerpt = source.excerpt;
-        const changed = Object.entries(input.patch).some(
+        const { photo_placements, ...fields } = input.patch;
+        const patch = photo_placements ? {
+          ...fields,
+          ...placePhotos({ ...effective, ...fields }, photo_placements),
+        } : fields;
+        const changed = Object.entries(patch).some(
           ([key, value]) => !equal(effective[key], value),
         );
         if (!changed) {
@@ -373,7 +414,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
           await save("verify");
           if (!input.release) return result(record, "unchanged");
         } else {
-          const document = { ...selected.document, ...input.patch };
+          const document = { ...selected.document, ...patch };
           if (
             document.excerpt === undefined &&
             source.excerpt !== null &&

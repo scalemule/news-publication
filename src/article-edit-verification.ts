@@ -55,6 +55,29 @@ export function articleEditHtmlMatches(
   const all = text(visible);
   if (!paragraphs.length || !paragraphs.every((p) => all.includes(p)))
     return false;
+  const figures = [...expected.content_html.matchAll(/<figure\b[^>]*data-sm-media-id=["']([^"']+)["'][^>]*>[\s\S]*?<\/figure>/giu)];
+  if (figures.length) {
+    let ordered = visible;
+    for (const figure of figures) {
+      const id = figure[1].toLowerCase();
+      const matches = [...visible.matchAll(/<figure\b[^>]*data-sm-media-id=["']([^"']+)["'][^>]*>[\s\S]*?<\/figure>/giu)].filter(m => m[1].toLowerCase() === id);
+      if (matches.length !== 1 || !/<img\b[^>]*\bsrc=["']https:\/\/[^"']+["']/iu.test(matches[0][0])) return false;
+      const caption = text(figure[0].match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/iu)?.[1] ?? "");
+      if (text(matches[0][0].match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/iu)?.[1] ?? "") !== caption) return false;
+      ordered = ordered.replace(matches[0][0], ` SM_PHOTO_${id} `);
+    }
+    const tokens = [...expected.content_html.matchAll(/<(p|li|h[2-6]|blockquote|figure)\b[^>]*>[\s\S]*?<\/\1>/giu)].map(m => {
+      const id = m[0].match(/data-sm-media-id=["']([^"']+)["']/iu)?.[1];
+      return id ? `SM_PHOTO_${id.toLowerCase()}` : text(m[0]);
+    }).filter(Boolean);
+    const shown = text(ordered);
+    let cursor = 0;
+    for (const token of tokens) {
+      const index = shown.indexOf(token, cursor);
+      if (index < 0) return false;
+      cursor = index + token.length;
+    }
+  }
   if (expected.tags?.length) {
     const links = [...visible.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/giu)];
     if (!expected.tags.every(tag => links.some(link => {
