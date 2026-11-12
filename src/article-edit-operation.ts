@@ -219,16 +219,26 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
   validate(input);
   const started = performance.now();
   let stage = "preflight";
-  const timeout = input.timeoutMs ?? 10000;
+  const timeout = input.timeoutMs ?? 30000;
   if (!Number.isFinite(timeout) || timeout < 100 || timeout > 120000)
     throw Error("Edit deadline must be between 100 and 120000 milliseconds");
   const signal = AbortSignal.timeout(timeout);
-  const request = <T = any>(
+  const requestTimings: { stage: string; method: string; elapsed_ms: number }[] = [];
+  const request = async <T = any>(
     path: string,
     method?: string,
     body?: unknown,
     extra?: HeadersInit,
-  ) => t.request<T>(path, method, body, extra, signal);
+  ) => {
+    const requestStarted = performance.now();
+    const requestStage = stage;
+    try {
+      return await t.request<T>(path, method, body, extra, signal);
+    } finally {
+      // No URLs, content or credentials in timing receipts.
+      requestTimings.push({ stage: requestStage, method: method ?? "GET", elapsed_ms: Math.round(performance.now() - requestStarted) });
+    }
+  };
   const identity = await digest([
     t.publicationId,
     input.articleId,
@@ -279,6 +289,7 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
     state: status,
     editorial_status: record.status,
     elapsed_ms: Math.round(performance.now() - started),
+    request_timings: requestTimings,
   });
   try {
     const [options, source, initial] = await Promise.all([
@@ -467,8 +478,9 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
       return result(record, state.unchanged ? "unchanged" : "saved_for_review");
     }
     await save("release");
+    let releaseReceipt;
     try {
-      await request(article + "/collaboration", "POST", {
+      releaseReceipt = await request(article + "/collaboration", "POST", {
         action: "RELEASE",
         expected_generation: record.generation,
         scheduled_at: null,
@@ -482,10 +494,33 @@ export async function runArticleEdit(t: Transport, input: ArticleEditInput) {
         record = checked;
       } else throw error;
     }
-    record = await request(article + "/collaboration");
+    // The command receipt comes from the committed transaction. Immutable
+    // revision identity was checked above; do not fetch all history again just
+    // to recover the same committed generation/status. Older servers still use
+    // a fresh read, and an uncertain command reuses its reconciliation read.
+    if (releaseReceipt !== undefined) {
+      if (
+        options.capabilities?.command_generation_receipt === true &&
+        Number.isSafeInteger(releaseReceipt.generation) &&
+        releaseReceipt.generation > record.generation &&
+        typeof releaseReceipt.current_revision_id === "string" &&
+        typeof releaseReceipt.published_revision_id === "string" &&
+        typeof releaseReceipt.status === "string"
+      ) {
+        record = { ...record,
+          generation: releaseReceipt.generation,
+          current_revision_id: releaseReceipt.current_revision_id,
+          published_revision_id: releaseReceipt.published_revision_id,
+          status: releaseReceipt.status,
+        };
+      } else {
+        record = await request(article + "/collaboration");
+      }
+    }
     if (
       record.current_revision_id !== state.revisionId ||
-      record.published_revision_id !== state.revisionId
+      record.published_revision_id !== state.revisionId ||
+      record.status !== "PUBLISHED"
     )
       throw new ArticleEditOperationError(
         "VERIFICATION_CONFLICT",

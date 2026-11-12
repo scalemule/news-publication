@@ -57,6 +57,8 @@ function fixture(normalizeMedia = false) {
     tagCapability = true,
     headlineCapability = true,
     inlineCapability = true,
+    commandReceipt = true,
+    receiptOverride: Record<string, unknown> = {},
     hold = false,
     lostSave = false,
     lostRelease = false,
@@ -81,7 +83,7 @@ function fixture(normalizeMedia = false) {
     if (path.endsWith("/options"))
       return reply({
         workflow_version: 1,
-        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability, headline_set: headlineCapability, inline_media_directives_version: inlineCapability ? 1 : undefined },
+        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability, headline_set: headlineCapability, inline_media_directives_version: inlineCapability ? 1 : undefined, command_generation_receipt: commandReceipt },
       });
     if (path.endsWith("/document")) return reply(source);
     if (path.endsWith("/enable")) {
@@ -161,7 +163,13 @@ function fixture(normalizeMedia = false) {
           lostRelease = false;
           throw new TypeError("Lost release acknowledgement");
         }
-        return reply({});
+        return reply(commandReceipt ? {
+          generation: record.generation,
+          current_revision_id: record.current_revision_id,
+          published_revision_id: record.published_revision_id,
+          status: record.status,
+          ...receiptOverride,
+        } : {});
       }
       return reply(record);
     }
@@ -200,6 +208,8 @@ function fixture(normalizeMedia = false) {
     input,
     original,
     transport,
+    withoutCommandReceipt: () => { commandReceipt = false; },
+    overrideReceipt: (value: Record<string, unknown>) => { receiptOverride = value; },
     get checkpoint() {
       return checkpoint;
     },
@@ -268,6 +278,35 @@ describe("repeatable versioned article editing", () => {
     expect(f.counts).toEqual({ saves: 1, releases: 1, enrolls: 0 });
     expect(f.source.slug).toBe("permanent-slug");
     expect(f.source.published_at).toBe("2026-10-19T12:00:00Z");
+  });
+  it("uses the committed receipt without another history read and still verifies public content", async () => {
+    const f = fixture();
+    const result = await f.client.editArticle({ ...f.input(), release: true });
+    const reads = f.transport.mock.calls.filter(([url, init]) => new URL(String(url)).pathname.endsWith("/collaboration") && init?.method === "GET");
+    // Initial snapshot and saved revision; no full-history request after release.
+    expect(reads).toHaveLength(2);
+    expect(result).toMatchObject({ state: "published", generation: 6 });
+    expect(result.request_timings).toHaveLength(7);
+    expect(result.request_timings.every(t => Object.keys(t).sort().join(",") === "elapsed_ms,method,stage")).toBe(true);
+    expect(String(f.transport.mock.calls.at(-1)?.[0])).toContain("/document");
+  });
+  it("reads publication state when an older server has no command receipt", async () => {
+    const f = fixture(); f.withoutCommandReceipt();
+    expect((await f.client.editArticle({ ...f.input(), release: true })).state).toBe("published");
+    expect(f.transport.mock.calls.filter(([url, init]) => new URL(String(url)).pathname.endsWith("/collaboration") && init?.method === "GET")).toHaveLength(3);
+  });
+  it("does not accept a release receipt for a different revision", async () => {
+    const f = fixture(); f.overrideReceipt({ published_revision_id: "another-revision" });
+    await expect(f.client.editArticle({ ...f.input(), release: true })).rejects.toMatchObject({ code: "VERIFICATION_CONFLICT" });
+  });
+  it("does not call a scheduled receipt published", async () => {
+    const f = fixture(); f.overrideReceipt({ status: "SCHEDULED" });
+    await expect(f.client.editArticle({ ...f.input(), release: true })).rejects.toMatchObject({ code: "VERIFICATION_CONFLICT" });
+  });
+  it("rechecks a malformed command receipt instead of assuming publication", async () => {
+    const f = fixture(); f.overrideReceipt({ generation: "6" });
+    expect((await f.client.editArticle({ ...f.input(), release: true })).state).toBe("published");
+    expect(f.transport.mock.calls.filter(([url, init]) => new URL(String(url)).pathname.endsWith("/collaboration") && init?.method === "GET")).toHaveLength(3);
   });
   it("retains a saved revision at a review hold and resumes after real external approval", async () => {
     const f = fixture();
@@ -360,6 +399,7 @@ describe("repeatable versioned article editing", () => {
       (await f.client.editArticle({ ...f.input(), release: true })).state,
     ).toBe("published");
     expect(f.counts.releases).toBe(1);
+    expect(f.transport.mock.calls.filter(([url, init]) => new URL(String(url)).pathname.endsWith("/collaboration") && init?.method === "GET")).toHaveLength(3);
   });
   it("rejects changed operation input and unsupported fields before mutation", async () => {
     const f = fixture();
