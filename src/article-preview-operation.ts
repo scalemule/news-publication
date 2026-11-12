@@ -26,6 +26,7 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
  const save=async()=>input.saveCheckpoint(structuredClone(state));
  const path=`/articles/${encodeURIComponent(input.articleId)}/collaboration`;
  const current=await t.request<any>(path,'GET',undefined,undefined,signal);
+ let readiness=current.readiness??null;
  if(state.stage==='invitation_pending')throw Error('Invitation acknowledgement is uncertain. Inspect the recorded article sessions; do not create another invitation or rotate its key.');
  if(state.sessionId){
   const session=current.sessions?.find((s:any)=>s.id===state.sessionId);
@@ -36,7 +37,8 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
   if(state.stage==='share_pending'&&state.revisionId!==current.current_revision_id)throw Error('Another revision became current while sharing; review the new draft before sharing it');
   if(session.revision_id!==current.current_revision_id){
    state.revisionId=current.current_revision_id;state.stage='share_pending';await save();
-   await t.request(path,'POST',{action:'SHARE_REVISION',expected_generation:current.generation,session_id:state.sessionId,revision_id:state.revisionId},undefined,signal);
+   const shared=await t.request<any>(path,'POST',{action:'SHARE_REVISION',expected_generation:current.generation,session_id:state.sessionId,revision_id:state.revisionId},undefined,signal);
+   readiness=shared?.readiness??null;
   }
   state.stage='issued';state.revisionId=current.current_revision_id;await save();
  }else{
@@ -52,7 +54,9 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
   if(typeof issued.session_id!=='string'||typeof issued.url!=='string')throw Error('Invitation receipt is incomplete; inspect the existing sessions');
   const url=new URL(issued.url);
   if(url.origin!==origin.origin||!url.pathname.startsWith('/news/')||url.searchParams.get('review')!==issued.session_id)throw Error('Invitation receipt does not match the publication');
+  // Invitations can change approval gates; report the committed receipt, not the earlier read.
+  readiness=issued.readiness??null;
   state.sessionId=issued.session_id;state.url=issued.url;state.stage='issued';await save();
  }
- return {state:'preview_ready',article_id:input.articleId,revision_id:state.revisionId,session_id:state.sessionId,url:state.url,readiness:current.readiness??null,elapsed_ms:Math.round(performance.now()-started)};
+ return {state:'preview_ready',article_id:input.articleId,revision_id:state.revisionId,session_id:state.sessionId,url:state.url,readiness,elapsed_ms:Math.round(performance.now()-started)};
 }
