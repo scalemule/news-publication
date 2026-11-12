@@ -1,3 +1,8 @@
+## 0.0.113
+
+- Type managed inline uploads with an explicit one-based `after_block` body position. The server resolves the uploaded file ID into the immutable revision; callers do not invent asset IDs or public URLs.
+- Expose inline directive and upload-position capabilities. Discover these on the running publication before using them. This patch does not deploy the Blog backend or change existing article content.
+
 ## 0.0.112
 
 - Replace browser confirmations for publication, review-policy changes, reviewer designation and response discard with a shared accessible in-page dialog. Actions have explicit labels; Cancel and Escape preserve the current state, and focus returns to the invoking control.

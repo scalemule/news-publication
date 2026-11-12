@@ -124,6 +124,8 @@ export type ArticleWorkflowOptions = {
   capabilities: {
     managed_private_asset_upload: boolean;
     inline_media_body?: boolean;
+    inline_media_directives_version?: number;
+    inline_asset_after_block?: boolean;
     automatic_public_narration?: boolean;
     prioritized_narration_processing?: boolean;
     content_first_editor_document?: boolean;
@@ -167,7 +169,7 @@ export type ArticleSubmissionManifest = {
   intent?: "draft" | "review" | "publish";
   approve_media?: boolean;
   sensitivity_review?: { policy_version: string; rule_ids: string[]; reason: string };
-  assets?: { slot: string; position: "hero" | "gallery" | "attachment"; metadata: AssetMetadata }[];
+  assets?: { slot: string; position: "hero" | "inline" | "gallery" | "attachment"; after_block?: number; metadata: AssetMetadata }[];
 };
 export type ArticleSubmissionReceipt = {
   submission_id: string; article_id: string | null; revision_id: string | null;
@@ -505,7 +507,7 @@ export class PublicationArticleClient {
   submitArticle(input: {
     operationKey: string; authorProfileId: string; document: ArticleDocument;
     reviewPolicy?: string; intent?: "draft" | "review" | "publish";
-    assets?: { file: Blob; filename: string; metadata: AssetMetadata; position: "hero" | "gallery" | "attachment" }[];
+    assets?: { file: Blob; filename: string; metadata: AssetMetadata; position: "hero" | "inline" | "gallery" | "attachment"; after_block?: number }[];
     approveMedia?: boolean;
   }) {
     if (input.document.media?.length) throw new Error("Pass file assets separately when creating an article package");
@@ -513,6 +515,6 @@ export class PublicationArticleClient {
     const assets=(input.assets ?? []).map((a,i)=>({...a,slot:"asset_"+String.fromCharCode(97+i)}));
     return this.submit({ article:{ operation:"create",author_profile_id:input.authorProfileId,document:input.document,review_policy:input.reviewPolicy },
       intent:input.intent ?? "draft",approve_media:input.approveMedia,
-      assets:assets.map(a=>({slot:a.slot,position:a.position,metadata:a.metadata})) },input.operationKey,assets);
+      assets:assets.map(a=>({slot:a.slot,position:a.position,after_block:a.after_block,metadata:a.metadata})) },input.operationKey,assets);
   }
 }

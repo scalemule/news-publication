@@ -567,3 +567,30 @@ Cancel, Escape and unmount resolve without accepting.
 
 This patch does not promise a fixed latency for AI generation, fresh media
 scanning/transforms, external websites, or human review.
+
+
+### Managed photographs inside the article
+
+Discover `inline_media_directives_version: 1` for existing selected photos and
+`inline_asset_after_block: true` for new uploads. Capability discovery must use
+the running publication API, not this package's version.
+
+For an existing approved photo, keep its actual `file_id`, contribution, caption,
+credit and alt text in `document.media`, set its position to `inline`, and put
+`::inline_media{id="<actual-file-id>"}` alone between blank lines at the desired
+position in `content_markdown`. Each reference must identify a selected inline
+photo and occur once. Save the complete document through the versioned workflow;
+review and publication still use the normal exact-revision gates. Raw Markdown
+image URLs and HTML images remain prohibited by the managed workflow.
+
+For a new photograph in a managed submission, use an asset with
+`position: "inline", after_block: 2`. Blocks are the original submitted Markdown's
+nonempty groups separated by blank lines, numbered from one. The photo is placed
+after block two. Keep placements outside code, lists and quotations. The normal
+intake scans and approves the managed asset, then inserts its real ID into the
+saved revision. The same manifest, files and operation key resume an interrupted
+submission. `queued` or `scanning` is pending, not published.
+
+The public renderer uses only ready managed delivery records. Inline photos retain
+captions and credits and are excluded from the bottom gallery. Narration skips the
+placement directives; moving a photo does not regenerate unchanged spoken prose.

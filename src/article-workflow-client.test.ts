@@ -6,6 +6,17 @@ import {
 } from "./article-workflow-client";
 
 describe("standard agent article package", () => {
+  it("preserves a new inline photograph's explicit body position in the managed manifest", async () => {
+    const transport = vi.fn(async (_url: URL | RequestInfo, init?: RequestInit) => {
+      const manifest = JSON.parse(String((init?.body as FormData).get("manifest")));
+      expect(manifest.assets[0]).toMatchObject({position:"inline",after_block:2,slot:"asset_a"});
+      expect(manifest.article.document.content_markdown).toBe("Opening.\n\nСофия 東京 🙂.\n\nClosing.");
+      return Response.json({success:true,data:{status:"queued",accepted_is_not_published:true}});
+    });
+    const client = new PublicationArticleClient({apiUrl:"https://api.example.org",publicationId:"publication",fetch:transport as typeof fetch});
+    await client.submitArticle({operationKey:"inline-photo",authorProfileId:"author",document:{title:"Local reporting",section:"Community",content_markdown:"Opening.\n\nСофия 東京 🙂.\n\nClosing."},assets:[{file:new Blob(["test bytes"]),filename:"photo.png",position:"inline",after_block:2,metadata:{caption:"Residents",credit:"Photographer",alt:"Residents planting",creator:"Photographer",who_is_pictured:"",when_taken:"",where_taken:"",rights_confirmed:true}}]});
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
   it("sends an article and its files in exactly one server request, including retries", async () => {
     const transport=vi.fn(async (url:URL|RequestInfo,init?:RequestInit)=>{
       expect(String(url)).toBe("https://api.example.org/v1/blog/publications/publication/submissions");
