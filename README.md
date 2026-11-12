@@ -518,3 +518,42 @@ permissions, identity verification, approvals and media decisions remain enforce
 by Blog; hiding a UI control is not an authorization boundary. A preview with no
 selected hero photograph displays a publication blocker and an upload action only
 when the reviewer has that permission.
+
+### Fast private previews and editorial controls
+
+Install the CLI once (`npm install -g @scalemule/news-publication@0.0.108`) for
+routine newsroom work. Prepared text and existing media references can finish
+private submission in the request; fresh uploads return a resumable processing
+receipt. A pending receipt is not publication.
+
+```sh
+scalemule-article submit --publication "$PUBLICATION_ID" --manifest article.json \
+  --reviewer reviewer.json --operation-key original-article-v1
+scalemule-article preview --publication "$PUBLICATION_ID" --article "$ARTICLE_ID" \
+  --reviewer reviewer.json --operation-key original-article-review
+scalemule-article feedback --publication "$PUBLICATION_ID" --article "$ARTICLE_ID"
+```
+
+A preview manifest uses `intent: "review"` and the explicitly chosen review
+policy. `reviewer.json` contains a label, permissions and history mode, for example
+`{"label":"Source feedback","permissions":["VIEW_DRAFT","COMMENT","PROPOSE_EDITS","REQUEST_CHANGES"],"history_mode":"LATEST","allow_contributors":true,"required_approval":false}`.
+Required consent needs a separate named, verified approval invitation. The CLI
+never changes review policy or supplies a human approval.
+
+The complete server-issued URL is retained in the private `invitation_file`
+checkpoint. `--show-private-url` prints it explicitly. Repeating `preview` with
+the same operation key and reviewer advances that same invitation to the current
+revision. Lost invitation acknowledgements stop for reconciliation; they never
+create a replacement or rotate a secret. Preview URLs are discovered from the
+running publication, not manufactured from a slug.
+
+`@scalemule/news-publication/editorial-controls` exports the shared human editor
+panel for both publication previews and network administration. It displays
+exact-revision blockers before actions, lets authorized publishers explicitly
+configure review policy, and supports transactional `APPROVE_AND_RELEASE` when
+the server exposes readiness. Server grants, consent, media rights and revision
+checks remain authoritative. Command receipts carry the committed generation,
+so a successful approval need not reload the complete account and history.
+
+This patch does not promise a fixed latency for AI generation, fresh media
+scanning/transforms, external websites, or human review.
