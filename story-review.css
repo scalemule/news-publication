@@ -1,3 +1,5 @@
+@import "./confirmation-dialog.css";
+
 .sm-review-frame:not(.sm-review-publication-frame) {
   --pub-paper: #fff;
   --pub-ink: #171917;
