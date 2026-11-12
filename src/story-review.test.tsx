@@ -329,7 +329,7 @@ describe("forwarded family invitations", () => {
     const token = "a".repeat(64);
     const fetcher = vi.fn(async (url: unknown, options?: RequestInit) => {
       const path = String(url), body = typeof options?.body === "string" ? JSON.parse(options.body) : {};
-      if (path.endsWith("/session")) return { ok: true, json: async () => ({ data: { share_url: `/review/family?key=${token}`, can_share: true } }) };
+      if (path.endsWith("/session")) return { ok: true, json: async () => ({ data: { share_url: `/news/a-private-family-announcement?review=family&key=${token}`, can_share: true } }) };
       if (path === "/api/news/me") return { ok: true, json: async () => ({ user: account ? { email: "mother@example.test", full_name: "Майка", email_verified: true } : null }) };
       if (path.endsWith("/account")) { identified = true; return { ok: true, json: async () => ({ success: true }) }; }
       if (path.endsWith("/verify") && body.code === "00000000") return { ok: false, json: async () => ({ error: { message: "Check the code in your email" } }) };
@@ -341,24 +341,37 @@ describe("forwarded family invitations", () => {
     render(<StoryReview sessionId="family" publicationName="Test publication" readerAccountUrl={google ? "/api/news/me" : undefined} renderSignIn={google ? next => <a href={`/sign-in?next=${encodeURIComponent(next)}`}>Continue with Google</a> : undefined} feedbackEmail={google ? "family@example.test" : undefined} />);
     return fetcher;
   }
-  it("preserves legacy fragment invitations exactly while navigating and copying", async () => {
+  it("resolves legacy fragments to the permanent path while navigating and copying", async () => {
     window.history.replaceState(null,"",`/review/family#${"a".repeat(64)}`);
     familySetup();
     await screen.findByRole("heading", { name: sampleDocument.title });
-    expect(window.location.hash).toBe(`#${"a".repeat(64)}`);
+    expect(window.location.hash).toBe("");
+    expect(window.location.pathname).toBe("/news/a-private-family-announcement");
     fireEvent.click(screen.getByText("Review options"));
-    expect(window.location.hash).toBe(`#${"a".repeat(64)}`);
+    expect(window.location.hash).toBe("");
+    expect(window.location.pathname).toBe("/news/a-private-family-announcement");
     fireEvent.click(screen.getByRole("button", { name: "Share private preview" }));
-    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toContain(`#${"a".repeat(64)}`);
+    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toContain(`?review=family&key=${"a".repeat(64)}`);
   });
-  it("preserves a permanent article URL even when an older proxy suggests a different address", async () => {
+  it("replaces an old UUID address with the server-issued permanent article path", async () => {
     const path = `/news/a/article-id?review=family&key=${"a".repeat(64)}`;
     window.history.replaceState(null,"",path);
     familySetup();
     await screen.findByRole("heading", { name: sampleDocument.title });
-    expect(window.location.pathname + window.location.search).toBe(path);
+    expect(window.location.pathname + window.location.search).toBe(`/news/a-private-family-announcement?review=family&key=${"a".repeat(64)}`);
     fireEvent.click(screen.getByRole("button", { name: "Share private preview" }));
-    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toBe(window.location.origin + path);
+    expect((await screen.findByLabelText("Private preview link") as HTMLInputElement).value).toBe(window.location.href);
+  });
+  it("retains correction intent in the address and copied link", async () => {
+    window.history.replaceState({kept:"router"},"",`/review/family?workspace=review#${"a".repeat(64)}`);
+    const fetcher=familySetup();await screen.findByRole("heading", {name:sampleDocument.title});
+    expect(window.location.pathname).toBe('/news/a-private-family-announcement');
+    expect(new URL(window.location.href).searchParams.get('workspace')).toBe('review');
+    expect(window.history.state).toEqual({kept:'router'});
+    const exchange=fetcher.mock.calls.find(([url])=>String(url).endsWith('/session'));
+    expect(JSON.parse(exchange![1]!.body as string).workspace).toBe('review');
+    fireEvent.click(screen.getByRole('button',{name:'Share private preview'}));
+    expect((await screen.findByLabelText('Private preview link') as HTMLInputElement).value).toContain('workspace=review');
   });
   it("lets forwarded readers open the story before asking who is contributing", async () => {
     const fetcher=familySetup();
