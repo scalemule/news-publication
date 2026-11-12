@@ -26,6 +26,7 @@ export default defineConfig({
     "community-maps-server": "src/community-maps-server.ts",
     "community-maps-view": "src/community-maps-view.tsx",
     "story-review": "src/story-review.tsx",
+    "editorial-controls": "src/editorial-controls.tsx",
     "snapshot-file": "src/snapshot-file.ts",
     "marketplace-view": "src/marketplace-view.tsx",
     "marketplace-forms": "src/marketplace-forms.tsx",

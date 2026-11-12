@@ -4,15 +4,26 @@ import { homedir } from 'node:os';
 import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
+import {preparePreview} from './preview-state.mjs';
 import { PublicationArticleClient, articlePhotoHtmlMatches,articleEditHtmlMatches } from '../dist/article-workflow-client.js';
 
 const help = `Usage:
   scalemule-article submit --publication ID --manifest article.json --operation-key KEY [--asset hero=/path/photo.jpg]
   scalemule-article status --publication ID --submission ID
+  scalemule-article preview --publication ID --article ID --reviewer reviewer.json --operation-key KEY
+  scalemule-article feedback --publication ID --article ID
   scalemule-article inspect --publication ID --article ID
   scalemule-article replace-cover --publication ID --article ID --file-id ID --expected-version N --metadata photo.json
   scalemule-article replace-photo --url ARTICLE_URL --file PHOTO --metadata photo.json --operation-key KEY
   scalemule-article edit --url ARTICLE_URL --patch edit.json --operation-key KEY [--release]
+
+preview creates one private invitation or shares the current revision on the same saved link.
+Reuse its operation key/checkpoint for updates. reviewer.json explicitly specifies label,
+permissions and history_mode; subject approval also requires a named verified reviewer.
+The full URL is saved privately; --show-private-url prints it when explicitly needed.
+submit --reviewer reviewer.json also issues the invitation when preparation is complete.
+A pending submission returns immediately; resume from its receipt, never recreate the article.
+feedback reports the current revision, publication blockers, reviewer state and contributions.
 
 Credentials: SCALEMULE_API_KEY and SCALEMULE_ACCESS_TOKEN (normal authorized member).
 Platform admins may use their normal access token with --application-id ID.
@@ -59,7 +70,7 @@ that every website/CDN cache already displays the new image.
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true, strict: true,
-    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','page-timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}]])),
+    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','page-timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission','reviewer'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}],['show-private-url',{type:'boolean'}]])),
   });
   if (values.help || !positionals.length) {
     console.log(help);
@@ -73,7 +84,7 @@ try {
     // a slow page must never consume the API operation's budget or vice versa.
     const pageBudget = Number(values['page-timeout-ms'] ?? 60000);
     if (!Number.isFinite(pageBudget) || pageBudget < 1000 || pageBudget > 300000) throw Error('--page-timeout-ms must be between 1000 and 300000');
-    if (extra.length || !['submit','status','inspect', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use submit, status, inspect, edit, replace-cover or replace-photo; see --help');
+    if (extra.length || !['submit','status','inspect','preview','feedback', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use submit, status, preview, feedback, inspect, edit, replace-cover or replace-photo; see --help');
     if (values.url) {
       if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN || values['application-id']) throw Error('URL resolution requires normal publication member/API-key credentials');
       const url = new URL(values.url);
@@ -114,7 +125,15 @@ try {
         assets.push({slot,filename:basename(path),file:new Blob([await readFile(path)])});
       }
       const receipt=await client.submit(manifest,values['operation-key'],assets,AbortSignal.timeout(remaining()));
-      console.log(JSON.stringify({...receipt,elapsed_ms:Math.round(performance.now()-started)},null,2));
+      const preview=values.reviewer&&receipt.status==='complete'&&receipt.article_id
+        ?await preparePreview(client,values,receipt.article_id,remaining()):undefined;
+      console.log(JSON.stringify({...receipt,...(preview?{preview}:{}),elapsed_ms:Math.round(performance.now()-started)},null,2));
+      if(values.reviewer&&!preview)process.exitCode=2;
+    }else if(command==='preview'){
+      console.log(JSON.stringify(await preparePreview(client,values,values.article,remaining()),null,2));
+    }else if(command==='feedback'){
+      const record=await client.get(values.article);
+      console.log(JSON.stringify({article_id:values.article,revision_id:record.current_revision_id,generation:record.generation,status:record.status,review_policy:record.review_policy,readiness:record.readiness,reviewers:record.sessions,contributions:record.contributions,elapsed_ms:Math.round(performance.now()-started)},null,2));
     }else if(command==='status'){
       if(!values.submission)throw Error('Missing --submission');
       console.log(JSON.stringify(await client.submission(values.submission,AbortSignal.timeout(remaining())),null,2));

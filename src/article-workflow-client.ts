@@ -1,3 +1,5 @@
+import {runArticlePreview,type ArticlePreviewInput} from "./article-preview-operation";
+export type {ArticlePreviewInput,ArticlePreviewCheckpoint,PreviewReviewer} from "./article-preview-operation";
 export { articlePhotoHtmlMatches } from "./article-photo-verification";
 export { articleEditHtmlMatches } from "./article-edit-verification";
 import type { ArticleFormat, ArticleLayout } from "./article-presentation";
@@ -146,6 +148,11 @@ type Record = {
   current_revision_id: string;
   generation: number;
   status: string;
+  review_origin?: string;
+  permalink_path?: string;
+  review_policy?: string;
+  readiness?: {revision_id:string;approval_blockers:{code:string;message:string}[];release_blockers:{code:string;message:string}[]};
+  sessions?: {id:string;label:string;revision_id:string;required_approval:boolean;revoked_at:string|null;expires_at:string|null}[];
   revisions: { id: string; document: ArticleDocument }[];
   contributions: {
     id: string;
@@ -274,6 +281,9 @@ export class PublicationArticleClient {
     return this.request<Record>(
       `/articles/${encodeURIComponent(articleId)}/collaboration`,
     );
+  }
+  previewArticle(input: ArticlePreviewInput) {
+    return runArticlePreview({publicationId:this.config.publicationId,request:this.request.bind(this),fetch:this.config.fetch??fetch},input);
   }
   processing(articleId: string, signal?: AbortSignal) {
     return this.request<ArticleProcessing>(
