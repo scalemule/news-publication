@@ -95,3 +95,16 @@ describe("the papers' entity cards and the search title", () => {
     expect(articleEditHtmlMatches(page("Stale title"), { ...expected, seo_title: null })).toBe(true);
   });
 });
+
+it("verifies managed photos once, with captions and between the intended paragraphs", () => {
+  const photo = '<figure data-sm-media-id="managed-id"><img src="https://cdn.example/photo.webp"><figcaption>Watering · Photographer</figcaption></figure>';
+  const body = '<p>Before София.</p>' + photo + '<p>After 東京.</p>';
+  const expected = { title: "Story", content_html: body, card_titles: [] };
+  const heading = '<h1>Story</h1>';
+  expect(articleEditHtmlMatches(heading + body, expected)).toBe(true);
+  expect(articleEditHtmlMatches(heading + body.replace(photo, "") + photo, expected)).toBe(false);
+  expect(articleEditHtmlMatches(heading + body + photo, expected)).toBe(false);
+  expect(articleEditHtmlMatches(heading + body.replace('<img src="https://cdn.example/photo.webp">', ""), expected)).toBe(false);
+  expect(articleEditHtmlMatches(heading + body.replace('Watering · Photographer', 'Incorrect caption'), expected)).toBe(false);
+  expect(articleEditHtmlMatches(heading + body.replace(photo, "") + '<script>' + photo + '</script>', expected)).toBe(false);
+});

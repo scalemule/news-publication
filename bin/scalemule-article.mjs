@@ -31,7 +31,8 @@ Optional --api-url URL defaults to https://api.scalemule.com.
 
 edit saves prose, excerpt, cards, citations, tenant-owned tag_ids and the headline set (title,
 headline <= 120 chars with 70 recommended, fly_title <= 40, subtitle as the rubric, seo_title) in
-one immutable revision.
+one immutable revision. photo_placements: [{file_id, after_block}] places already selected
+supporting photos between body blocks; requires deployed inline_media_directives_version: 1.
 Unspecified fields and media are retained. Default: save for review.
 --release explicitly requests release under the existing policy; it never issues
 APPROVE or changes a policy. Legacy onboarding requires an explicit

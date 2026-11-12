@@ -1,5 +1,7 @@
 ## 0.0.113
 
+- Add `photo_placements` to the standard checkpointed article edit command for existing selected photographs, retaining the hero and exact revision gates. Verify released figures, captions and body order on the rendered page.
+
 - Type managed inline uploads with an explicit one-based `after_block` body position. The server resolves the uploaded file ID into the immutable revision; callers do not invent asset IDs or public URLs.
 - Expose inline directive and upload-position capabilities. Discover these on the running publication before using them. This patch does not deploy the Blog backend or change existing article content.
 

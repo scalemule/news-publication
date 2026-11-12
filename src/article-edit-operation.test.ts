@@ -56,6 +56,7 @@ function fixture(normalizeMedia = false) {
     capability = true,
     tagCapability = true,
     headlineCapability = true,
+    inlineCapability = true,
     hold = false,
     lostSave = false,
     lostRelease = false,
@@ -80,7 +81,7 @@ function fixture(normalizeMedia = false) {
     if (path.endsWith("/options"))
       return reply({
         workflow_version: 1,
-        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability, headline_set: headlineCapability },
+        capabilities: { versioned_editorial_fields: capability, versioned_editorial_tags: tagCapability, headline_set: headlineCapability, inline_media_directives_version: inlineCapability ? 1 : undefined },
       });
     if (path.endsWith("/document")) return reply(source);
     if (path.endsWith("/enable")) {
@@ -195,6 +196,7 @@ function fixture(normalizeMedia = false) {
     client,
     withoutTagCapability: () => { tagCapability = false; },
     withoutHeadlineCapability: () => { headlineCapability = false; },
+    withoutInlineCapability: () => { inlineCapability = false; },
     input,
     original,
     transport,
@@ -461,4 +463,49 @@ it("resumes the exact saved revision when legacy media UUID formatting is canoni
   f.record.revisions[0].document.media[0].caption = f.original.media[0].caption;
   f.record.revisions[0].document.media[0].contribution_id = "01a1237d-3ce6-7bde-9749-f5619f8e1aa5";
   await expect(f.client.editArticle({ ...f.input(), checkpoint, release: true })).rejects.toMatchObject({ code: "VERIFICATION_CONFLICT" });
+});
+
+describe("existing photograph placement through the normal edit command", () => {
+  const file = "019471a0-1234-7000-8000-000000000123";
+  const prepare = () => {
+    const f = fixture();
+    f.original.content_markdown = "Opening.\n\nСофия 東京 🙂 e\u0301.\n\nClosing.";
+    f.original.media.push({ ...f.original.media[0], file_id: file, position: "gallery" });
+    return f;
+  };
+  const patch = { photo_placements: [{ file_id: file, after_block: 2 }] };
+  it("preserves photo rights references, captions, prose and hero; replays a lost response once", async () => {
+    const f = prepare(), photo = structuredClone(f.original.media[1]);
+    f.lostSave();
+    await expect(f.client.editArticle({ ...f.input(), patch })).rejects.toThrow();
+    await f.client.editArticle({ ...f.input(), patch });
+    const doc = f.record.revisions[0].document;
+    expect(doc.content_markdown).toBe(`Opening.\n\nСофия 東京 🙂 e\u0301.\n\n::inline_media{id="${file}"}\n\nClosing.`);
+    expect(doc.media).toEqual([f.original.media[0], { ...photo, position: "inline" }]);
+    expect(doc).not.toHaveProperty("photo_placements");
+    expect(f.counts).toEqual({ saves: 1, releases: 0, enrolls: 0 });
+    // A new operation with the same placement is also a no-op, not another revision.
+    await f.client.editArticle({ ...f.input(), operationKey: "same-layout", checkpoint: undefined, patch });
+    expect(f.counts.saves).toBe(1);
+  });
+  it("keeps exact revision release gates", async () => {
+    const f = prepare(); f.hold();
+    await expect(f.client.editArticle({ ...f.input(), patch, release: true })).rejects.toMatchObject({ code: "RELEASE_HELD" });
+    expect(f.counts).toEqual({ saves: 1, releases: 0, enrolls: 0 });
+    expect(f.source.slug).toBe("permanent-slug");
+  });
+  it("rejects absent capabilities, unknown photos and out of range positions before saving", async () => {
+    const f = prepare(); f.withoutInlineCapability();
+    await expect(f.client.editArticle({ ...f.input(), patch })).rejects.toMatchObject({ code: "CAPABILITY_UNAVAILABLE" });
+    expect(f.counts.saves).toBe(0);
+    for (const photo_placements of [
+      [{ file_id: file, after_block: 99 }],
+      [{ file_id: "019471a0-1234-7000-8000-000000000456", after_block: 1 }],
+      [...patch.photo_placements, ...patch.photo_placements],
+    ]) {
+      const invalid = prepare();
+      await expect(invalid.client.editArticle({ ...invalid.input(), patch: { photo_placements } })).rejects.toThrow();
+      expect(invalid.counts.saves).toBe(0);
+    }
+  });
 });

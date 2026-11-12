@@ -594,3 +594,20 @@ submission. `queued` or `scanning` is pending, not published.
 The public renderer uses only ready managed delivery records. Inline photos retain
 captions and credits and are excluded from the bottom gallery. Narration skips the
 placement directives; moving a photo does not regenerate unchanged spoken prose.
+
+For already selected supporting photographs, use the normal edit command (SDK
+0.0.113+) with a patch such as:
+
+```json
+{"photo_placements": [{"file_id": "<existing managed file UUID>", "after_block": 2}]}
+```
+
+Discover `inline_media_directives_version: 1` first. Indexes count nonempty
+blank-line-separated Markdown blocks after removing the requested photos' existing
+directives; if the patch also changes `content_markdown`, they refer to that new
+body. Existing unrequested directives remain. Photos at the same position follow
+patch order. The command preserves prose, rights references, caption, credit, alt
+and hero, and saves placement and text changes in one revision. It neither uploads
+again nor approves a revision. Normal checkpoint/retry, generation and release
+gates apply. With `--url --release`, the public check also requires each managed
+figure once, with its caption, in the intended body order.
