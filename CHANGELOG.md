@@ -1,3 +1,8 @@
+## 0.0.114
+
+- Use the committed release receipt to avoid fetching all article history again after publication. Older servers retain read-back verification; uncertain releases reconcile once without issuing a second release. Exact revision, permanent identity and published content checks remain in place.
+- Include per-request stage timings in successful edit results without logging URLs, article content or credentials. This is not a claim that production publishing meets a 2–3 second target.
+
 ## 0.0.113
 
 - Add `photo_placements` to the standard checkpointed article edit command for existing selected photographs, retaining the hero and exact revision gates. Verify released figures, captions and body order on the rendered page.
