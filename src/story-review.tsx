@@ -1,4 +1,5 @@
 "use client";
+import { permanentReviewUrl, readableArticlePath } from './permanent-review-url';
 import { articlePresentation, articleFormatLabel, type ArticleFormat, type ArticlePresentation } from "./article-presentation";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
@@ -309,17 +310,28 @@ export function StoryReview({
           setRequestedPanel(respond); setReturnPanel(respond); setPanelState("identity");
         }
         const token = new URL(window.location.href).searchParams.get("key") || (/^[a-f0-9]{64}$/.test(window.location.hash.slice(1)) ? window.location.hash.slice(1) : undefined);
-        // A review never changes the address the newsroom sent. In particular,
-        // fragment capabilities must survive copying and returning from sign-in.
+        // Resolve legacy invitations to the permanent article path. Keep the same
+        // capability, contributor identity and explicit correction workspace.
         let exchange: { share_url?: string; can_share?: boolean; review?: Review | { verification_required: true } } = {};
-        try { exchange = await request("/session", { ...(token ? { token } : {}), include_review: true }); }
+        try { exchange = await request("/session", { ...(token ? { token } : {}), include_review: true, workspace: returnUrl.searchParams.get("workspace") === "review" ? "review" : undefined }); }
         catch (e) { if (token) throw e; }
-        const address = token ? window.location.href : exchange.share_url;
-        if (address) {
-          const shared = new URL(address, window.location.origin);
-          if (shared.origin === window.location.origin) {
+        if (exchange.share_url) {
+          const issued = new URL(exchange.share_url, window.location.origin);
+          const address = permanentReviewUrl(issued.href, issued.pathname, window.location.origin, sessionId);
+          if (address && readableArticlePath(issued.pathname)) {
+            const shared = new URL(address);
+            if (returnUrl.searchParams.get("workspace") === "review") shared.searchParams.set("workspace", "review");
             shared.searchParams.delete("respond"); shared.searchParams.delete("signin");
-            if (active) { setShareUrl(shared.href); setCanShare(exchange.can_share === true); }
+            if (active) {
+              setShareUrl(shared.href); setCanShare(exchange.can_share === true);
+              const visible = new URL(shared);
+              for (const key of ["respond", "signin"]) {
+                const value = returnUrl.searchParams.get(key);
+                if (value) visible.searchParams.set(key, value);
+              }
+              // Preserve Next's history state and avoid reloading the authorized snapshot.
+              window.history.replaceState(window.history.state, "", visible.pathname + visible.search + visible.hash);
+            }
           }
         }
         // New proxies return the already-authorized snapshot with the exchange.

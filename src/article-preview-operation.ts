@@ -1,3 +1,4 @@
+import { permanentReviewUrl, readableArticlePath } from './permanent-review-url';
 export type PreviewReviewer = {
  label:string; permissions:string[]; history_mode:'LATEST'|'PREVIOUS'|'SELECTED';
  shared_revision_ids?:string[]; questions?:unknown[]; allow_contributors?:boolean;
@@ -27,11 +28,17 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
  const path=`/articles/${encodeURIComponent(input.articleId)}/collaboration`;
  const current=await t.request<any>(path,'GET',undefined,undefined,signal);
  let readiness=current.readiness??null;
+ const origin=new URL(current.review_origin);
+ if(origin.protocol!=='https:'||origin.username||origin.password||origin.origin!==current.review_origin.replace(/\/$/,''))throw Error('Publication has no verified HTTPS review origin');
+ if(!readableArticlePath(current.permalink_path))throw Error('Article has no reserved readable permalink');
  if(state.stage==='invitation_pending')throw Error('Invitation acknowledgement is uncertain. Inspect the recorded article sessions; do not create another invitation or rotate its key.');
  if(state.sessionId){
   const session=current.sessions?.find((s:any)=>s.id===state.sessionId);
   if(!session||session.revoked_at||(session.expires_at&&Date.parse(session.expires_at)<=Date.now()))throw Error('The saved invitation is unavailable; inspect its expiry and revocation in the newsroom');
   if(!state.url)throw Error('The issued private URL is missing from its checkpoint; do not reconstruct its secret');
+  const canonical=permanentReviewUrl(state.url,current.permalink_path,origin.origin,state.sessionId);
+  if(!canonical)throw Error('Saved invitation does not match the publication or has no valid capability');
+  state.url=canonical;
   // Lost SHARE_REVISION responses can be reconciled from the authoritative session.
   if(state.stage==='share_pending'&&session.revision_id!==state.revisionId)throw Error('Share acknowledgement is uncertain; inspect the current session before retrying');
   if(state.stage==='share_pending'&&state.revisionId!==current.current_revision_id)throw Error('Another revision became current while sharing; review the new draft before sharing it');
@@ -42,18 +49,16 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
   }
   state.stage='issued';state.revisionId=current.current_revision_id;await save();
  }else{
-  const origin=new URL(current.review_origin);
-  if(origin.protocol!=='https:'||origin.username||origin.password||origin.origin!==current.review_origin.replace(/\/$/,''))throw Error('Publication has no verified HTTPS review origin');
   const response=await t.fetch(new URL('/api/news/review-capabilities',origin),{credentials:'omit',redirect:'error',cache:'no-store',signal});
   if(!response.ok)throw Error('Publication review capabilities are unavailable');
   const capabilities=await response.json();
-  if(capabilities.publication_id!==t.publicationId||capabilities.review_contract<2||capabilities.stable_article_urls!==true||capabilities.readable_article_urls!==true)throw Error('Publication does not confirm readable permanent preview URLs');
+  if(capabilities.publication_id!==t.publicationId||capabilities.review_contract<2||capabilities.stable_article_urls!==true||capabilities.readable_article_urls!==true||capabilities.permanent_preview_urls!==true)throw Error('Publication does not confirm readable permanent preview URLs');
   // Persist before the non-idempotent mutation. A crash never triggers blind re-invitation.
   state.revisionId=current.current_revision_id;state.stage='invitation_pending';await save();
   const issued=await t.request<any>(path,'POST',{...r,action:'INVITE',stable_article_url:true,expected_generation:current.generation,revision_id:state.revisionId},undefined,signal);
   if(typeof issued.session_id!=='string'||typeof issued.url!=='string')throw Error('Invitation receipt is incomplete; inspect the existing sessions');
   const url=new URL(issued.url);
-  if(url.origin!==origin.origin||!url.pathname.startsWith('/news/')||url.searchParams.get('review')!==issued.session_id)throw Error('Invitation receipt does not match the publication');
+  if(url.origin!==origin.origin||url.pathname!==current.permalink_path||url.searchParams.get('review')!==issued.session_id||!permanentReviewUrl(issued.url,current.permalink_path,origin.origin,issued.session_id))throw Error('Invitation receipt does not match the publication');
   // Invitations can change approval gates; report the committed receipt, not the earlier read.
   readiness=issued.readiness??null;
   state.sessionId=issued.session_id;state.url=issued.url;state.stage='issued';await save();
