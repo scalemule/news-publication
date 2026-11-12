@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const targeted = new Set([
+  "confirmation-dialog.js", "confirmation-dialog.cjs",
   "marketplace-forms.js", "marketplace-forms.cjs",
   "meet-forms.js", "meet-forms.cjs",
   "neighbors-forms.js", "neighbors-forms.cjs",

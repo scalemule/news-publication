@@ -1,5 +1,6 @@
 'use client';
 import React, {useCallback,useEffect,useState} from 'react';
+import {useConfirmation} from './confirmation-dialog';
 
 type Access={role:string|null;actions:string[];account?:{email?:string|null;name?:string|null}|null};
 type Blocker={code:string;message:string};
@@ -13,6 +14,7 @@ async function request(base:string,path:string,body?:unknown){
 const policies=[['FACT_CHECK','Source feedback — publisher decides'],['CONTRIBUTOR_REVIEW','Contributor feedback — publisher decides'],['SUBJECT_APPROVAL_REQUIRED','Required subject consent'],['SUBJECT_APPROVAL_PLUS_EDITOR','Required subject consent and editor approval']];
 /** Shared by publication previews and the network admin; the server remains the authority. */
 export function EditorialControls({base,post,previewRevision,showDocument=false,newsroomUrl='/newsroom'}:EditorialControlsProps){
+ const {requestConfirmation,confirmationDialog}=useConfirmation();
  const [access,setAccess]=useState<Access|null>(null),[record,setRecord]=useState<Story|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[policy,setPolicy]=useState('');
  const read=useCallback(async()=>{
   const [a,r]=await Promise.allSettled([request(base,'access'),request(base,`articles/${post}/collaboration`)]);
@@ -30,10 +32,10 @@ export function EditorialControls({base,post,previewRevision,showDocument=false,
  const approvalBlocks=record.readiness?.approval_blockers||[],releaseBlocks=record.readiness?.release_blockers||[];
  const blockers=[...new Map([...approvalBlocks,...releaseBlocks].map(b=>[b.code+':'+b.message,b])).values()];
  const nonApprovalBlocks=releaseBlocks.filter(b=>b.code!=='editorial_approval');
- async function command(action:string,extra:object={}){
+ async function command(action:string,extra:object={},trigger?:HTMLElement){
   if(!record)return;
-  if(['RELEASE','APPROVE_AND_RELEASE'].includes(action)&&!window.confirm(`Publish “${current?.document.title}” revision ${current?.number}?`))return;
-  if(action==='CONFIGURE_POLICY'&&!window.confirm(`Change this article’s review policy to “${policies.find(p=>p[0]===policy)?.[1]}”? Existing reviewer feedback is retained. Automatic publication will be turned off; you will publish manually. This does not publish the article.`))return;
+  if(['RELEASE','APPROVE_AND_RELEASE'].includes(action)&&!await requestConfirmation({title:'Publish this article?',description:<><p><strong>{current?.document.title}</strong></p><p>Revision {current?.number} will become publicly available.{action==='APPROVE_AND_RELEASE'?' Your editorial approval will be recorded for this revision.':''}</p></>,confirmLabel:action==='APPROVE_AND_RELEASE'?'Approve and publish':'Publish article'},trigger))return;
+  if(action==='CONFIGURE_POLICY'&&!await requestConfirmation({title:'Change review policy?',description:<><p><strong>{policies.find(p=>p[0]===policy)?.[1]}</strong></p><p>Reviewer feedback will be kept. Automatic publication will be turned off; you will publish manually.</p><p>Saving this policy does not publish the article.</p></>,confirmLabel:'Save review policy'},trigger))return;
   setBusy(true);setError('');setNotice('');const started=performance.now();
   try{
    const result=await request(base,`articles/${post}/collaboration`,{expected_generation:record.generation,action,sensitivity_review:null,...extra,...(action==='RELEASE'?{scheduled_at:null}:{})});
@@ -45,6 +47,7 @@ export function EditorialControls({base,post,previewRevision,showDocument=false,
  }
  const publicUrl=record.permalink_path&&record.review_origin?new URL(record.permalink_path,record.review_origin).href:null;
  return <aside className="newsroom newsroom-editor" aria-label="Editorial controls">
+  {confirmationDialog}
   <h2>{published?'Published':'Editorial review'}</h2>
   <p>{access.account?.email?`Signed in as ${access.account.email} · `:''}{access.role} · Revision {current?.number} · {record.status.toLowerCase().replaceAll('_',' ')}</p>
   {showDocument&&<><h3>{current?.document.title}</h3><pre>{current?.document.content_markdown}</pre></>}
@@ -54,15 +57,15 @@ export function EditorialControls({base,post,previewRevision,showDocument=false,
   {error&&<p role="alert" className="newsroom-error">{error}</p>}{notice&&<p role="status">{notice}</p>}
   {published&&publicUrl&&<a href={publicUrl}>View published article</a>}
   {!published&&<div>
-   {access.actions.includes('publish')&&record.readiness&&!approved&&<button disabled={busy||stale||approvalBlocks.length>0||nonApprovalBlocks.length>0} onClick={()=>void command('APPROVE_AND_RELEASE')}>Approve and publish</button>}
+   {access.actions.includes('publish')&&record.readiness&&!approved&&<button disabled={busy||stale||approvalBlocks.length>0||nonApprovalBlocks.length>0} onClick={e=>void command('APPROVE_AND_RELEASE',{},e.currentTarget)}>Approve and publish</button>}
    {access.actions.includes('approve')&&<button disabled={busy||stale||approved||approvalBlocks.length>0} onClick={()=>void command('APPROVE')}>{approved?'Editorial approval recorded':'Approve for publication'}</button>}
-   {access.actions.includes('publish')&&<button disabled={busy||stale||!approved||releaseBlocks.length>0} onClick={()=>void command('RELEASE')}>Publish approved revision</button>}
+   {access.actions.includes('publish')&&<button disabled={busy||stale||!approved||releaseBlocks.length>0} onClick={e=>void command('RELEASE',{},e.currentTarget)}>Publish approved revision</button>}
   </div>}
   {access.actions.includes('publish')&&!published&&<details><summary>Review policy and reviewers</summary>
    <p>Ordinary reporting can request feedback while the publisher makes the final decision. Select required subject consent when the story requires that consent.</p>
    <label>Review policy<select value={policy} disabled={busy} onChange={e=>setPolicy(e.target.value)}>{!policies.some(p=>p[0]===policy)&&<option value={policy}>{policy.toLowerCase().replaceAll('_',' ')}</option>}{policies.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
-   <button disabled={busy||policy===record.review_policy} onClick={()=>void command('CONFIGURE_POLICY',{policy,auto_publish:false,scheduled_at:null})}>Save review policy</button>
-   <ul>{record.sessions?.filter(s=>!s.revoked_at).map(s=><li key={s.id}>{s.label} — {s.required_approval?'required approval':'feedback'}; {s.revision_id===record.current_revision_id?'current revision':'older revision'}{s.email_verified&&!s.required_approval&&s.revision_id===record.current_revision_id&&<button disabled={busy} onClick={()=>{if(window.confirm(`Require ${s.label} to approve this exact revision?`))void command('DESIGNATE_APPROVER',{session_id:s.id});}}>Require this reviewer’s approval</button>}</li>)}</ul>
+   <button disabled={busy||policy===record.review_policy} onClick={e=>void command('CONFIGURE_POLICY',{policy,auto_publish:false,scheduled_at:null},e.currentTarget)}>Save review policy</button>
+   <ul>{record.sessions?.filter(s=>!s.revoked_at).map(s=><li key={s.id}>{s.label} — {s.required_approval?'required approval':'feedback'}; {s.revision_id===record.current_revision_id?'current revision':'older revision'}{s.email_verified&&!s.required_approval&&s.revision_id===record.current_revision_id&&<button disabled={busy} onClick={async e=>{if(await requestConfirmation({title:'Require this reviewer’s approval?',description:<p><strong>{s.label}</strong> must approve revision {current?.number} before it can be published.</p>,confirmLabel:'Require approval'},e.currentTarget))void command('DESIGNATE_APPROVER',{session_id:s.id});}}>Require this reviewer’s approval</button>}</li>)}</ul>
   </details>}
   <button disabled={busy} onClick={()=>void reload().catch(e=>setError(e.message))}>Reload state</button><a href={newsroomUrl}>Open newsroom</a>
  </aside>;

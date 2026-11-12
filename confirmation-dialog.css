@@ -1,0 +1,34 @@
+/* Deliberately scoped: publication prose and admin form styles must not restyle confirmations. */
+dialog.sm-confirm-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 28px;
+  overflow: auto;
+  color: #172c45;
+  background: #fff;
+  border: 1px solid #cad5e2;
+  border-radius: 8px;
+  box-shadow: 0 16px 56px rgb(23 44 69 / 22%);
+  font: 16px/1.55 Arial, sans-serif;
+  text-align: left;
+  color-scheme: light;
+}
+.sm-confirm-dialog::backdrop { background: rgb(17 30 46 / 48%); }
+.sm-confirm-dialog .sm-confirm-title { margin: 0 0 16px; color: #172c45; font: 600 24px/1.25 Georgia, serif; }
+.sm-confirm-dialog .sm-confirm-description { color: #34465b; font: inherit; overflow-wrap: anywhere; }
+.sm-confirm-dialog .sm-confirm-description p { margin: 0 0 12px; font: inherit; color: inherit; }
+.sm-confirm-dialog .sm-confirm-description p:last-child { margin-bottom: 0; }
+.sm-confirm-dialog .sm-confirm-description strong { color: #172c45; }
+.sm-confirm-dialog .sm-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #cad5e2; }
+.sm-confirm-dialog .sm-confirm-button { box-sizing: border-box; min-height: 44px; width: auto; margin: 0; padding: 10px 16px; border: 1px solid #173e6a; border-radius: 4px; font: 600 15px/1.4 Arial, sans-serif; cursor: pointer; text-decoration: none; }
+.sm-confirm-dialog .sm-confirm-cancel { color: #173e6a; background: #fff; }
+.sm-confirm-dialog .sm-confirm-accept { color: #fff; background: #173e6a; }
+.sm-confirm-dialog .sm-confirm-danger { background: #a12b35; border-color: #a12b35; }
+.sm-confirm-dialog .sm-confirm-button:focus-visible { outline: 3px solid #e5a72d; outline-offset: 3px; }
+@media (max-width: 480px) {
+  dialog.sm-confirm-dialog { padding: 22px; }
+  .sm-confirm-dialog .sm-confirm-actions { flex-direction: column-reverse; }
+  .sm-confirm-dialog .sm-confirm-button { width: 100%; }
+}

@@ -1,3 +1,8 @@
+## 0.0.112
+
+- Replace browser confirmations for publication, review-policy changes, reviewer designation and response discard with a shared accessible in-page dialog. Actions have explicit labels; Cancel and Escape preserve the current state, and focus returns to the invoking control.
+- Export the dialog hook and stylesheet for publication and network-admin access management. Consumers must adopt the package and stylesheet; this release alone does not update deployed websites. Existing server grants and exact-revision gates remain authoritative.
+
 ## 0.0.107
 
 - Preserve configured local OAuth API callback paths through authorization and code exchange. Reader return destinations still reject API routes; invalid callback configuration fails closed.

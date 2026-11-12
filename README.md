@@ -555,5 +555,15 @@ the server exposes readiness. Server grants, consent, media rights and revision
 checks remain authoritative. Command receipts carry the committed generation,
 so a successful approval need not reload the complete account and history.
 
+Import `@scalemule/news-publication/confirmation-dialog.css` with that panel.
+Editorial publication, policy changes and reviewer designation use the shared
+in-page dialog with named actions. `useConfirmation` from
+`@scalemule/news-publication/confirmation-dialog` also serves team-access actions.
+Render its `confirmationDialog` beside the controls; await `requestConfirmation`
+before sending a mutation. Pass `event.currentTarget` as its second argument so
+focus returns to the initiating control, including after a mouse click in Safari.
+Cancel, Escape and unmount resolve without accepting.
+`story-review.css` includes the same styles for unsent-response discard.
+
 This patch does not promise a fixed latency for AI generation, fresh media
 scanning/transforms, external websites, or human review.

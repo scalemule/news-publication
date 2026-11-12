@@ -4,6 +4,7 @@ import { articlePresentation, articleFormatLabel, type ArticleFormat, type Artic
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useReviewDrafts, hasDraft, type Draft } from "./story-review-drafts";
 import { usePendingPhoto } from "./story-review-photo";
+import { useConfirmation } from "./confirmation-dialog";
 import { VerifiedCardSection } from "./verified-card";
 import type { VerifiedCard, ArticleCitation } from "./types";
 import { proseDiff } from "./story-diff";
@@ -147,6 +148,7 @@ export function StoryReview({
   formatImageCaption?: (value?: string | null) => string;
 }) {
   const base = `/api/news/review/${encodeURIComponent(sessionId)}`;
+  const { requestConfirmation, confirmationDialog } = useConfirmation();
   const [mediaSessionReady, setMediaSessionReady] = useState(false);
   const [review, setReview] = useState<Review | null>(initialReview ?? null),
     [error, setError] = useState(""),
@@ -510,6 +512,7 @@ export function StoryReview({
   const heroBeforeHeadline = presentation.layout.headline_position === "after_hero";
   return (
     <ReviewMediaSession.Provider value={mediaSessionReady}>
+    {confirmationDialog}
     <div className={`sm-review-frame${publicationHeader ? " sm-review-publication-frame" : ""}`}>
       <div className="sm-review-banner-wrap">
       <div className="sm-review-private">
@@ -1082,7 +1085,7 @@ export function StoryReview({
                   <p>{currentDraft.local ? "Saved on this device. Waiting for a connection to save online." : "Not saved yet. Keep this page open and try again."}</p>
                   <button disabled={busy} onClick={() => void drafts.flush(panel).catch(e => setError(e.message))}>Try saving again</button>
                 </> : <p>{currentDraft?.status === "saving" ? "Saving your writing…" : hasDraft(currentDraft?.data) ? "Saved — not sent yet. You can safely come back later." : "Your writing saves automatically. Use the Send button below when you're ready to share it with the newsroom."}</p>}
-                {hasDraft(currentDraft?.data) && <button className="sm-review-quiet" disabled={busy} onClick={() => { if (window.confirm("Discard this unsent response? Responses already sent will be kept.")) void drafts.discard(panel).catch(e => setError(e.message)); }}>Discard this unsent response</button>}
+                {hasDraft(currentDraft?.data) && <button className="sm-review-quiet" disabled={busy} onClick={async event => { if (await requestConfirmation({ title: "Discard this unsent response?", description: <p>This removes your unsent writing in this response. Responses already sent will be kept.</p>, confirmLabel: "Discard response", cancelLabel: "Keep writing", destructive: true }, event.currentTarget)) void drafts.discard(panel).catch(e => setError(e.message)); }}>Discard this unsent response</button>}
               </div>}
               <fieldset disabled={busy} className="sm-review-response-fields">
               {panel === "edits" && (
