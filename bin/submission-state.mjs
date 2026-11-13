@@ -28,7 +28,7 @@ const readerCitations = citations => {
 
 // A receipt is durable before any polling or invitation. Replaying a completed
 // intake is a GET, not another upload or a client-side publishing workflow.
-export async function submitWithCheckpoint(client, values, manifest, assets, remaining) {
+export async function submitWithCheckpoint(client, values, manifest, assets, remaining, preflight=()=>[]) {
   const identity = [values['api-url'] ?? 'https://api.scalemule.com', values.publication,
     values['application-id'] ?? null, values['operation-key']];
   const files = await Promise.all(assets.map(async a => ({slot:a.slot, filename:a.filename,
@@ -55,6 +55,12 @@ export async function submitWithCheckpoint(client, values, manifest, assets, rem
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (state && (state.version !== 1 || state.fingerprint !== fingerprint))
       throw Error('Submission input changed. Restore the original manifest/files/key to resume; use a new operation for new content.');
+    // An accepted receipt resumes by GET, including receipts accepted by older
+    // tool versions. Apply intake validation before saving a new checkpoint.
+    if (!state?.receipt?.submission_id) {
+      const problems=preflight();
+      if(problems.length)throw Error('Submission preflight: '+problems.join('; '));
+    }
     const save = async receipt => {
       state = {version:1, fingerprint, receipt, operation_key:values['operation-key']};
       const temp = path+'.'+process.pid+'.tmp';
@@ -136,12 +142,8 @@ export async function waitForSubmission(client, initial, {
       const stopped = stopReason(receipt);
       if (stopped) return result(stopped);
       if (receipt.status === 'complete' && ['draft','review'].includes(receipt.progress?.intent)) return result('prepared');
-      const retired = receipt.processing?.assets?.filter(a => a.status === 'retired') ?? [];
-      if (receipt.status === 'published' && !receipt.public_ready && retired.length)
-        return result('published_processing_blocked', {
-          reason:'Server public readiness includes retired media. Inspect article processing; do not upload again or bypass readiness.',
-          blocked_assets:retired.map(a=>({source_file_id:a.source_file_id,status:a.status})),
-        });
+      // Historical retired rows are diagnostic history, not a reason to abandon
+      // the current job. Only the server knows the selected revision's gates.
       if (receipt.status !== 'published' || !receipt.public_ready) { await poll(); continue; }
       if (!receipt.article_id || !receipt.revision_id || !/^\/news\/[^/?#]+$/u.test(receipt.permalink_path??''))
         return result('verification_blocked', {reason:'Receipt lacks an exact revision or permanent article path'});

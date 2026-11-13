@@ -45,11 +45,11 @@ describe('one bounded submission',()=>{
     const f=fixture();f.receipt.superseded=true;
     expect((await f.run()).state).toBe('superseded');expect(f.client.get).not.toHaveBeenCalled();
   });
-  it('names the historical retired-media readiness problem instead of polling it forever',async()=>{
-    const f=fixture();f.receipt.public_ready=false;
-    f.receipt.processing={assets:[{source_file_id:'old-photo',status:'retired'}]};
-    expect(await f.run()).toMatchObject({state:'published_processing_blocked',public_ready:false,blocked_assets:[{source_file_id:'old-photo',status:'retired'}]});
-    expect(f.client.submission).not.toHaveBeenCalled();expect(f.options.fetcher).not.toHaveBeenCalled();
+  it('continues the same job when history contains a retired image and selected media finishes',async()=>{
+    const f=fixture();
+    const pending={...f.receipt,public_ready:false,processing:{assets:[{source_file_id:'old-photo',status:'retired'},{source_file_id:'selected-photo',status:'pending'}]}};
+    expect(await f.run(pending)).toMatchObject({state:'published_and_verified',public_ready:true});
+    expect(f.client.submission).toHaveBeenCalledTimes(2);
   });
   it('requires the snapshot to match the receipt revision even if the old page matches the old snapshot',async()=>{
     const f=fixture();f.snapshot.article.content_markdown='Older text.';
@@ -95,6 +95,20 @@ describe('one bounded submission',()=>{
 });
 
 describe('submission checkpoint',()=>{
+  it('fails preflight before POST/checkpoint and does not revalidate an accepted receipt',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'article-preflight-'));
+    try {
+      const values={publication:'paper','operation-key':'preflight',state:join(dir,'state.json')};
+      const client={submit:vi.fn(async()=>complete()),submission:vi.fn(async()=>complete())};
+      await expect(submitWithCheckpoint(client,values,{article:doc},[],()=>5000,()=>['Invalid headline','Invalid reason'])).rejects.toThrow('Invalid headline; Invalid reason');
+      expect(client.submit).not.toHaveBeenCalled();
+      await expect(stat(values.state)).rejects.toMatchObject({code:'ENOENT'});
+      await submitWithCheckpoint(client,values,{article:doc},[],()=>5000,()=>[]);
+      const check=vi.fn(()=>['New validation rule']);
+      await submitWithCheckpoint(client,values,{article:doc},[],()=>5000,check);
+      expect(check).not.toHaveBeenCalled();expect(client.submit).toHaveBeenCalledTimes(1);expect(client.submission).toHaveBeenCalledTimes(1);
+    } finally {await rm(dir,{recursive:true,force:true});}
+  });
   it('saves before POST, retries uncertain intake with the same key, then resumes with GET only',async()=>{
     const dir=await mkdtemp(join(tmpdir(),'article-submission-'));
     try{
