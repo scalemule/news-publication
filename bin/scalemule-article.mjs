@@ -140,7 +140,9 @@ try {
         throw Error('--wait publishing requires SCALEMULE_API_KEY to verify public delivery');
       if(values.reviewer && manifest.intent==='publish')
         throw Error('Use draft/review intent when requesting a private reviewer invitation');
+      const preflightStarted=performance.now();
       const options=await client.options(manifest.article?.article_id,AbortSignal.timeout(remaining()));
+      const preflightMs=Math.round(performance.now()-preflightStarted);
       if(options.capabilities?.managed_submission_version!==1)throw Error('Managed submission v1 is not deployed for this publication');
       const operation=await submitWithCheckpoint(client,values,manifest,assets,remaining);
       const receipt=values.wait ? await waitForSubmission(client,operation.receipt,{
@@ -152,7 +154,7 @@ try {
         ?await preparePreview(client,{...values,state:operation.checkpoint_file+'.preview.json'},receipt.article_id,remaining(),receipt.revision_id):undefined;
       const completed=values.wait ? ['prepared','published_and_verified'].includes(receipt.state) : ['complete','published'].includes(receipt.status);
       console.log(JSON.stringify({...receipt,...(preview?{preview}:{}),checkpoint_file:operation.checkpoint_file,
-        request_timings:[...operation.request_timings,...(receipt.request_timings??[])],
+        request_timings:[{stage:'capabilities',elapsed_ms:preflightMs},...operation.request_timings,...(receipt.request_timings??[])],
         resume_argv:['scalemule-article',...process.argv.slice(2)],total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
       if(!completed || (values.reviewer&&!preview))process.exitCode=2;
     }else if(command==='preview'){

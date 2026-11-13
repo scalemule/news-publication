@@ -17,7 +17,7 @@ describe("standard agent article package", () => {
     const client=new PublicationArticleClient({apiUrl:'https://api.example.org',publicationId:'paper',
       applicationId:'application',apiKey:'publication-key',accessToken:'admin',fetch:transport as typeof fetch});
     await expect(client.publicArticle('readable-story')).resolves.toMatchObject({article:{id:'article'}});
-    expect(()=>new PublicationArticleClient({apiUrl:'https://api.example.org',publicationId:'paper',accessToken:'admin'}).publicArticle('story')).toThrow('SCALEMULE_API_KEY');
+    await expect(new PublicationArticleClient({apiUrl:'https://api.example.org',publicationId:'paper',accessToken:'admin'}).publicArticle('story')).rejects.toThrow('SCALEMULE_API_KEY');
   });
   it("preserves a new inline photograph's explicit body position in the managed manifest", async () => {
     const transport = vi.fn(async (_url: URL | RequestInfo, init?: RequestInit) => {

@@ -263,7 +263,7 @@ export class PublicationArticleClient {
       undefined, undefined, undefined, signal,
     );
   }
-  publicArticle(slug:string,signal?:AbortSignal){
+  async publicArticle(slug:string,signal?:AbortSignal){
     // Public delivery uses the publication's API key. A platform admin bearer
     // selects a different gateway auth context and cannot read this endpoint.
     if (!this.config.apiKey) throw new Error("Public article verification requires SCALEMULE_API_KEY");

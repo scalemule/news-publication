@@ -135,7 +135,7 @@ export async function waitForSubmission(client, initial, {
       }
       const stopped = stopReason(receipt);
       if (stopped) return result(stopped);
-      if (receipt.status === 'complete' && receipt.progress?.intent !== 'publish') return result('prepared');
+      if (receipt.status === 'complete' && ['draft','review'].includes(receipt.progress?.intent)) return result('prepared');
       const retired = receipt.processing?.assets?.filter(a => a.status === 'retired') ?? [];
       if (receipt.status === 'published' && !receipt.public_ready && retired.length)
         return result('published_processing_blocked', {
