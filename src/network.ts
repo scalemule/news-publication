@@ -300,6 +300,18 @@ export const localPublications: readonly PublicationNetworkItem[] = [
       "Napa Gate is an independent local publication devoted to the distinctive communities, agricultural heritage, and civic life of the Napa Valley. From municipal decisions in the City of Napa to vineyard stewardship, hospitality labor, wildfire defense, and cultural events throughout Yountville, St. Helena, and Calistoga, we tell the stories of the people who live and work here year-round. We deliver nuanced, independent journalism that respects the valley’s unique identity while examining the economic and environmental choices that will define its future.",
     listed: false,
   },
+  {
+    slug: "sfwall",
+    name: "SF Wall",
+    url: "https://sfwall.com",
+    area: "San Francisco",
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent local news connecting the neighborhoods, people, civic life, and small businesses of San Francisco.",
+    aboutIntro:
+      "SF Wall is an independent local publication devoted to the distinct neighborhoods, civic life, and small businesses of San Francisco. From the Mission, Castro, and Noe Valley to the Sunset, Richmond, North Beach, Chinatown, SoMa, and Bayview, we report on neighborhood planning, City Hall decisions, transit, parks, and the residents and merchants who shape block-by-block life across the city. We provide clear, constructive journalism that helps San Franciscans stay informed, connected, and engaged in the neighborhoods they call home.",
+    listed: false,
+  },
 ] as const;
 
 export const listedPublications: readonly PublicationNetworkItem[] = localPublications.filter(

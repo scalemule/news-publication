@@ -21,8 +21,8 @@ describe("publication network", () => {
     expect(NETWORK_PARENT.principles.length).toBe(6);
   });
 
-  it("includes all 12 publications in the Bay Area network", () => {
-    expect(localPublications.length).toBe(12);
+  it("includes all 13 publications in the Bay Area network", () => {
+    expect(localPublications.length).toBe(13);
     const slugs = localPublications.map((p) => p.slug);
     expect(slugs[0]).toBe("lazytensor"); // the technology title opens the network bar
     expect(slugs).toContain("bayareachronicle");
@@ -36,13 +36,15 @@ describe("publication network", () => {
     expect(slugs).toContain("lamorindapost");
     expect(slugs).toContain("eastbaypost");
     expect(slugs).toContain("napagate");
+    expect(slugs).toContain("sfwall");
   });
 
   it("filters listed and community publications correctly", () => {
-    expect(listedPublications.length).toBe(11); // napagate is unlisted
+    expect(listedPublications.length).toBe(11); // napagate and sfwall are unlisted
     expect(communityPublications.length).toBe(9); // excludes bayareachronicle and the topical title
     expect(communityPublications.some((p) => p.slug === "bayareachronicle")).toBe(false);
     expect(communityPublications.some((p) => p.slug === "lazytensor")).toBe(false);
+    expect(communityPublications.some((p) => p.slug === "sfwall")).toBe(false);
     expect(topicalPublications.map((p) => p.slug)).toEqual(["lazytensor"]);
     expect(findPublicationBySlug("lazytensor")?.kind).toBe("topical");
     expect(findPublicationBySlug("lazytensor")?.focus).toBe("AI & Technology");
@@ -71,8 +73,8 @@ describe("publication network", () => {
     expect(url).toContain("https://alamoweekly.com/");
   });
 
-  it("builds fixed handoff URLs for all 12 network publications", () => {
-    expect(localPublications).toHaveLength(12);
+  it("builds fixed handoff URLs for all 13 network publications", () => {
+    expect(localPublications).toHaveLength(13);
     for (const publication of localPublications) {
       expect(getNetworkReaderHandoffUrl(publication.slug)).toBe(`${publication.url}/api/news/network-handoff`);
     }
@@ -80,7 +82,7 @@ describe("publication network", () => {
     expect(getNetworkReaderHandoffUrl("https://evil.test")).toBeNull();
   });
 
-  it("identifies network hostnames across all 12 publications", () => {
+  it("identifies network hostnames across all 13 publications", () => {
     expect(isNetworkHostname("lazytensor.com")).toBe(true);
     expect(isNetworkHostname("www.lazytensor.com")).toBe(true);
     expect(isNetworkHostname("bayareachronicle.com")).toBe(true);
@@ -95,6 +97,7 @@ describe("publication network", () => {
     expect(isNetworkHostname("trivalleyweekly.com")).toBe(true);
     expect(isNetworkHostname("eastbaypost.com")).toBe(true);
     expect(isNetworkHostname("napagate.com")).toBe(true);
+    expect(isNetworkHostname("sfwall.com")).toBe(true);
     expect(isNetworkHostname("preview.napsite.com")).toBe(true);
 
     expect(isNetworkHostname("google.com")).toBe(false);
