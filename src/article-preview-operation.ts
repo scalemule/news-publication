@@ -11,6 +11,8 @@ export type ArticlePreviewCheckpoint = {
 };
 export type ArticlePreviewInput = {
  articleId:string; reviewer:PreviewReviewer; checkpoint?:ArticlePreviewCheckpoint;
+ /** When attached to a submission, share only that exact prepared revision. */
+ expectedRevisionId?:string;
  saveCheckpoint:(state:ArticlePreviewCheckpoint)=>Promise<void>; timeoutMs?:number;
 };
 type Transport={publicationId:string;request:<T=any>(path:string,method?:string,body?:unknown,extra?:HeadersInit,signal?:AbortSignal)=>Promise<T>;fetch:typeof fetch};
@@ -27,6 +29,7 @@ export async function runArticlePreview(t:Transport,input:ArticlePreviewInput){
  const save=async()=>input.saveCheckpoint(structuredClone(state));
  const path=`/articles/${encodeURIComponent(input.articleId)}/collaboration`;
  const current=await t.request<any>(path,'GET',undefined,undefined,signal);
+ if(input.expectedRevisionId && current.current_revision_id!==input.expectedRevisionId)throw Error('Another revision became current; reload the submission before sharing a preview');
  let readiness=current.readiness??null;
  const origin=new URL(current.review_origin);
  if(origin.protocol!=='https:'||origin.username||origin.password||origin.origin!==current.review_origin.replace(/\/$/,''))throw Error('Publication has no verified HTTPS review origin');

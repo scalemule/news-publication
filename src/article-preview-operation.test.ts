@@ -15,6 +15,11 @@ function fixture(){
  return {current,request,fetcher,input,get checkpoint(){return checkpoint;},run:()=>runArticlePreview({publicationId:'pub',request:request as any,fetch:fetcher as any},input())};
 }
 describe('preview operation',()=>{
+ it('does not share a different revision while finishing a prepared submission',async()=>{
+  const f=fixture();
+  await expect(runArticlePreview({publicationId:'pub',request:f.request as any,fetch:f.fetcher as any},{...f.input(),expectedRevisionId:'older'})).rejects.toThrow('Another revision');
+  expect(f.request.mock.calls.filter(c=>c[1]==='POST')).toHaveLength(0);
+ });
  it('issues once and updates the existing link without replacing its secret or permissions',async()=>{
   const f=fixture();const first=await f.run();expect(first.state).toBe('preview_ready');expect(first.readiness).toBeNull();
   expect(f.checkpoint?.stage).toBe('issued');expect((await f.run()).url).toBe(first.url);

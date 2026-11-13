@@ -2,7 +2,7 @@ import {mkdir,open,readFile,writeFile,rename,unlink} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
 import {homedir} from 'node:os';
 import {createHash} from 'node:crypto';
-export async function preparePreview(client,values,articleId,timeoutMs){
+export async function preparePreview(client,values,articleId,timeoutMs,expectedRevisionId){
  if(!values.reviewer||!values['operation-key'])throw Error('Preview requires --reviewer reviewer.json and --operation-key KEY');
  const reviewer=JSON.parse(await readFile(values.reviewer,'utf8'));
  const key=createHash('sha256').update(JSON.stringify(['preview',values['api-url']??'https://api.scalemule.com',values.publication,articleId,values['operation-key']])).digest('hex');
@@ -19,7 +19,7 @@ export async function preparePreview(client,values,articleId,timeoutMs){
  await lock.writeFile(String(process.pid));await lock.close();
  try{
   let checkpoint;try{checkpoint=JSON.parse(await readFile(path,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
-  const result=await client.previewArticle({articleId,reviewer,checkpoint,timeoutMs,saveCheckpoint:async state=>{
+  const result=await client.previewArticle({articleId,reviewer,checkpoint,timeoutMs,expectedRevisionId,saveCheckpoint:async state=>{
    const temp=path+'.'+process.pid+'.tmp';await writeFile(temp,JSON.stringify(state),{mode:0o600});await rename(temp,path);
   }});
   // Full capability is retained privately, not written into routine CLI logs.
