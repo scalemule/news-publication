@@ -5,11 +5,12 @@ import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import {preparePreview} from './preview-state.mjs';
+import {submitWithCheckpoint, waitForSubmission, snapshotMatchesDocument} from './submission-state.mjs';
 import { PublicationArticleClient, articlePhotoHtmlMatches,articleEditHtmlMatches } from '../dist/article-workflow-client.js';
 
 const help = `Usage:
-  scalemule-article submit --publication ID --manifest article.json --operation-key KEY [--asset hero=/path/photo.jpg]
-  scalemule-article status --publication ID --submission ID
+  scalemule-article submit --publication ID --manifest article.json --operation-key KEY [--asset hero=/path/photo.jpg] [--wait]
+  scalemule-article status --publication ID --submission ID [--wait]
   scalemule-article preview --publication ID --article ID --reviewer reviewer.json --operation-key KEY
   scalemule-article feedback --publication ID --article ID
   scalemule-article inspect --publication ID --article ID
@@ -22,7 +23,12 @@ Reuse its operation key/checkpoint for updates. reviewer.json explicitly specifi
 permissions and history_mode; subject approval also requires a named verified reviewer.
 The full URL is saved privately; --show-private-url prints it when explicitly needed.
 submit --reviewer reviewer.json also issues the invitation when preparation is complete.
-A pending submission returns immediately; resume from its receipt, never recreate the article.
+--wait follows the same receipt and verifies the public page within one 60000 ms budget.
+Without --wait, a pending submission returns immediately. Both save a private checkpoint.
+Rerun the identical command to resume without re-uploading an accepted submission.
+A hold or unfinished verification is exit 2, never a publication success. --wait with
+publish intent requires SCALEMULE_API_KEY for the separate public reader check.
+status --wait is read-only and can follow an existing receipt. Timings identify each stage.
 feedback reports the current revision, publication blockers, reviewer state and contributions.
 
 Credentials: SCALEMULE_API_KEY and SCALEMULE_ACCESS_TOKEN (normal authorized member).
@@ -38,8 +44,9 @@ Unspecified fields and media are retained. Default: save for review.
 APPROVE or changes a policy. Legacy onboarding requires an explicit
 --enable-review-policy value. Scheduled legacy articles stop before onboarding.
 Use --expected-generation when coordinating an edit with another editor.
-Default edit deadline: 30000 ms (--timeout-ms, API work). The public page check after --release
-has its own --page-timeout-ms (default 60000). Reuse the same patch/key/checkpoint on retry.
+Default edit deadline: 60000 ms (--timeout-ms), including API work and public-page checks.
+--page-timeout-ms can shorten the page check but cannot extend the command deadline.
+Reuse the same patch/key/checkpoint on retry.
 RELEASE_HELD means the revision is saved and existing review gates remain.
 
 replace-photo accepts a local file and uses normal member/API-key credentials.
@@ -71,35 +78,39 @@ that every website/CDN cache already displays the new image.
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true, strict: true,
-    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','page-timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission','reviewer'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['release',{type:'boolean'}],['show-private-url',{type:'boolean'}]])),
+    options: Object.fromEntries(['publication', 'article', 'file-id', 'expected-version', 'metadata', 'application-id', 'api-url', 'url', 'file', 'operation-key', 'state', 'timeout-ms','page-timeout-ms','patch','expected-generation','enable-review-policy','manifest','submission','reviewer'].map(k => [k, { type: 'string' }]).concat([['asset',{type:'string',multiple:true}],['help', { type: 'boolean' }],['wait',{type:'boolean'}],['release',{type:'boolean'}],['show-private-url',{type:'boolean'}]])),
   });
   if (values.help || !positionals.length) {
     console.log(help);
   } else {
     const [command, ...extra] = positionals;
     const commandStarted = performance.now();
-    const budget = Number(values['timeout-ms'] ?? 30000);
+    const budget = Number(values['timeout-ms'] ?? (values.wait || command==='edit' ? 60000 : 30000));
     if (!Number.isFinite(budget) || budget < 100 || budget > 120000) throw Error('--timeout-ms must be between 100 and 120000');
     const remaining = () => { const ms = Math.floor(budget - (performance.now()-commandStarted)); if (ms < 1) throw Error('Operation deadline reached; resume the same operation'); return ms; };
-    // The public page check has its own deadline: caches and rolling pods make it slower than the API, and
-    // a slow page must never consume the API operation's budget or vice versa.
+    // Page verification shares the command deadline; it cannot silently add another minute.
     const pageBudget = Number(values['page-timeout-ms'] ?? 60000);
     if (!Number.isFinite(pageBudget) || pageBudget < 1000 || pageBudget > 300000) throw Error('--page-timeout-ms must be between 1000 and 300000');
     if (extra.length || !['submit','status','inspect','preview','feedback', 'replace-cover', 'replace-photo','edit'].includes(command)) throw Error('Use submit, status, preview, feedback, inspect, edit, replace-cover or replace-photo; see --help');
     if (values.url) {
-      if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN || values['application-id']) throw Error('URL resolution requires normal publication member/API-key credentials');
+      if (!process.env.SCALEMULE_API_KEY || !process.env.SCALEMULE_ACCESS_TOKEN) throw Error('URL resolution requires a publication API key and authorized member/admin credentials');
       const url = new URL(values.url);
       if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw Error('Use the public HTTPS article URL, without a private review key');
       const api = values['api-url'] ?? 'https://api.scalemule.com';
       const apiOrigin = new URL(api); if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) throw Error('Use an HTTPS platform API endpoint');
       const headers = { 'x-api-key': process.env.SCALEMULE_API_KEY, authorization: 'Bearer '+process.env.SCALEMULE_ACCESS_TOKEN };
-      const get = async route => { const r = await fetch(api.replace(/\/$/,'')+route,{headers,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))}); const v = await r.json(); if (!r.ok || !v.success) throw Error(`Article resolution HTTP ${r.status}`); return v.data; };
+      const get = async (route, publicRead=false) => {
+        const target = new URL(api.replace(/\/$/,'')+route);
+        if(!publicRead&&values['application-id'])target.searchParams.set('application_id',values['application-id']);
+        const r = await fetch(target,{headers:publicRead?{'x-api-key':process.env.SCALEMULE_API_KEY}:headers,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(10000,remaining()))});
+        const v = await r.json(); if (!r.ok || !v.success) throw Error(`Article resolution HTTP ${r.status}`); return v.data;
+      };
       const pubs = await get('/v1/blog/publications');
       const pub = pubs.items?.find(p=>new URL(p.canonical_url).origin===url.origin);
       if (!pub) throw Error('The caller has no publication grant for that article origin');
       const match = /^\/news\/([^/]+)\/?$/.exec(url.pathname);
       if (!match) throw Error('Use the publication article slug URL');
-      const resolved = await get(`/v1/blog/publications/${encodeURIComponent(pub.id)}/article-content/${encodeURIComponent(decodeURIComponent(match[1]))}`);
+      const resolved = await get(`/v1/blog/publications/${encodeURIComponent(pub.id)}/article-content/${encodeURIComponent(decodeURIComponent(match[1]))}`,true);
       if (!resolved.article?.id) throw Error('No published article at this URL');
       if ((values.publication && values.publication !== pub.id) || (values.article && values.article !== resolved.article.id)) throw Error('Article URL and supplied IDs disagree');
       values.publication = pub.id; values.article = resolved.article.id;
@@ -125,23 +136,46 @@ try {
         const info=await stat(path);if(!info.isFile()||info.size<1||info.size>25*1024*1024)throw Error('Photo must be a regular file between 1 byte and 25 MiB');
         assets.push({slot,filename:basename(path),file:new Blob([await readFile(path)])});
       }
-      const receipt=await client.submit(manifest,values['operation-key'],assets,AbortSignal.timeout(remaining()));
-      const preview=values.reviewer&&receipt.status==='complete'&&receipt.article_id
-        ?await preparePreview(client,values,receipt.article_id,remaining()):undefined;
-      console.log(JSON.stringify({...receipt,...(preview?{preview}:{}),elapsed_ms:Math.round(performance.now()-started)},null,2));
-      if(values.reviewer&&!preview)process.exitCode=2;
+      if(values.wait && manifest.intent==='publish' && !process.env.SCALEMULE_API_KEY)
+        throw Error('--wait publishing requires SCALEMULE_API_KEY to verify public delivery');
+      if(values.reviewer && manifest.intent==='publish')
+        throw Error('Use draft/review intent when requesting a private reviewer invitation');
+      const preflightStarted=performance.now();
+      const options=await client.options(manifest.article?.article_id,AbortSignal.timeout(remaining()));
+      const preflightMs=Math.round(performance.now()-preflightStarted);
+      if(options.capabilities?.managed_submission_version!==1)throw Error('Managed submission v1 is not deployed for this publication');
+      const operation=await submitWithCheckpoint(client,values,manifest,assets,remaining);
+      const receipt=values.wait ? await waitForSubmission(client,operation.receipt,{
+        remaining,save:operation.save,onProgress:event=>console.error(JSON.stringify(event)),
+        editMatches:articleEditHtmlMatches,photoMatches:articlePhotoHtmlMatches,
+      }) : operation.receipt;
+      const preview=values.reviewer&&receipt.status==='complete'&&receipt.article_id&&receipt.revision_id
+        &&!receipt.superseded&&receipt.next_action!=='reload_current_revision'&&(!values.wait||receipt.state==='prepared')
+        ?await preparePreview(client,{...values,state:operation.checkpoint_file+'.preview.json'},receipt.article_id,remaining(),receipt.revision_id):undefined;
+      const completed=values.wait ? ['prepared','published_and_verified'].includes(receipt.state) : ['complete','published'].includes(receipt.status);
+      console.log(JSON.stringify({...receipt,...(preview?{preview}:{}),checkpoint_file:operation.checkpoint_file,
+        request_timings:[{stage:'capabilities',elapsed_ms:preflightMs},...operation.request_timings,...(receipt.request_timings??[])],
+        resume_argv:['scalemule-article',...process.argv.slice(2)],total_elapsed_ms:Math.round(performance.now()-commandStarted)},null,2));
+      if(!completed || (values.reviewer&&!preview))process.exitCode=2;
     }else if(command==='preview'){
       console.log(JSON.stringify(await preparePreview(client,values,values.article,remaining()),null,2));
     }else if(command==='feedback'){
-      const record=await client.get(values.article);
+      const record=await client.get(values.article,AbortSignal.timeout(remaining()));
       console.log(JSON.stringify({article_id:values.article,revision_id:record.current_revision_id,generation:record.generation,status:record.status,review_policy:record.review_policy,readiness:record.readiness,reviewers:record.sessions,contributions:record.contributions,elapsed_ms:Math.round(performance.now()-started)},null,2));
     }else if(command==='status'){
       if(!values.submission)throw Error('Missing --submission');
-      console.log(JSON.stringify(await client.submission(values.submission,AbortSignal.timeout(remaining())),null,2));
+      const initial=await client.submission(values.submission,AbortSignal.timeout(remaining()));
+      const receipt=values.wait ? await waitForSubmission(client,initial,{
+        remaining,onProgress:event=>console.error(JSON.stringify(event)),
+        editMatches:articleEditHtmlMatches,photoMatches:articlePhotoHtmlMatches,
+      }) : initial;
+      console.log(JSON.stringify({...receipt,total_elapsed_ms:Math.round(performance.now()-commandStarted),
+        resume_argv:['scalemule-article',...process.argv.slice(2)]},null,2));
+      if(values.wait&&!['prepared','published_and_verified'].includes(receipt.state))process.exitCode=2;
     }else if (command === 'inspect') {
       const [options, processing, collaboration] = await Promise.all([
-        client.options(values.article), client.processing(values.article),
-        client.get(values.article).then(current => ({ enabled: true, generation: current.generation, status: current.status })).catch(error => {
+        client.options(values.article,AbortSignal.timeout(remaining())), client.processing(values.article,AbortSignal.timeout(remaining())),
+        client.get(values.article,AbortSignal.timeout(remaining())).then(current => ({ enabled: true, generation: current.generation, status: current.status })).catch(error => {
           if (error.status === 404 && error.message === 'Story collaboration is not enabled') return { enabled: false };
           throw error;
         }),
@@ -178,12 +212,15 @@ try {
         if(values.url&&values.release&&['published','already_published'].includes(result.state)){
           let verified=false,reason;
           const pageStarted=performance.now();
-          const pageRemaining=()=>{const ms=Math.floor(pageBudget-(performance.now()-pageStarted));if(ms<1)throw Error('Public page deadline reached; the page may still be refreshing. Resume the same operation or raise --page-timeout-ms');return ms;};
+          const pageRemaining=()=>{const ms=Math.min(remaining(),Math.floor(pageBudget-(performance.now()-pageStarted)));if(ms<1)throw Error('Public page deadline reached; the page may still be refreshing. Resume the same operation');return ms;};
           try{
-            const snapshot=await client.publicArticle(checkpoint.sourceIdentity.slug,AbortSignal.timeout(pageRemaining()));
-            const article=snapshot.article;
-            if(!article||!article.content_html||article.id!==values.article)throw Error('Published reader snapshot is missing');
             while(!verified){
+              const snapshot=await client.publicArticle(checkpoint.sourceIdentity.slug,AbortSignal.timeout(pageRemaining()));
+              const article=snapshot.article;
+              if(!article||!article.content_html||article.id!==values.article)throw Error('Published reader snapshot is missing');
+              if(!snapshotMatchesDocument(snapshot,checkpoint.document)){
+                await new Promise(r=>setTimeout(r,Math.min(1000,pageRemaining())));continue;
+              }
               const response=await fetch(values.url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(Math.min(5000,pageRemaining()))});
               const html=await response.text();
               verified=response.ok&&articleEditHtmlMatches(html,{title:article.title,headline:article.headline,seo_title:'seo_title' in patch?article.seo_title:undefined,content_html:article.content_html,card_titles:(article.metadata?.cards??[]).map(c=>c.title),tags:checkpoint.document.tag_ids?article.tags:undefined});
@@ -279,6 +316,6 @@ try {
     }
   }
 } catch (error) {
-  console.error(JSON.stringify({ error: error.message, status: error.status, code:error.code, stage:error.stage, file_id:error.fileId,revision_id:error.revisionId }));
+  console.error(JSON.stringify({ error: error.message, status: error.status, code:error.code, stage:error.stage, file_id:error.fileId,revision_id:error.revisionId, checkpoint_file:error.checkpointFile, next_action:error.nextAction }));
   process.exitCode = error.code==='RELEASE_HELD'?2:1;
 }

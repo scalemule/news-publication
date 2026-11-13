@@ -1,3 +1,10 @@
+## 0.0.115
+
+- Add `submit --wait` and read-only `status --wait`: follow one durable submission under a shared 60-second default deadline and verify the exact published revision against the public snapshot and rendered article. Report holds, superseded revisions and unfinished verification with exit 2 and a resume command. Server processing can continue after the CLI deadline.
+- Persist a private submission checkpoint before intake; bind retries to the manifest and file bytes, and poll accepted work without uploading it again. Reviewer invitations retain a separate checkpoint and are restricted to draft/review intent.
+- Separate public API-key reads from member/admin editorial authorization. Admin publishers can resolve article URLs with their publication API key and scoped application context. Edit verification now compares the snapshot with the saved document and shares the command's deadline.
+- Keep all review, scan, rights and server-readiness gates. New-article production latency, optional media readiness and infrastructure repairs remain outside any guaranteed one-minute service level; validate with real changed submissions, not no-op replays.
+
 ## 0.0.114
 
 - Align the edit deadline with the CLI’s bounded 30-second API budget to avoid interrupting ordinary production writes at 10 seconds. Operations still return immediately on completion; checkpoints and explicit timeout overrides remain supported.

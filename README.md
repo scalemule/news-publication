@@ -374,9 +374,46 @@ CLI equivalents:
 
 ```sh
 scalemule-article submit --publication "$PUBLICATION_ID" \
-  --manifest article.json --asset hero=./venue.jpg --operation-key story-intake-v1
+  --manifest article.json --asset hero=./venue.jpg --operation-key story-intake-v1 --wait
 scalemule-article status --publication "$PUBLICATION_ID" --submission "$SUBMISSION_ID"
 ```
+
+From 0.0.115, `submit --wait` uses one **60-second command budget** for intake,
+processing and public-page verification. It returns immediately when finished;
+60 seconds is a limit, not a sleep or a promise about image generation. Every
+submission saves a private checkpoint before sending its POST, with a hash of the
+manifest and actual file bytes. Repeating the **same command** polls an accepted
+submission; an uncertain intake reuses its original idempotency key. Changed input
+is refused. Do not delete the checkpoint or switch operation keys to retry a hold.
+`--state` selects the submission checkpoint; an optional reviewer invitation uses
+its own adjacent `.preview.json` checkpoint, preserving invitation recovery.
+
+The result includes `request_timings`, `total_elapsed_ms`, `checkpoint_file`, and
+`resume_argv`. `published_and_verified` requires server public readiness, the exact
+published revision, a matching public snapshot, and visible headline, prose, card
+titles, topic links, author-profile link, cover and social image. A final receipt
+read checks for a concurrent publication. A stale page, missing credentials,
+server hold, superseded revision or deadline never becomes verified success.
+`status --wait` performs the same observation without making a content change.
+Public reads use only the publication API key, independently of the member/admin
+credential used for editorial work. Admin publishers also supply that key for
+public verification. No credential is sent to the publication's public website.
+
+`--wait` exits 2 with the receipt and next action when unfinished; required human
+review stops immediately. It does not manufacture approval, start paid generation,
+change policy, retry held workers, or start a deployment. A publish-intent job may
+continue on the server after the CLI deadline; a timeout is **not cancellation**.
+Keep following that job. A server readiness defect or retired-asset hold is shown
+as pending, never overridden locally.
+
+For the fast path, prepare one complete article package before submission: edited
+prose, real author profile with biography, approved/rights-confirmed hero and any
+inline photos, citations, existing topic IDs, and information cards only where the
+story needs them. Discover publication capabilities, choose the review policy
+explicitly, then make one submission and one automated verification. Image
+commissioning, research, new template work and infrastructure repairs have their
+own timings; do not hide them inside a claim that publication took seconds. Measure
+new, changed articles across the next batch; no-op replays are not throughput proof.
 
 The manifest uses the API's snake_case fields: `article`, `intent`, and optional
 `assets: [{slot: "hero", position: "hero", metadata: {...}}]`. Each `--asset`
@@ -406,8 +443,10 @@ remain authoritative; the deployed server must advertise
 
 From 0.0.114, deployed command receipts avoid a redundant full-history read after release. Older servers fall back to read-back verification. Results include `request_timings` (stage, method and elapsed milliseconds), separately from public-page verification. These timings are measured per operation; no fixed production latency is promised. The deadline is a failure limit, not a required wait: commands return as soon as their work finishes.
 
-The 30-second default deadline bounds the operation; `--timeout-ms` may raise it
-to at most 120 seconds. Keep the same patch/key and private checkpoint
+From 0.0.115, the CLI has one 60-second default deadline for the edit **and**
+public-page check; `--timeout-ms` may raise it to at most 120 seconds.
+`--page-timeout-ms` may shorten verification but never extends that shared budget.
+The SDK method retains its separate 30-second default unless a caller supplies a budget. Keep the same patch/key and private checkpoint
 (`--state` or `~/.scalemule/newsroom/operations`) on retries. The checkpoint
 contains the submitted document and private provenance: never publish it.
 Unknown save/release responses reconcile against the original revision; another

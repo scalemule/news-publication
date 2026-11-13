@@ -257,13 +257,19 @@ export class PublicationArticleClient {
       );
     return value.data;
   }
-  options(articleId?: string) {
+  options(articleId?: string, signal?: AbortSignal) {
     return this.request<ArticleWorkflowOptions>(
       `/article-workflow/options${articleId ? `?article_id=${encodeURIComponent(articleId)}` : ""}`,
+      undefined, undefined, undefined, signal,
     );
   }
-  publicArticle(slug:string,signal?:AbortSignal){
-    return this.request<any>('/article-content/'+encodeURIComponent(slug),undefined,undefined,undefined,signal);
+  async publicArticle(slug:string,signal?:AbortSignal){
+    // Public delivery uses the publication's API key. A platform admin bearer
+    // selects a different gateway auth context and cannot read this endpoint.
+    if (!this.config.apiKey) throw new Error("Public article verification requires SCALEMULE_API_KEY");
+    const reader = new PublicationArticleClient({apiUrl:this.config.apiUrl,
+      publicationId:this.config.publicationId,apiKey:this.config.apiKey,fetch:this.config.fetch});
+    return reader.request<any>('/article-content/'+encodeURIComponent(slug),undefined,undefined,undefined,signal);
   }
   /** Explicit approver-authorized onboarding for a legacy article; never called by get().
    * Existing schedules are cancelled by the server; public content remains unchanged.
@@ -279,9 +285,10 @@ export class PublicationArticleClient {
       { review_policy: reviewPolicy },
     );
   }
-  get(articleId: string) {
+  get(articleId: string, signal?: AbortSignal) {
     return this.request<Record>(
       `/articles/${encodeURIComponent(articleId)}/collaboration`,
+      undefined, undefined, undefined, signal,
     );
   }
   previewArticle(input: ArticlePreviewInput) {
