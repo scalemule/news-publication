@@ -5,6 +5,7 @@ import { dirname, join, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import {preparePreview} from './preview-state.mjs';
+import {submissionProblems} from './submission-preflight.mjs';
 import {submitWithCheckpoint, waitForSubmission, snapshotMatchesDocument} from './submission-state.mjs';
 import { PublicationArticleClient, articlePhotoHtmlMatches,articleEditHtmlMatches } from '../dist/article-workflow-client.js';
 
@@ -144,7 +145,7 @@ try {
       const options=await client.options(manifest.article?.article_id,AbortSignal.timeout(remaining()));
       const preflightMs=Math.round(performance.now()-preflightStarted);
       if(options.capabilities?.managed_submission_version!==1)throw Error('Managed submission v1 is not deployed for this publication');
-      const operation=await submitWithCheckpoint(client,values,manifest,assets,remaining);
+      const operation=await submitWithCheckpoint(client,values,manifest,assets,remaining,()=>submissionProblems(manifest,options));
       const receipt=values.wait ? await waitForSubmission(client,operation.receipt,{
         remaining,save:operation.save,onProgress:event=>console.error(JSON.stringify(event)),
         editMatches:articleEditHtmlMatches,photoMatches:articlePhotoHtmlMatches,
