@@ -52,26 +52,32 @@ describe("publication network", () => {
     expect(findPublicationBySlug("lazytensor")?.focus).toBe("AI & Technology");
   });
 
-  it("orders each paper's network menu nearest first", () => {
+  it("orders each paper's network menu nearest first between fixed ends", () => {
     const order = (slug: string) => publicationsByProximity(slug).map((p) => p.slug);
     expect(order("concordchronicle")).toEqual([
-      "concordchronicle", "walnutcreektimes", "diablovalleynews", "alamoweekly", "lamorindapost", "danvilletimes",
-      "sanramontimes", "eastbaypost", "trivalleyweekly", "sfwall", "napagate", "lazytensor", "bayareachronicle",
+      "lazytensor", "concordchronicle", "walnutcreektimes", "diablovalleynews", "alamoweekly", "lamorindapost", "danvilletimes",
+      "sanramontimes", "eastbaypost", "trivalleyweekly", "sfwall", "bayareachronicle", "napagate",
     ]);
-    expect(order("sfwall").slice(0, 4)).toEqual(["sfwall", "eastbaypost", "lamorindapost", "alamoweekly"]);
-    expect(order("napagate").slice(0, 2)).toEqual(["napagate", "concordchronicle"]);
-    expect(order("sanramontimes").slice(0, 3)).toEqual(["sanramontimes", "danvilletimes", "alamoweekly"]);
-    // Region-wide and topical titles keep directory order at the end, and open with themselves.
-    expect(order("lazytensor")).toEqual(["lazytensor", ...listedPublications.filter((p) => p.center).map((p) => p.slug), "bayareachronicle"]);
+    expect(order("sfwall").slice(0, 4)).toEqual(["lazytensor", "sfwall", "eastbaypost", "lamorindapost"]);
+    expect(order("sanramontimes").slice(0, 4)).toEqual(["lazytensor", "sanramontimes", "danvilletimes", "alamoweekly"]);
+    // Napa Gate's own menu still opens with Lazy Tensor and itself, then its nearest neighbours.
+    expect(order("napagate")).toEqual([
+      "lazytensor", "napagate", "concordchronicle", "walnutcreektimes", "lamorindapost", "diablovalleynews", "alamoweekly",
+      "eastbaypost", "danvilletimes", "sfwall", "sanramontimes", "trivalleyweekly", "bayareachronicle",
+    ]);
+    expect(order("lazytensor")).toEqual([
+      "lazytensor", "concordchronicle", "walnutcreektimes", "lamorindapost", "alamoweekly", "danvilletimes", "sanramontimes",
+      "diablovalleynews", "trivalleyweekly", "eastbaypost", "sfwall", "bayareachronicle", "napagate",
+    ]);
     for (const publication of listedPublications) {
       const menu = order(publication.slug);
-      expect(menu[0]).toBe(publication.slug);
+      expect(menu[0]).toBe("lazytensor");
+      expect(menu.indexOf(publication.slug)).toBeLessThanOrEqual(1);
+      if (publication.slug !== "napagate") expect(menu.at(-1)).toBe("napagate");
       expect([...menu].sort()).toEqual(listedPublications.map((p) => p.slug).sort());
     }
-    expect(order("unknown")).toEqual([
-      ...listedPublications.filter((p) => p.center).map((p) => p.slug),
-      ...listedPublications.filter((p) => !p.center).map((p) => p.slug),
-    ]);
+    expect(order("unknown")[0]).toBe("lazytensor");
+    expect(order("unknown").at(-1)).toBe("napagate");
     expect(communityPublications.every((p) => p.center)).toBe(true);
   });
 

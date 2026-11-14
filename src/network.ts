@@ -164,6 +164,8 @@ export interface PublicationNetworkItem {
    * titles) follow the local papers in directory order.
    */
   center?: { lat: number; lng: number };
+  /** Fixed place in every network menu, outside the nearest-first order. */
+  menuPosition?: "first" | "last";
 }
 
 /**
@@ -179,6 +181,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     area: "Silicon Valley · AI & Technology",
     focus: "AI & Technology",
     kind: "topical",
+    menuPosition: "first",
     slogan: "Technology, Intelligence & Everything in Between.",
     description:
       "The network's technology publication: artificial intelligence, computing, science, startups and what technology means for the people and communities of Silicon Valley and the Bay Area.",
@@ -310,6 +313,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     url: "https://napagate.com",
     area: "Napa Valley",
     center: { lat: 38.3, lng: -122.29 },
+    menuPosition: "last",
     slogan: "Local stories. Stronger communities.",
     description:
       "Bespoke local reporting for the people, agriculture, culinary culture, riverfront, and civic institutions of the Napa Valley.",
@@ -351,21 +355,24 @@ function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: numb
 }
 
 /**
- * Listed publications for one paper's network menu: that paper first, then the
- * other local papers nearest first, then region-wide and topical titles in
- * directory order. The order depends only on `currentSlug`, so every reader of
- * a paper receives the same markup and cached pages stay shared.
+ * Listed publications for one paper's network menu: titles pinned first (Lazy
+ * Tensor), then the current paper, the other local papers nearest first,
+ * region-wide titles in directory order, and titles pinned last (Napa Gate).
+ * The order depends only on `currentSlug`, so every reader of a paper receives
+ * the same markup and cached pages stay shared.
  */
 export function publicationsByProximity(currentSlug: string): readonly PublicationNetworkItem[] {
-  const current = listedPublications.find((p) => p.slug === currentSlug);
-  const others = listedPublications.filter((p) => p.slug !== currentSlug);
+  const first = listedPublications.filter((p) => p.menuPosition === "first");
+  const last = listedPublications.filter((p) => p.menuPosition === "last" && p.slug !== currentSlug);
+  const current = listedPublications.find((p) => p.slug === currentSlug && p.menuPosition !== "first");
+  const rest = listedPublications.filter((p) => !p.menuPosition && p.slug !== currentSlug);
   const origin = current?.center;
-  const located = others.filter((p) => p.center);
+  const located = rest.filter((p) => p.center);
   if (origin) {
     // Array.prototype.sort is stable, so equal distances keep directory order.
     located.sort((a, b) => distanceKm(origin, a.center!) - distanceKm(origin, b.center!));
   }
-  return [...(current ? [current] : []), ...located, ...others.filter((p) => !p.center)];
+  return [...first, ...(current ? [current] : []), ...located, ...rest.filter((p) => !p.center), ...last];
 }
 
 /** Find a publication in the network by its slug. */
