@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { listedPublications } from "./network";
+import { publicationsByProximity } from "./network";
 import {
   decorateNetworkUrl,
   setupNetworkConsentDelegation,
@@ -59,7 +59,7 @@ export function LocalNetworkBar({ currentSlug, className = "", style }: LocalNet
           Our local sites <span aria-hidden="true">{open ? "−" : "+"}</span>
         </button>
         <ul id={id} className={`sm-network-sites ${open ? "sm-network-expanded" : ""}`} aria-label="All local publications">
-          {listedPublications.map((publication) => {
+          {publicationsByProximity(currentSlug).map((publication) => {
             const isCurrent = publication.slug === currentSlug;
             const targetUrl = isCurrent ? publication.url + "/" : decorateNetworkUrl(publication.url + "/");
             return (

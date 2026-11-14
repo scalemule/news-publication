@@ -158,11 +158,20 @@ export interface PublicationNetworkItem {
   kind?: "local" | "topical";
   /** Short subject line shown beside the name in directories, e.g. "AI & Technology". */
   focus?: string;
+  /**
+   * Approximate centre of the paper's coverage area. Network menus list the
+   * nearest papers first. Papers without a centre (region-wide or topical
+   * titles) follow the local papers in directory order.
+   */
+  center?: { lat: number; lng: number };
+  /** Fixed place in every network menu, outside the nearest-first order. */
+  menuPosition?: "first" | "last";
 }
 
 /**
  * Public directory of all ScaleMule local news publications in the Bay Area network.
- * Menu order follows the central corridor from north to south.
+ * Directory order: network-wide titles, then the central corridor from north
+ * to south. Network menus use {@link publicationsByProximity} instead.
  */
 export const localPublications: readonly PublicationNetworkItem[] = [
   {
@@ -172,6 +181,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     area: "Silicon Valley · AI & Technology",
     focus: "AI & Technology",
     kind: "topical",
+    menuPosition: "first",
     slogan: "Technology, Intelligence & Everything in Between.",
     description:
       "The network's technology publication: artificial intelligence, computing, science, startups and what technology means for the people and communities of Silicon Valley and the Bay Area.",
@@ -194,6 +204,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Concord Chronicle",
     url: "https://concordchronicle.com",
     area: "Concord & Clayton",
+    center: { lat: 37.96, lng: -121.99 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Independent reporting on municipal governance, school districts, small business, and neighborhood culture in Concord and Clayton.",
@@ -205,6 +216,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Walnut Creek Times",
     url: "https://walnutcreektimes.com",
     area: "Walnut Creek · Rossmoor · Saranap · Pleasant Hill",
+    center: { lat: 37.92, lng: -122.06 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Independent local journalism covering civic decisions, downtown commerce, neighborhood life, and community achievements across Walnut Creek, Rossmoor, Saranap, and Pleasant Hill.",
@@ -216,6 +228,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Lamorinda Post",
     url: "https://lamorindapost.com",
     area: "Orinda · Lafayette · Moraga",
+    center: { lat: 37.88, lng: -122.12 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Community-rooted journalism for the three hillside towns of Lamorinda, covering local schools, civic leadership, wildfire preparedness, and neighborhood traditions.",
@@ -227,6 +240,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Alamo Weekly",
     url: "https://alamoweekly.com",
     area: "Alamo & Round Hill",
+    center: { lat: 37.85, lng: -122.03 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Hyperlocal news focused on the unincorporated enclave of Alamo, Round Hill, local schools, neighborhood preservation, and community organizations.",
@@ -238,6 +252,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Danville Times",
     url: "https://danvilletimes.com",
     area: "Danville & Blackhawk",
+    center: { lat: 37.82, lng: -122.0 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Civic reporting, community events, local enterprise, youth sports, and cultural heritage for the Town of Danville and Blackhawk.",
@@ -249,6 +264,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "San Ramon Times",
     url: "https://sanramontimes.com",
     area: "San Ramon & Dougherty Valley",
+    center: { lat: 37.77, lng: -121.95 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Daily reporting on municipal policy, City Center Bishop Ranch, San Ramon Valley schools, and the neighborhoods of Dougherty Valley.",
@@ -260,6 +276,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Diablo Valley News",
     url: "https://diablovalleynews.com",
     area: "Concord · Walnut Creek · Pleasant Hill · Alamo · Danville · San Ramon",
+    center: { lat: 37.87, lng: -122.02 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Regional perspectives on economic trends, transportation, environmental stewardship, and community life surrounding Mount Diablo.",
@@ -271,6 +288,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Tri-Valley Weekly",
     url: "https://trivalleyweekly.com",
     area: "Dublin · Pleasanton · Livermore",
+    center: { lat: 37.68, lng: -121.86 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Comprehensive reporting across the innovation and wine corridor of Dublin, Pleasanton, and Livermore, connecting civic developments, local research, and regional culture.",
@@ -282,6 +300,7 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "East Bay Post",
     url: "https://eastbaypost.com",
     area: "The East Bay",
+    center: { lat: 37.8, lng: -122.27 },
     slogan: "Local stories. Stronger communities.",
     description:
       "Connecting the diverse neighborhoods, public policy, shoreline communities, and independent businesses across the East Bay.",
@@ -293,12 +312,25 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     name: "Napa Gate",
     url: "https://napagate.com",
     area: "Napa Valley",
+    center: { lat: 38.3, lng: -122.29 },
+    menuPosition: "last",
     slogan: "Local stories. Stronger communities.",
     description:
       "Bespoke local reporting for the people, agriculture, culinary culture, riverfront, and civic institutions of the Napa Valley.",
     aboutIntro:
       "Napa Gate is an independent local publication devoted to the distinctive communities, agricultural heritage, and civic life of the Napa Valley. From municipal decisions in the City of Napa to vineyard stewardship, hospitality labor, wildfire defense, and cultural events throughout Yountville, St. Helena, and Calistoga, we tell the stories of the people who live and work here year-round. We deliver nuanced, independent journalism that respects the valley’s unique identity while examining the economic and environmental choices that will define its future.",
-    listed: false,
+  },
+  {
+    slug: "sfwall",
+    name: "SF Wall",
+    url: "https://sfwall.com",
+    area: "San Francisco",
+    center: { lat: 37.76, lng: -122.44 },
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent local news connecting the neighborhoods, people, civic life, and small businesses of San Francisco.",
+    aboutIntro:
+      "SF Wall is an independent local publication devoted to the distinct neighborhoods, civic life, and small businesses of San Francisco. From the Mission, Castro, and Noe Valley to the Sunset, Richmond, North Beach, Chinatown, SoMa, and Bayview, we report on neighborhood planning, City Hall decisions, transit, parks, and the residents and merchants who shape block-by-block life across the city. We provide clear, constructive journalism that helps San Franciscans stay informed, connected, and engaged in the neighborhoods they call home.",
   },
 ] as const;
 
@@ -314,6 +346,34 @@ export const communityPublications: readonly PublicationNetworkItem[] = listedPu
 export const topicalPublications: readonly PublicationNetworkItem[] = listedPublications.filter(
   (publication) => publication.kind === "topical",
 );
+
+function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = Math.PI / 180;
+  const x = (b.lng - a.lng) * rad * Math.cos(((a.lat + b.lat) / 2) * rad);
+  const y = (b.lat - a.lat) * rad;
+  return 6371 * Math.hypot(x, y);
+}
+
+/**
+ * Listed publications for one paper's network menu: titles pinned first (Lazy
+ * Tensor), then the current paper, the other local papers nearest first,
+ * region-wide titles in directory order, and titles pinned last (Napa Gate).
+ * The order depends only on `currentSlug`, so every reader of a paper receives
+ * the same markup and cached pages stay shared.
+ */
+export function publicationsByProximity(currentSlug: string): readonly PublicationNetworkItem[] {
+  const first = listedPublications.filter((p) => p.menuPosition === "first");
+  const last = listedPublications.filter((p) => p.menuPosition === "last" && p.slug !== currentSlug);
+  const current = listedPublications.find((p) => p.slug === currentSlug && p.menuPosition !== "first");
+  const rest = listedPublications.filter((p) => !p.menuPosition && p.slug !== currentSlug);
+  const origin = current?.center;
+  const located = rest.filter((p) => p.center);
+  if (origin) {
+    // Array.prototype.sort is stable, so equal distances keep directory order.
+    located.sort((a, b) => distanceKm(origin, a.center!) - distanceKm(origin, b.center!));
+  }
+  return [...first, ...(current ? [current] : []), ...located, ...rest.filter((p) => !p.center), ...last];
+}
 
 /** Find a publication in the network by its slug. */
 export function findPublicationBySlug(slug: string): PublicationNetworkItem | undefined {
