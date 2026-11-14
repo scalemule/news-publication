@@ -241,6 +241,7 @@ export type {
 export {
   localPublications,
   listedPublications,
+  publicationsByProximity,
   communityPublications,
   topicalPublications,
   findPublicationBySlug,

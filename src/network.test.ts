@@ -4,6 +4,7 @@ import {
   listedPublications,
   communityPublications,
   topicalPublications,
+  publicationsByProximity,
   findPublicationBySlug,
   findPublicationByHost,
   getNetworkPublicationUrl,
@@ -40,14 +41,38 @@ describe("publication network", () => {
   });
 
   it("filters listed and community publications correctly", () => {
-    expect(listedPublications.length).toBe(11); // napagate and sfwall are unlisted
-    expect(communityPublications.length).toBe(9); // excludes bayareachronicle and the topical title
+    expect(listedPublications.length).toBe(13);
+    expect(communityPublications.length).toBe(11); // excludes bayareachronicle and the topical title
     expect(communityPublications.some((p) => p.slug === "bayareachronicle")).toBe(false);
     expect(communityPublications.some((p) => p.slug === "lazytensor")).toBe(false);
-    expect(communityPublications.some((p) => p.slug === "sfwall")).toBe(false);
+    expect(communityPublications.some((p) => p.slug === "sfwall")).toBe(true);
+    expect(communityPublications.some((p) => p.slug === "napagate")).toBe(true);
     expect(topicalPublications.map((p) => p.slug)).toEqual(["lazytensor"]);
     expect(findPublicationBySlug("lazytensor")?.kind).toBe("topical");
     expect(findPublicationBySlug("lazytensor")?.focus).toBe("AI & Technology");
+  });
+
+  it("orders each paper's network menu nearest first", () => {
+    const order = (slug: string) => publicationsByProximity(slug).map((p) => p.slug);
+    expect(order("concordchronicle")).toEqual([
+      "concordchronicle", "walnutcreektimes", "diablovalleynews", "alamoweekly", "lamorindapost", "danvilletimes",
+      "sanramontimes", "eastbaypost", "trivalleyweekly", "sfwall", "napagate", "lazytensor", "bayareachronicle",
+    ]);
+    expect(order("sfwall").slice(0, 4)).toEqual(["sfwall", "eastbaypost", "lamorindapost", "alamoweekly"]);
+    expect(order("napagate").slice(0, 2)).toEqual(["napagate", "concordchronicle"]);
+    expect(order("sanramontimes").slice(0, 3)).toEqual(["sanramontimes", "danvilletimes", "alamoweekly"]);
+    // Region-wide and topical titles keep directory order at the end, and open with themselves.
+    expect(order("lazytensor")).toEqual(["lazytensor", ...listedPublications.filter((p) => p.center).map((p) => p.slug), "bayareachronicle"]);
+    for (const publication of listedPublications) {
+      const menu = order(publication.slug);
+      expect(menu[0]).toBe(publication.slug);
+      expect([...menu].sort()).toEqual(listedPublications.map((p) => p.slug).sort());
+    }
+    expect(order("unknown")).toEqual([
+      ...listedPublications.filter((p) => p.center).map((p) => p.slug),
+      ...listedPublications.filter((p) => !p.center).map((p) => p.slug),
+    ]);
+    expect(communityPublications.every((p) => p.center)).toBe(true);
   });
 
   it("finds publications by slug", () => {
