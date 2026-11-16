@@ -289,6 +289,8 @@ export function VerifiedCardComponent({
   card: VerifiedCard;
   className?: string;
 }) {
+  const facts = Array.isArray(card.facts) ? card.facts : [];
+  const actions = Array.isArray(card.actions) ? card.actions : [];
   return (
     <aside
       className={`article-verified-card ${className || ""}`.trim()}
@@ -309,9 +311,9 @@ export function VerifiedCardComponent({
         <p className="article-verified-card__summary">{card.summary}</p>
       )}
 
-      {card.facts.length > 0 && (
+      {facts.length > 0 && (
         <dl className="article-verified-card__fact-grid">
-          {card.facts.map((fact, i) => (
+          {facts.map((fact, i) => (
             <div key={i} className="article-verified-card__fact-row">
               <dt className="article-verified-card__fact-label">{fact.label}</dt>
               <dd className="article-verified-card__fact-value">
@@ -333,9 +335,9 @@ export function VerifiedCardComponent({
         </dl>
       )}
 
-      {card.actions.length > 0 && (
+      {actions.length > 0 && (
         <div className="article-verified-card__actions">
-          {card.actions.map((act, i) => (
+          {actions.map((act, i) => (
             <a
               key={i}
               className={`article-verified-card__action ${
