@@ -7,6 +7,7 @@ import {
   formatPayExact,
   formatPayShort,
   groupJobs,
+  jobBodyBlocks,
   jobDescription,
   jobFacets,
   jobsBoardHref,
@@ -61,6 +62,7 @@ describe("parseJob", () => {
     expect(job.website).toBe("https://www.contracosta.ca.gov/");
     expect(job.paragraphs).toEqual(["Why join Contra Costa County? For more details, please..."]);
     expect(job.truncated).toBe(true);
+    expect(job.brief).toBe(true);
   });
 
   it("keeps an employer whose own name carries brackets", () => {
@@ -88,6 +90,7 @@ describe("parseJob", () => {
     expect(job.schedule).toBe("Part-time");
     expect(job.paragraphs).toEqual(["Утренние смены 😀 в кафе."]);
     expect(job.truncated).toBe(false);
+    expect(parseJob(seeded({ title: "Clerk" }, ["Work the front desk. ".repeat(20)])).brief).toBe(false);
   });
 
   it("refuses an application link that is not https", () => {
@@ -165,5 +168,38 @@ describe("board", () => {
     expect(formatPayExact(unique[0].pay!)).toBe("$119,438 – $160,059");
     expect(formatPayShort(unique[0].pay!)).toBe("$119k–$160k");
     expect(jobDescription(unique[0], "Alamo Weekly")).toBe("Information Systems Programmer and Analyst IV at Contra Costa County in Alamo. Full-time. Pay $119,438 – $160,059 a year. Listed on Alamo Weekly.");
+  });
+});
+
+describe("jobBodyBlocks", () => {
+  it("turns bullet lines into one list and an introducing short line into a sub-heading", () => {
+    expect(jobBodyBlocks([
+      "We are seeking a skilled Line Cook to join the team.",
+      "What You'll Do",
+      "• Prepare food for 350 guests",
+      "- Keep the station clean",
+      "2) Check deliveries",
+      "Requirements:",
+      "• 2+ years of experience",
+    ])).toEqual([
+      { kind: "text", text: "We are seeking a skilled Line Cook to join the team." },
+      { kind: "heading", text: "What You'll Do" },
+      { kind: "list", items: ["Prepare food for 350 guests", "Keep the station clean", "Check deliveries"] },
+      { kind: "heading", text: "Requirements" },
+      { kind: "list", items: ["2+ years of experience"] },
+    ]);
+  });
+
+  it("keeps short runs, closing lines and non-Latin text as written", () => {
+    expect(jobBodyBlocks(["Acme Bakery", "12 Main Street", "Open daily and hiring now for the holiday season."]).map(block => block.kind)).toEqual(["text", "text", "text"]);
+    expect(jobBodyBlocks(["Thanks for reading"])).toEqual([{ kind: "text", text: "Thanks for reading" }]);
+    expect(jobBodyBlocks(["#LI-Associate", "Veeva is an equal opportunity employer."])[0].kind).toBe("text");
+    expect(jobBodyBlocks(["Обязанности", "• Готовить кофе ☕", "職務内容", "お客様への対応をお願いします。"])).toEqual([
+      { kind: "heading", text: "Обязанности" },
+      { kind: "list", items: ["Готовить кофе ☕"] },
+      { kind: "heading", text: "職務内容" },
+      { kind: "text", text: "お客様への対応をお願いします。" },
+    ]);
+    expect(jobBodyBlocks(["-5% is not a bullet, and neither is this.", "Email jobs@example.com", "Pay is $20-25 an hour."]).map(block => block.kind)).toEqual(["text", "text", "text"]);
   });
 });

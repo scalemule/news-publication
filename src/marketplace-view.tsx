@@ -14,6 +14,7 @@ import {
   formatPayShort,
   groupJobs,
   hasJobFilters,
+  jobBodyBlocks,
   jobFacets,
   jobsBoardHref,
   jobsBoardState,
@@ -253,11 +254,15 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
         <div className="story">
           <div className="prose">
             {view.paragraphs.length > 0
-              ? view.paragraphs.map((text, index) => <p key={index}>{text}</p>)
+              ? jobBodyBlocks(view.paragraphs).map((block, index) => block.kind === "heading"
+                ? <h2 key={index}>{block.text}</h2>
+                : block.kind === "list"
+                  ? <ul key={index}>{block.items.map((item, at) => <li key={at}>{item}</li>)}</ul>
+                  : <p key={index}>{block.text}</p>)
               : <p>Details are in the listing.</p>}
-            {view.truncated && view.applyUrl ? (
+            {(view.truncated || view.brief) && view.applyUrl ? (
               <p className="more">
-                This is the start of the listing. Duties, qualifications and how to apply are on the employer’s page.{" "}
+                {view.truncated ? "This is the start of the listing." : "This listing is brief."} Duties, qualifications and how to apply are on the employer’s page.{" "}
                 <a href={view.applyUrl} {...external}>Continue at {view.applyHost} <span aria-hidden="true">↗</span></a>
               </p>
             ) : null}

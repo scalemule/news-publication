@@ -235,7 +235,7 @@ export {
   formatPayShort,
   groupJobs,
   hasJobFilters,
-  jobDescription,
+  jobBodyBlocks, jobDescription,
   jobFacets,
   jobsBoardHref,
   jobsBoardState,
@@ -245,7 +245,7 @@ export {
   relatedJobs,
   topPaidJobs,
 } from "./jobs";
-export type { JobFacet, JobGroup, JobPay, JobPayPeriod, JobProfessionId, JobView, JobWorkplace, JobsBoardState, JobsBoardView } from "./jobs";
+export type { JobBodyBlock, JobFacet, JobGroup, JobPay, JobPayPeriod, JobProfessionId, JobView, JobWorkplace, JobsBoardState, JobsBoardView } from "./jobs";
 export type { MeetActivity, MeetupInput, PreparedMeetup, PublicPlace } from "./meet";
 export type {
   NeighborFeedPost,

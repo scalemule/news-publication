@@ -269,12 +269,18 @@
 .np-job .story { flex: 999 1 520px; min-width: 0; }
 .np-job .prose { max-width: 66ch; padding-top: 28px; border-top: 1px solid var(--pub-rule, #d7dcd7); }
 .np-job .prose p { margin: 0 0 18px; font: 400 18px/1.65 var(--pub-serif); overflow-wrap: anywhere; }
+.np-job .prose h2 { margin: 30px 0 12px; font: 600 22px/1.25 var(--pub-serif); letter-spacing: -0.015em; }
+.np-job .prose > h2:first-child { margin-top: 0; }
+.np-job .prose ul { margin: 0 0 22px; padding: 0 0 0 22px; }
+.np-job .prose li { margin: 0 0 8px; padding-left: 4px; font: 400 18px/1.6 var(--pub-serif); overflow-wrap: anywhere; }
+.np-job .prose li::marker { color: var(--pub-accent, #bb171d); }
 .np-job .prose .more { margin-top: 28px; padding: 20px 24px; background: var(--pub-soft, #f5f6f3); font: 400 15px/1.55 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-job .prose .more a { color: var(--pub-accent, #bb171d); font-weight: 600; white-space: nowrap; }
 .np-job .facts { position: sticky; top: 16px; flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 20px; border-top: 3px solid var(--pub-ink, #171917); }
 .np-job .payBlock { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 .np-job .payBlock .figure { font: 600 clamp(28px, 2.6vw, 38px)/1.1 var(--pub-serif); letter-spacing: -0.03em; }
 .np-job .facts dl { margin: 0; border-top: 1px solid var(--pub-rule, #d7dcd7); }
+.np-job .facts > dl:first-child { margin-top: -20px; border-top: 0; }
 .np-job .facts dl div { display: flex; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid var(--pub-rule, #d7dcd7); }
 .np-job .facts dt { flex: none; font: 400 14px/1.45 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-job .facts dd { margin: 0; text-align: right; font: 600 14px/1.45 var(--pub-sans); }

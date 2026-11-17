@@ -92,6 +92,8 @@ export type JobView = {
   paragraphs: string[];
   /** The source text stops mid-sentence; the page says so instead of pretending it is whole. */
   truncated: boolean;
+  /** The listing says very little (under 240 characters); the page points to the employer's page for the rest. */
+  brief: boolean;
   publishedAt?: string;
 };
 
@@ -197,6 +199,44 @@ function scheduleKey(job: PublicJob, label: string): string {
 }
 
 /** Reads the facts out of a posting. Every field degrades to empty rather than to a guess. */
+export type JobBodyBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "list"; items: string[] }
+  | { kind: "text"; text: string };
+
+const BULLET = /^(?:[•·▪◦‣*–—-]|\d{1,2}[.)])\s+(?=\S)/u;
+
+const headingLike = (line: string | undefined): boolean =>
+  line !== undefined
+  && !BULLET.test(line)
+  && Array.from(line).length <= 60
+  && line.split(/\s+/u).length <= 8
+  && /\p{L}/u.test(line)
+  && !/[.!?;,…。！？]$/u.test(line)
+  && !/https?:\/\/|@|^#/u.test(line);
+
+/**
+ * Give a description its shape back: bullet lines become one list, and a short line
+ * with no sentence ending that introduces what follows becomes a sub-heading.
+ * A run of short lines (an address, a sign-off) stays text. Nothing is reworded or dropped.
+ */
+export function jobBodyBlocks(paragraphs: readonly string[]): JobBodyBlock[] {
+  const blocks: JobBodyBlock[] = [];
+  paragraphs.forEach((line, index) => {
+    if (BULLET.test(line)) {
+      const item = line.replace(BULLET, "").trim();
+      const previous = blocks[blocks.length - 1];
+      if (previous?.kind === "list") previous.items.push(item);
+      else blocks.push({ kind: "list", items: [item] });
+      return;
+    }
+    const next = paragraphs[index + 1];
+    const heading = headingLike(line) && next !== undefined && !headingLike(next) && !headingLike(paragraphs[index - 1]);
+    blocks.push(heading ? { kind: "heading", text: line.replace(/\s*:$/u, "") } : { kind: "text", text: line });
+  });
+  return blocks;
+}
+
 export function parseJob(job: PublicJob): JobView {
   const rawTitle = (job.title ?? "").trim();
   const body = (job.body_md ?? "").trim();
@@ -278,6 +318,7 @@ export function parseJob(job: PublicJob): JobView {
     website,
     paragraphs: prose,
     truncated: /(\.\.\.|…)$/u.test(last),
+    brief: Array.from(prose.join(" ")).length < 240,
     publishedAt: job.published_at ?? undefined,
   };
 }

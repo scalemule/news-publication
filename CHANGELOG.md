@@ -1,6 +1,6 @@
 ## 0.0.119
 
-- Rebuild the jobs board and job page (`JobsBoard`, `JobArticle`): openings grouped by profession, employer or pay; pay shown on every row; town, schedule and pay filters as plain links; a real Apply button naming the destination site; phone apply bar. No client JavaScript.
+- Rebuild the jobs board and job page (`JobsBoard`, `JobArticle`): openings grouped by profession, employer or pay; pay shown on every row; town, schedule and pay filters as plain links; a real Apply button naming the destination site; phone apply bar; long descriptions keep their sub-headings and bullet lists. No client JavaScript.
 - Add `./jobs` reading rules (`parseJob`, `classifyProfession`, `groupJobs`, `filterJobs`, `jobFacets`, `jobsBoardState`, `jobsBoardHref`, `relatedJobs`, `jobDescription`). Facts are read from the posting's typed salary fields and its text; a field the posting does not state stays empty.
 - `PublicJob` now types the salary, expiry and employer fields the jobs API already returns. `JobsBoard` and `JobArticle` accept the old props; `state`, `classifieds`, `related`, `region`, `paper` and `category` are optional.
 - Not included: job alerts, paid placements and JobPosting structured data. Town and profession are read from text until the jobs API carries them as fields; this patch does not correct listings whose stored town is wrong.
