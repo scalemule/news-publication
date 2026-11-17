@@ -12,6 +12,7 @@ import {
   jobFacets,
   jobsBoardHref,
   jobsBoardState,
+  jobSourceLine,
   parseJob,
   payUnit,
   relatedJobs,
@@ -287,5 +288,302 @@ describe("review regressions", () => {
     const posted = parseJob({ id: "1", slug: "barista", title: prepared.title, body_md: jobPostingBody(prepared).body_md, employment_type: prepared.employment_type });
     expect(posted).toMatchObject({ title: "Barista", employer: "Sideboard Café", town: "Danville", applyEmail: "jobs@sideboard.example", schedule: "Part-time" });
     expect(posted.paragraphs).toEqual(["Morning shifts, tips shared. Experience preferred."]);
+  });
+});
+
+/** No half of a character pair left on its own: the text was never cut inside a character. */
+const whole = (text: string): boolean => !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(text);
+
+describe("facts the jobs API states as fields", () => {
+  /** What the API sends for every posting that exists today. */
+  const unfilled = { origin: "employer", employer_name: null, locality: null, region: null, apply_url: null, source_host: null, source_checked_at: null } as const;
+
+  const description = [
+    "Under general supervision, maintains school grounds, athletic fields and irrigation systems.",
+    "",
+    "## Essential duties",
+    "* Mow, edge and water athletic fields",
+    "* Repair sprinklers and report hazards",
+  ].join("\n");
+
+  const sourced = (overrides: Partial<PublicJob> = {}): PublicJob => ({
+    id: "s1",
+    slug: "grounds-worker-ii",
+    title: "Grounds Worker II",
+    origin: "sourced",
+    employer_name: "Acme School District",
+    locality: "Pleasant Hill",
+    region: "CA",
+    apply_url: "https://example.org/job/1",
+    source_host: "www.edjoin.org",
+    source_checked_at: "2026-11-17T20:00:00Z",
+    employment_type: "full_time",
+    location_type: "onsite",
+    body_md: description,
+    ...overrides,
+  });
+
+  it("reads a posting with only lines in its text exactly as before", () => {
+    const expected = {
+      id: county.id,
+      slug: county.slug,
+      title: "Information Systems Programmer and Analyst IV",
+      rawTitle: "Information Systems Programmer and Analyst IV — Contra Costa County (Alamo, CA)",
+      employer: "Contra Costa County",
+      sector: "County Government & Health Services",
+      town: "Alamo",
+      region: "CA",
+      workplace: "On-site",
+      schedule: "Full-time",
+      scheduleKey: "full_time",
+      department: "County-Wide",
+      profession: "technology",
+      pay: { min: 119438.27, max: 160058.65, period: "year", annual: 160058.65 },
+      applyUrl: "https://www.governmentjobs.com/careers/contracosta/jobs/5537300/x",
+      applyHost: "governmentjobs.com",
+      applyEmail: undefined,
+      website: "https://www.contracosta.ca.gov/",
+      websiteHost: "contracosta.ca.gov",
+      paragraphs: ["Why join Contra Costa County? For more details, please..."],
+      truncated: true,
+      brief: true,
+      publishedAt: undefined,
+      origin: "employer",
+      sourceHost: undefined,
+      sourceCheckedAt: undefined,
+    };
+    expect(parseJob(county)).toEqual(expected);
+    // The fields sent empty, blank or as something that is not text change nothing.
+    expect(parseJob({ ...county, ...unfilled })).toEqual(expected);
+    expect(parseJob({ ...county, employer_name: "  ", locality: "", region: "", apply_url: "" })).toEqual(expected);
+    expect(parseJob({ ...county, employer_name: 7, locality: {}, apply_url: [] } as unknown as PublicJob)).toEqual(expected);
+    // A source is only ever reported for a sourced listing.
+    expect(parseJob({ ...county, source_host: "www.edjoin.org", source_checked_at: "2026-11-17T20:00:00Z" })).toEqual(expected);
+  });
+
+  it("reads a sourced posting from its fields and leaves the description whole", () => {
+    const job = parseJob(sourced());
+    expect(job).toMatchObject({
+      title: "Grounds Worker II",
+      employer: "Acme School District",
+      town: "Pleasant Hill",
+      region: "CA",
+      workplace: "On-site",
+      schedule: "Full-time",
+      applyUrl: "https://example.org/job/1",
+      applyHost: "example.org",
+      origin: "sourced",
+      sourceHost: "edjoin.org",
+      sourceCheckedAt: "2026-11-17T20:00:00Z",
+    });
+    expect(job.paragraphs).toEqual([
+      "Under general supervision, maintains school grounds, athletic fields and irrigation systems.",
+      "## Essential duties",
+      "* Mow, edge and water athletic fields",
+      "* Repair sprinklers and report hazards",
+    ]);
+    expect(jobDescription(job, "Pleasant Hill Weekly")).toBe("Grounds Worker II at Acme School District in Pleasant Hill. Full-time. Listed on Pleasant Hill Weekly.");
+    // The calling is read from the role, as before; a description is not searched for a department.
+    expect(parseJob(sourced({ title: "Night Custodian" })).profession).toBe("trades");
+    expect(groupJobs([job, parseJob(sourced({ id: "s2", slug: "custodian", title: "Night Custodian" }))], "employer")).toMatchObject([{ label: "Acme School District", jobs: [{ slug: "grounds-worker-ii" }, { slug: "custodian" }] }]);
+  });
+
+  it("lets a filled field win over the headline and the lines in the text", () => {
+    const job = parseJob({
+      ...county,
+      ...unfilled,
+      employer_name: "Contra Costa County Health",
+      locality: "Martinez",
+      region: "CA",
+      apply_url: "https://jobs.cchealth.example/5537300",
+    });
+    expect(job).toMatchObject({
+      employer: "Contra Costa County Health",
+      town: "Martinez",
+      region: "CA",
+      applyUrl: "https://jobs.cchealth.example/5537300",
+      applyHost: "jobs.cchealth.example",
+      // Facts with no field of their own are still read from the text.
+      sector: "County Government & Health Services",
+      department: "County-Wide",
+      website: "https://www.contracosta.ca.gov/",
+    });
+    expect(job.pay).toMatchObject({ min: 119438.27, max: 160058.65 });
+    // The lines the text carried are still taken off the page.
+    expect(job.paragraphs).toEqual(["Contra Costa County is hiring for Information Systems Programmer and Analyst IV in Alamo, CA.", "Why join Contra Costa County? For more details, please..."]);
+    // One field filled: the others still come from the text.
+    expect(parseJob({ ...county, locality: "Martinez" })).toMatchObject({ employer: "Contra Costa County", town: "Martinez", applyHost: "governmentjobs.com" });
+    // A town written with its state and workplace reads the same as a bare one.
+    expect(parseJob({ ...county, locality: "Martinez, CA 94553 (Hybrid)" })).toMatchObject({ town: "Martinez", region: "CA", workplace: "Hybrid" });
+  });
+
+  it("does not search a sourced description for facts or take lines out of it", () => {
+    const lines = ["Location: District Office, Room 4", "Employer: Somebody Else · Education", "Apply: https://elsewhere.example/apply", "Compensation: $28–$35 / hour", "Role Overview:", "Keeps the grounds."];
+    const job = parseJob(sourced({ body_md: lines.join("\n") }));
+    expect(job).toMatchObject({ employer: "Acme School District", town: "Pleasant Hill", sector: "", applyUrl: "https://example.org/job/1", pay: null });
+    expect(job.paragraphs).toEqual(lines);
+    // The typed salary fields are where a sourced listing's pay comes from.
+    expect(parseJob(sourced({ salary_min_minor: 2800, salary_max_minor: 3500, salary_period: "hourly" })).pay).toMatchObject({ min: 28, max: 35, period: "hour" });
+  });
+
+  it("ignores an application address that is not a web address", () => {
+    for (const address of ["javascript:alert(1)", "mailto:jobs@example.org", "ftp://example.org/job/1", "data:text/html,hello", "/job/1", "example.org/job/1", "https://localhost/job"]) {
+      const job = parseJob(sourced({ apply_url: address }));
+      expect(job.applyUrl).toBeUndefined();
+      expect(job.applyHost).toBeUndefined();
+    }
+    // A posting made to the paper falls back to the address in its text.
+    expect(parseJob({ ...county, apply_url: "javascript:alert(1)" }).applyHost).toBe("governmentjobs.com");
+    // Same rule as an address read from text: http is opened as https. A stated address keeps its last character.
+    expect(parseJob(sourced({ apply_url: " http://example.org/job/1 " })).applyUrl).toBe("https://example.org/job/1");
+    expect(parseJob(sourced({ apply_url: "https://example.org/job/Clerk_(Part-time)" })).applyUrl).toBe("https://example.org/job/Clerk_(Part-time)");
+  });
+
+  it("keeps employers, towns and titles in any script whole", () => {
+    const sofia = parseJob(sourced({ title: "Учител по математика 🧮 — пълен работен ден", employer_name: "Столична община", locality: "София", region: "София-град" }));
+    expect(sofia).toMatchObject({ title: "Учител по математика 🧮 — пълен работен ден", employer: "Столична община", town: "София", region: "София-град" });
+    const tokyo = parseJob(sourced({ title: "看護師 👩‍⚕️", employer_name: "東京都立病院機構", locality: "東京都", region: null }));
+    expect(tokyo).toMatchObject({ title: "看護師 👩‍⚕️", employer: "東京都立病院機構", town: "東京都", region: "" });
+    // A cut falls between characters, never inside one.
+    const long = parseJob(sourced({ employer_name: "🌳".repeat(200), locality: "山".repeat(59) + "🏔️🏔️" }));
+    expect(Array.from(long.employer)).toHaveLength(120);
+    expect(long.employer).toBe("🌳".repeat(120));
+    expect(Array.from(long.town)).toHaveLength(60);
+    expect(whole(long.town)).toBe(true);
+    expect(whole("🌳".slice(0, 1))).toBe(false);
+    // Everything arranged from these values uses them.
+    const all = dedupeJobs([sofia, tokyo, parseJob(sourced({ id: "s2", slug: "second", title: "Домакин", employer_name: "Столична община", locality: "София" }))]);
+    expect(groupJobs(all, "employer")[0]).toMatchObject({ label: "Столична община" });
+    expect(groupJobs(all, "employer")[0].jobs).toHaveLength(2);
+    expect(jobFacets(all).towns).toEqual([{ value: "София", label: "София", count: 2 }, { value: "東京都", label: "東京都", count: 1 }]);
+    expect(filterJobs(all, jobsBoardState({ town: "東京都" })).map(job => job.title)).toEqual(["看護師 👩‍⚕️"]);
+    expect(relatedJobs(sofia, all).sameEmployer.map(job => job.title)).toEqual(["Домакин"]);
+  });
+
+  it("shows no town for a sourced posting that does not state one", () => {
+    // Neither the headline nor the description stands in for the missing field.
+    const job = parseJob(sourced({ title: "Grounds Worker II — Acme School District (Walnut Creek, CA)", locality: null, region: null, body_md: "Location: Walnut Creek, CA\nTown: Walnut Creek\nWe are in Walnut Creek." }));
+    expect(job).toMatchObject({ title: "Grounds Worker II", employer: "Acme School District", town: "", region: "", workplace: "On-site" });
+    expect(jobFacets([job]).towns).toEqual([]);
+    expect(jobDescription(job, "Walnut Creek Times")).toBe("Grounds Worker II at Acme School District. Full-time. Listed on Walnut Creek Times.");
+    expect(parseJob(sourced({ locality: null, location_type: "remote" }))).toMatchObject({ town: "", workplace: "Remote" });
+    expect(parseJob(sourced({ locality: "Remote" }))).toMatchObject({ town: "", workplace: "Remote" });
+    // With no stated employer the headline's is kept, so the role is not left without one.
+    expect(parseJob(sourced({ title: "Clerk — Acme School District (Alamo, CA)", employer_name: null })).employer).toBe("Acme School District");
+    expect(parseJob(sourced({ employer_name: null })).employer).toBe("");
+  });
+
+  it("says where a sourced listing came from and when it was last checked", () => {
+    const now = new Date("2026-11-18T08:00:00Z");
+    expect(jobSourceLine(parseJob(sourced()), now)).toBe("Listed on edjoin.org · checked Nov 17");
+    expect(jobSourceLine(parseJob(sourced({ source_checked_at: null })), now)).toBe("Listed on edjoin.org");
+    expect(jobSourceLine(parseJob(sourced({ source_checked_at: "not a date" })), now)).toBe("Listed on edjoin.org");
+    expect(jobSourceLine(parseJob(sourced({ source_host: null })), now)).toBe("");
+    expect(jobSourceLine(parseJob(sourced({ source_host: "not a host <b>" })), now)).toBe("");
+    expect(jobSourceLine(parseJob(sourced({ source_host: "https://WWW.EdJoin.org/Home/Job" })), now)).toBe("Listed on edjoin.org · checked Nov 17");
+    expect(jobSourceLine(parseJob(sourced({ source_host: "careers.www.example.org" })), now)).toBe("Listed on careers.www.example.org · checked Nov 17");
+    // The day is the paper's, not UTC's, and a date from another year says so.
+    expect(jobSourceLine(parseJob(sourced({ source_checked_at: "2026-11-18T03:00:00Z" })), now)).toBe("Listed on edjoin.org · checked Nov 17");
+    expect(jobSourceLine(parseJob(sourced({ source_checked_at: "2025-12-30T20:00:00Z" })), now)).toBe("Listed on edjoin.org · checked Dec 30, 2025");
+    expect(jobSourceLine(parseJob({ ...county, source_host: "www.edjoin.org" }), now)).toBe("");
+  });
+});
+
+describe("a fetched Markdown description", () => {
+  const blocks = (lines: string[]) => jobBodyBlocks(parseJob({ id: "1", slug: "x", title: "Clerk", origin: "sourced", body_md: lines.join("\n") }).paragraphs, { markdown: true });
+
+  it("reads paragraphs, headings, lists, bold text and links", () => {
+    expect(blocks([
+      "# Grounds Worker II",
+      "",
+      "**About the role:**",
+      "Maintains *school* grounds and `irrigation` systems. See the [district site](https://www.acme.example/about).",
+      "",
+      "Essential Duties",
+      "----------------",
+      "* Mow, edge and **water** athletic fields",
+      "    - Replace heads and valves",
+      "+ Operate light equipment",
+      "",
+      "### Qualifications",
+      "1. Two years of experience",
+      "2. Valid driver\\'s license \\(Class C\\)",
+    ])).toEqual([
+      { kind: "heading", text: "Grounds Worker II" },
+      { kind: "heading", text: "About the role" },
+      {
+        kind: "text",
+        text: "Maintains school grounds and irrigation systems. See the district site.",
+        rich: [{ text: "Maintains school grounds and irrigation systems. See the " }, { text: "district site", href: "https://www.acme.example/about" }, { text: "." }],
+      },
+      { kind: "heading", text: "Essential Duties" },
+      {
+        kind: "list",
+        items: ["Mow, edge and water athletic fields", "Replace heads and valves", "Operate light equipment"],
+        rich: [[{ text: "Mow, edge and " }, { text: "water", strong: true }, { text: " athletic fields" }], [{ text: "Replace heads and valves" }], [{ text: "Operate light equipment" }]],
+      },
+      { kind: "heading", text: "Qualifications" },
+      { kind: "list", items: ["Two years of experience", "Valid driver's license (Class C)"] },
+    ]);
+  });
+
+  it("only ever links to an https web address and shows the words of anything else", () => {
+    expect(blocks(["Apply [here](javascript:void) or [call](tel:+19255551212), [write](mailto:a@example.org), [see](/careers) and **[the portal](http://jobs.example.org/a?b=1 \"Jobs\")**."])).toEqual([{
+      kind: "text",
+      text: "Apply here or call, write, see and the portal.",
+      rich: [{ text: "Apply here or call, write, see and " }, { text: "the portal", strong: true, href: "https://jobs.example.org/a?b=1" }, { text: "." }],
+    }]);
+    // An address this reader cannot follow stays on the page as typed; it is never made into a link.
+    expect(blocks(["Apply [here](javascript:alert(1)) before the closing date on Friday."])).toEqual([{ kind: "text", text: "Apply [here](javascript:alert(1)) before the closing date on Friday." }]);
+  });
+
+  it("turns what it cannot draw into plain lines and leaves out rules and pictures", () => {
+    expect(blocks([
+      "| Step | Hourly |",
+      "| --- | ---: |",
+      "| 1 | $28.00 |",
+      "",
+      "---",
+      "> Acme is an equal opportunity employer.",
+      "![logo](https://www.acme.example/logo.png)",
+      "```",
+      "**Salary: $28–$35 per hour.**",
+      "Location: District Office",
+      "A paragraph that ends the description.",
+    ])).toEqual([
+      { kind: "text", text: "Step · Hourly" },
+      { kind: "text", text: "1 · $28.00" },
+      { kind: "text", text: "Acme is an equal opportunity employer." },
+      { kind: "text", text: "Salary: $28–$35 per hour.", rich: [{ text: "Salary: $28–$35 per hour.", strong: true }] },
+      { kind: "text", text: "Location: District Office" },
+      { kind: "text", text: "A paragraph that ends the description." },
+    ]);
+    // A rule set apart by a blank line is a rule, not a heading's underline.
+    expect(blocks(["We are hiring for the season.", "", "---", "", "Apply today at the front desk."]).map(block => block.kind)).toEqual(["text", "text"]);
+  });
+
+  it("keeps plain text, snake_case and other scripts as written", () => {
+    expect(blocks(["Обязанности", "• Готовить **кофе** ☕", "職務内容", "お客様への対応をお願いします。"])).toEqual([
+      { kind: "heading", text: "Обязанности" },
+      { kind: "list", items: ["Готовить кофе ☕"], rich: [[{ text: "Готовить " }, { text: "кофе", strong: true }, { text: " ☕" }]] },
+      { kind: "heading", text: "職務内容" },
+      { kind: "text", text: "お客様への対応をお願いします。" },
+    ]);
+    expect(blocks(["Set max_retry_count and min_wait_ms, then compute 5 * 3 * 2 for the team🧮."])).toEqual([{ kind: "text", text: "Set max_retry_count and min_wait_ms, then compute 5 * 3 * 2 for the team🧮." }]);
+    expect(blocks(["\\- not a bullet, 2\\. not a number, \\*\\*not bold\\*\\* and \\[not a link\\](https://example.org) here."])).toEqual([{ kind: "text", text: "- not a bullet, 2. not a number, **not bold** and [not a link](https://example.org) here." }]);
+    for (const block of blocks(["**Привет 😀 мир** и [東京 🗼](https://example.org/東京)"])) expect(whole(JSON.stringify(block))).toBe(true);
+  });
+
+  it("does not read Markdown in a posting made to the paper", () => {
+    const lines = ["## Not a heading here.", "+ not a bullet here.", "**Bold stays as typed** in a longer sentence."];
+    expect(jobBodyBlocks(lines)).toEqual(lines.map(text => ({ kind: "text", text })));
+  });
+
+  it("stays fast on hostile Markdown", () => {
+    const started = Date.now();
+    const body = [`${"[".repeat(20000)}`, `${"**a".repeat(20000)}`, `${"_a ".repeat(20000)}`, `${"[a](".repeat(20000)}`, `# ${" ".repeat(20000)}x`, `${"| ".repeat(20000)}|`, `${"- ".repeat(20000)}`, `${"\\*".repeat(20000)}`, `${"`".repeat(20000)}`].join("\n");
+    const view = parseJob({ id: "1", slug: "x", title: "Clerk", origin: "sourced", body_md: `${body}\n${body}\n${body}` });
+    jobBodyBlocks(view.paragraphs, { markdown: true });
+    expect(Date.now() - started).toBeLessThan(500);
   });
 });

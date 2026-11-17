@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import {
   categoryLabel,
   CLASSIFIED_CATEGORIES,
@@ -18,11 +19,13 @@ import {
   jobFacets,
   jobsBoardHref,
   jobsBoardState,
+  jobSourceLine,
   parseJob,
   payUnit,
   professionLabel,
   relatedJobs,
   topPaidJobs,
+  type JobInline,
   type JobsBoardState,
   type JobsBoardView,
   type JobView,
@@ -80,6 +83,19 @@ function JobsTransition() {
 
 /** Employer-supplied destinations: no opener access and no endorsement passed to search engines. */
 const OUTBOUND = { target: "_blank", rel: "noopener nofollow" } as const;
+
+/** Bold text and links in a fetched description. A link gets the same treatment as any employer-supplied address. */
+function JobText({ text, rich }: { text: string; rich?: JobInline[] }) {
+  if (!rich) return <>{text}</>;
+  return (
+    <>
+      {rich.map((span, at) => {
+        const words = span.strong ? <strong>{span.text}</strong> : span.text;
+        return span.href ? <a key={at} href={span.href} {...OUTBOUND}>{words}</a> : <Fragment key={at}>{words}</Fragment>;
+      })}
+    </>
+  );
+}
 
 function JobRow({ job, view, morph = true }: { job: JobView; view: JobsBoardView; morph?: boolean }) {
   return (
@@ -246,9 +262,13 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
   const applyHref = view.applyUrl ?? (view.applyEmail ? `mailto:${view.applyEmail}?subject=${encodeURIComponent(view.title)}` : undefined);
   const applyLabel = view.applyUrl ? `Apply at ${view.applyHost ?? "the employer’s site"}` : "Apply by email";
   const external = view.applyUrl ? OUTBOUND : {};
+  const sourced = view.origin === "sourced";
+  const source = jobSourceLine(view);
+  // A sourced listing that states no town shows none; "On-site" alone would be a place nobody stated.
+  const place = sourced && !view.town && view.workplace === "On-site" ? "" : [view.town, view.workplace].filter(Boolean).join(" · ");
   const facts: Array<[string, string]> = [
     ["Employer", view.employer],
-    ["Location", [view.town, view.workplace].filter(Boolean).join(" · ")],
+    ["Location", place],
     ["Schedule", view.schedule],
     ["Department", view.department],
     ["Posted", formatJobDate(view.publishedAt)],
@@ -277,11 +297,11 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
         <div className="story">
           <div className="prose">
             {view.paragraphs.length > 0
-              ? jobBodyBlocks(view.paragraphs).map((block, index) => block.kind === "heading"
+              ? jobBodyBlocks(view.paragraphs, { markdown: sourced }).map((block, index) => block.kind === "heading"
                 ? <h2 key={index}>{block.text}</h2>
                 : block.kind === "list"
-                  ? <ul key={index}>{block.items.map((item, at) => <li key={at}>{item}</li>)}</ul>
-                  : <p key={index}>{block.text}</p>)
+                  ? <ul key={index}>{block.items.map((item, at) => <li key={at}><JobText text={item} rich={block.rich?.[at]} /></li>)}</ul>
+                  : <p key={index}><JobText text={block.text} rich={block.rich} /></p>)
               : <p>Details are in the listing.</p>}
             {(view.truncated || view.brief) && view.applyUrl ? (
               <p className="more">
@@ -305,9 +325,9 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
           {applyHref ? (
             <>
               <a className="apply" href={applyHref} {...external}>{applyLabel}{view.applyUrl ? <span aria-hidden="true"> ↗</span> : null}</a>
-              <p className="meta">You apply directly with the employer{paper ? `. ${paper} does not collect applications.` : "."}</p>
+              <p className="meta">You apply directly with the employer{paper ? `. ${paper} does not collect applications.` : "."}{source ? <>{" "}<span className="source">{source}</span></> : null}</p>
             </>
-          ) : null}
+          ) : source ? <p className="meta">{source}</p> : null}
           {view.website && view.websiteHost ? <a className="quiet" href={view.website} {...OUTBOUND}>{view.websiteHost} <span aria-hidden="true">↗</span></a> : null}
         </aside>
         {applyHref ? (

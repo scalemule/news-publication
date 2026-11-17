@@ -6,7 +6,7 @@
  * profession, how to apply) and arrange a list of postings for the board. They are
  * pure: API calls stay in the site.
  */
-import { employmentLabel, type PublicJob } from "./marketplace";
+import { employmentLabel, type JobOrigin, type PublicJob } from "./marketplace";
 
 export const JOB_PROFESSIONS = [
   { id: "education", label: "Education & libraries" },
@@ -80,6 +80,8 @@ export type JobView = {
   employer: string;
   sector: string;
   town: string;
+  /** State or region as stated ("CA"). Kept for the site; the shared pages show the town alone. */
+  region: string;
   workplace: JobWorkplace;
   schedule: string;
   scheduleKey: string;
@@ -99,6 +101,12 @@ export type JobView = {
   /** The listing says very little (under 240 characters); the page points to the employer's page for the rest. */
   brief: boolean;
   publishedAt?: string;
+  /** `sourced` mirrors a listing on the employer's own page: its text is the description as fetched. */
+  origin: JobOrigin;
+  /** Sourced listings only: the site the listing was read from, without a leading "www.". */
+  sourceHost?: string;
+  /** Sourced listings only: when the listing was last read at its source (ISO timestamp). */
+  sourceCheckedAt?: string;
 };
 
 const ANNUAL_FACTOR: Record<JobPayPeriod, number> = { year: 1, month: 12, hour: 2080 };
@@ -204,10 +212,11 @@ export function cleanJobTitle(role: string): string {
   return kept.join(" - ").replace(/\s{2,}/gu, " ").trim().replace(/[,;:–—-]+$/u, "").trim();
 }
 
-function httpsUrl(raw?: string | null): string | undefined {
-  if (!raw) return undefined;
+/** `inText` drops the sentence punctuation that trails an address written in prose; a stated field is read whole. */
+function httpsUrl(raw?: string | null, inText = true): string | undefined {
+  if (!raw || typeof raw !== "string") return undefined;
   try {
-    const parsed = new URL(raw.trim().replace(/[).,;]+$/u, ""));
+    const parsed = new URL(inText ? raw.trim().replace(/[).,;]+$/u, "") : raw.trim());
     // Web addresses only, always opened over https; an "http://" careers link is upgraded rather than dropped.
     if (parsed.protocol === "http:") parsed.protocol = "https:";
     return parsed.protocol === "https:" && parsed.hostname.includes(".") ? parsed.href : undefined;
@@ -234,6 +243,24 @@ function scheduleKeyOf(label: string): string {
   return /full/u.test(text) ? "full_time" : "";
 }
 
+/** A stated field as one clean line. Anything that is not text reads as empty. */
+function stated(value: unknown, max: number): string {
+  return typeof value === "string" ? clip(value.replace(/\s+/gu, " ").trim(), max) : "";
+}
+
+const HOST_NAME = /^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+$/u;
+
+/** "www.edjoin.org" and "https://www.edjoin.org/x" both read as "edjoin.org"; anything that is not a host name is left out. */
+function sourceHostOf(raw: unknown): string | undefined {
+  const text = stated(raw, 253).toLowerCase();
+  const host = (/^https?:\/\//u.test(text) ? hostOf(text) ?? "" : text).replace(/^www\./u, "");
+  return HOST_NAME.test(host) ? host : undefined;
+}
+
+function isoTime(raw: unknown): string | undefined {
+  return typeof raw === "string" && raw.trim() && !Number.isNaN(new Date(raw.trim()).getTime()) ? raw.trim() : undefined;
+}
+
 /** The label a reader sees and the key a filter matches always come from the same source. */
 function scheduleOf(job: PublicJob, line: string): { label: string; key: string } {
   const typed = employmentLabel(job.employment_type);
@@ -243,11 +270,17 @@ function scheduleOf(job: PublicJob, line: string): { label: string; key: string 
   return { label: line, key: scheduleKeyOf(line) };
 }
 
-/** Reads the facts out of a posting. Every field degrades to empty rather than to a guess. */
+/** A run of description text. `strong` is bold; `href` is an https address the text links to. */
+export type JobInline = { text: string; strong?: true; href?: string };
+
+/**
+ * `text` and `items` are always plain words. `rich` is set only for a Markdown description,
+ * and only where a line carries bold text or a link; `rich[i]` belongs to `items[i]`.
+ */
 export type JobBodyBlock =
   | { kind: "heading"; text: string }
-  | { kind: "list"; items: string[] }
-  | { kind: "text"; text: string };
+  | { kind: "list"; items: string[]; rich?: JobInline[][] }
+  | { kind: "text"; text: string; rich?: JobInline[] };
 
 const BULLET = /^(?:[•·▪◦‣*–—-]|\d{1,2}[.)])\s+(?=\S)/u;
 
@@ -260,12 +293,122 @@ const headingLike = (line: string | undefined): boolean =>
   && !/[.!?;,…。！？]$/u.test(line)
   && !/https?:\/\/|@|^#/u.test(line);
 
+const MD_BULLET = /^(?:[•·▪◦‣*+–—-]|\d{1,3}[.)])\s+(?=\S)/u;
+const MD_RULE = /^(?:[-*_=]\s*){3,}$/u;
+const MD_FENCE = /^(?:```|~~~)/u;
+const MD_HEADING = /^#{1,6}\s+(?=\S)/u;
+const MD_BOLD_LINE = /^(?:\*\*([^*]{1,80})\*\*|__([^_]{1,80})__):?$/u;
+const MD_TABLE_ROW = /^\|.*\|$/u;
+const MD_TABLE_RULE = /^[\s:|-]+$/u;
+// Bold, then an image or a link. Every run is bounded and stops at its own opening mark, so hostile text stays linear.
+const MD_INLINE = /(?<!\\)(?:\*\*([^*\n]{1,300})\*\*|(?<![\p{L}\p{N}])__([^_\n]{1,300})__(?![\p{L}\p{N}])|(!?)\[([^[\]\n]{0,300})\]\(([^()\s]{1,2000})(?:\s+"[^"\n]{0,300}")?\))/gu;
+
+/** Takes the marks off text that is shown plain: `*emphasis*`, `_emphasis_`, `` `code` `` and backslash escapes. */
+function unmark(text: string): string {
+  return text
+    .replace(/(?<![\\*\p{L}\p{N}])\*(?=\S)([^*\n]{1,300}?)(?<=\S)\*(?![*\p{L}\p{N}])/gu, "$1")
+    .replace(/(?<![\\_\p{L}\p{N}])_(?=\S)([^_\n]{1,300}?)(?<=\S)_(?![_\p{L}\p{N}])/gu, "$1")
+    .replace(/`([^`\n]{1,300})`/gu, "$1")
+    .replace(/\\([!-/:-@[-`{-~])/gu, "$1");
+}
+
+function inlineSpans(source: string, strong = false): JobInline[] {
+  const spans: JobInline[] = [];
+  const push = (text: string, href?: string) => {
+    const clean = unmark(text);
+    if (!clean) return;
+    const last = spans[spans.length - 1];
+    // Words that turned out plain (a link with no usable address) rejoin the text around them.
+    if (last && !href && !last.href && Boolean(last.strong) === strong) last.text += clean;
+    else spans.push({ text: clean, ...(strong ? { strong: true as const } : {}), ...(href ? { href } : {}) });
+  };
+  let at = 0;
+  for (const match of source.matchAll(MD_INLINE)) {
+    const start = match.index ?? 0;
+    // UTF8-SAFETY: a match starts and ends on an ASCII mark, so these cuts never fall inside a character.
+    push(source.slice(at, start));
+    at = start + match[0].length;
+    const bold = match[1] ?? match[2];
+    if (bold !== undefined) for (const span of inlineSpans(bold, true)) spans.push(span);
+    // A link keeps its words and, when the address is a plain https one, its destination. A picture is left out.
+    else if (!match[3]) push(match[4], httpsUrl(match[5], false));
+  }
+  push(source.slice(at));
+  return spans;
+}
+
+type MarkdownLine = { kind: "heading" | "item" | "row" | "text"; text: string; spans: JobInline[] };
+
+function readMarkdownLine(raw: string): MarkdownLine | null {
+  let line = raw.trim().replace(/^(?:>\s?)+/u, "");
+  if (!line || MD_RULE.test(line) || MD_FENCE.test(line)) return null;
+  let kind: MarkdownLine["kind"] = "text";
+  let match: RegExpMatchArray | null;
+  if (MD_TABLE_ROW.test(line)) {
+    if (MD_TABLE_RULE.test(line)) return null;
+    kind = "row";
+    line = line.split("|").map(cell => cell.trim()).filter(Boolean).join(" · ");
+  } else if ((match = line.match(MD_HEADING))) {
+    kind = "heading";
+    // UTF8-SAFETY: the cut follows a matched run of "#" and spaces.
+    line = line.slice(match[0].length);
+  } else if ((match = line.match(MD_BOLD_LINE)) && !/[.!?。！？]$/u.test(match[1] ?? match[2])) {
+    kind = "heading";
+    line = match[1] ?? match[2];
+  } else if ((match = line.match(MD_BULLET))) {
+    kind = "item";
+    // UTF8-SAFETY: the cut follows a whole matched bullet mark and its spaces.
+    line = line.slice(match[0].length).replace(/^\[[ xX]\]\s+/u, "");
+  }
+  const spans = inlineSpans(line);
+  const text = spans.map(span => span.text).join("").replace(/\s+/gu, " ").trim();
+  return text ? { kind, text, spans } : null;
+}
+
+const marked = (spans: JobInline[]): boolean => spans.some(span => span.strong || span.href);
+
+/**
+ * A description fetched from the employer's page as Markdown. Read: paragraphs, `#` headings,
+ * a bold-only line as a heading, bullet and numbered lists (shown as bullets, nesting flattened),
+ * bold text and https links. Emphasis, code marks and quote marks come off and the words stay.
+ * A table row becomes one line of its cells; rules, code fences and pictures are left out.
+ */
+function markdownBlocks(paragraphs: readonly string[]): JobBodyBlock[] {
+  const lines = paragraphs.map(readMarkdownLine).filter((line): line is MarkdownLine => line !== null);
+  // A short plain line may still be a heading the source did not mark; a "Label: value" line or a table row never is.
+  const loose = (line: MarkdownLine | undefined): boolean =>
+    line?.kind === "text" && !marked(line.spans) && !/:\s+\S/u.test(line.text) && headingLike(line.text);
+  const blocks: JobBodyBlock[] = [];
+  lines.forEach((line, index) => {
+    if (line.kind === "item") {
+      const previous = blocks[blocks.length - 1];
+      const list = previous?.kind === "list" ? previous : { kind: "list" as const, items: [] as string[], rich: [] as JobInline[][] };
+      if (list !== previous) blocks.push(list);
+      list.items.push(line.text);
+      list.rich?.push(line.spans);
+      return;
+    }
+    const before = lines[index - 1];
+    const after = lines[index + 1];
+    const heading = line.kind === "heading"
+      || (loose(line) && after !== undefined && after.kind !== "heading" && !loose(after) && before?.kind !== "heading" && !loose(before));
+    if (heading) blocks.push({ kind: "heading", text: line.text.replace(/\s*:$/u, "") });
+    else blocks.push(marked(line.spans) ? { kind: "text", text: line.text, rich: line.spans } : { kind: "text", text: line.text });
+  });
+  for (const block of blocks) if (block.kind === "list" && !block.rich?.some(marked)) delete block.rich;
+  return blocks;
+}
+
 /**
  * Give a description its shape back: bullet lines become one list, and a short line
  * with no sentence ending that introduces what follows becomes a sub-heading.
  * A run of short lines (an address, a sign-off) stays text. Nothing is reworded or dropped.
+ *
+ * `markdown` is for a sourced listing, whose text is the description as fetched: see `markdownBlocks`.
+ * Without it the lines are read exactly as before.
  */
-export function jobBodyBlocks(paragraphs: readonly string[]): JobBodyBlock[] {
+export function jobBodyBlocks(paragraphs: readonly string[], options: { markdown?: boolean } = {}): JobBodyBlock[] {
+  if (options.markdown) return markdownBlocks(paragraphs);
   const blocks: JobBodyBlock[] = [];
   paragraphs.forEach((line, index) => {
     if (BULLET.test(line)) {
@@ -282,14 +425,45 @@ export function jobBodyBlocks(paragraphs: readonly string[]): JobBodyBlock[] {
   return blocks;
 }
 
+/**
+ * The lines of a fetched description, untouched. The one thing settled here is a heading written as a line
+ * with a row of "=" or "-" directly under it, because only here are the blank lines still known.
+ */
+function descriptionLines(body: string): string[] {
+  const lines: string[] = [];
+  let underlinable = false;
+  for (const rawLine of body.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line) { underlinable = false; continue; }
+    if (underlinable && /^(?:={2,}|-{2,})$/u.test(line)) {
+      lines[lines.length - 1] = `## ${lines[lines.length - 1]}`;
+      underlinable = false;
+      continue;
+    }
+    lines.push(line);
+    underlinable = line.length <= 120 && !MD_BULLET.test(line) && !MD_RULE.test(line) && !/^[#|>]/u.test(line);
+  }
+  return lines;
+}
+
+/**
+ * Reads the facts out of a posting. Every field degrades to empty rather than to a guess.
+ *
+ * A fact the jobs API states as a field (`employer_name`, `locality`, `region`, `apply_url`) is used
+ * when it is filled; otherwise the fact is read from the headline and the labelled lines of the text.
+ * A `sourced` posting's text is the description as fetched: it is not searched for facts and no line
+ * is taken out of it, so its town is the stated `locality` or none.
+ */
 export function parseJob(job: PublicJob): JobView {
   const rawTitle = clip((job.title ?? "").trim(), TITLE_LIMIT);
   const body = (job.body_md ?? "").trim();
+  const sourced = job.origin === "sourced";
   // "Role — Employer (Town, ST) [Track]". The employer may carry its own brackets: "District (EBMUD) (Alamo, CA)".
   // Without the closing "(Town, ST)" a dash is just punctuation in someone's headline, not an employer.
   const titleMatch = rawTitle.match(/^(.*)\s+—\s+(.+?)\s*\(([^()]+,\s*[A-Z]{2})\)(?:\s*\[[^\]]+\])?$/u);
   const role = cleanJobTitle(titleMatch?.[1]?.trim() || rawTitle.replace(/\s*\[[^\]]+\]$/u, ""));
-  let employer = titleMatch?.[2]?.trim() ?? "";
+  // The stated employer outranks the headline, and the headline outranks a line in the text.
+  let employer = stated(job.employer_name, 120) || (titleMatch?.[2]?.trim() ?? "");
   const titlePlace = titleMatch?.[3]?.trim() ?? "";
 
   let sector = "";
@@ -300,11 +474,11 @@ export function parseJob(job: PublicJob): JobView {
   let applyUrl: string | undefined;
   let applyEmail: string | undefined;
   let website: string | undefined;
-  const paragraphs: string[] = [];
+  const paragraphs: string[] = sourced ? descriptionLines(body) : [];
 
   // A labelled line is taken off the page only when its value was understood;
   // "Apply: call 925-555-1212" or "Compensation: DOE" stays in the text as written.
-  for (const rawLine of body.split(/\r?\n/u)) {
+  for (const rawLine of sourced ? [] : body.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line) continue;
     if (line.length > LINE_LIMIT) { paragraphs.push(line); continue; }
@@ -341,22 +515,28 @@ export function parseJob(job: PublicJob): JobView {
     paragraphs.push(line);
   }
 
-  const location = place || titlePlace;
-  const named = location
-    .replace(/\s*\((On-site|Hybrid|Remote)\)\s*/giu, "")
-    .replace(/,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/u, "")
-    .trim();
+  // The stated town outranks the text and the headline. A sourced listing has no other place to read one from:
+  // its headline and description are the employer's words, not a labelled fact, so an unstated town stays empty.
+  const locality = stated(job.locality, 80);
+  const location = locality || (sourced ? "" : place || titlePlace);
+  const unlabelled = location.replace(/\s*\((On-site|Hybrid|Remote)\)\s*/giu, "");
+  const state = unlabelled.match(/,\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/u);
+  // UTF8-SAFETY: the cut is at the comma the pattern matched.
+  const named = (state ? unlabelled.slice(0, state.index) : unlabelled).trim();
   const town = /^(remote|hybrid|on-?site|anywhere)$/iu.test(named) ? "" : clip(named, 60);
-  const workplace: JobWorkplace = /\bhybrid\b/iu.test(place) || job.location_type === "hybrid"
+  const where = locality ? `${locality} ${place}` : place;
+  const workplace: JobWorkplace = /\bhybrid\b/iu.test(where) || job.location_type === "hybrid"
     ? "Hybrid"
-    : /\bremote\b/iu.test(place) || job.location_type === "remote" || job.remote_allowed
+    : /\bremote\b/iu.test(where) || job.location_type === "remote" || job.remote_allowed
       ? "Remote"
       : "On-site";
   const schedule = scheduleOf(job, scheduleLine);
+  // The stated application page outranks an address found in the text; one that is not a web address is ignored.
+  applyUrl = httpsUrl(job.apply_url, false) ?? applyUrl;
 
   // The seeded opening sentence ("Acme is hiring for Role in Town, CA.") repeats the headline; drop it when real text follows.
   const opener = paragraphs[0] ?? "";
-  const seededOpener = paragraphs.length > 1 && employer !== "" && opener.length < 400
+  const seededOpener = !sourced && paragraphs.length > 1 && employer !== "" && opener.length < 400
     && opener.startsWith(`${employer} is hiring for `) && opener.endsWith(".");
   const prose = seededOpener ? paragraphs.slice(1) : paragraphs;
   const last = prose[prose.length - 1] ?? "";
@@ -369,6 +549,7 @@ export function parseJob(job: PublicJob): JobView {
     employer,
     sector,
     town,
+    region: stated(job.region, 40) || (state?.[1] ?? ""),
     workplace,
     schedule: schedule.label,
     scheduleKey: schedule.key,
@@ -384,6 +565,9 @@ export function parseJob(job: PublicJob): JobView {
     truncated: /(\.\.\.|…)$/u.test(last),
     brief: Array.from(prose.join(" ")).length < 240,
     publishedAt: job.published_at ?? undefined,
+    origin: sourced ? "sourced" : "employer",
+    sourceHost: sourced ? sourceHostOf(job.source_host) : undefined,
+    sourceCheckedAt: sourced ? isoTime(job.source_checked_at) : undefined,
   };
 }
 
@@ -552,4 +736,23 @@ export function formatJobDate(iso?: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" });
+}
+
+/**
+ * Where a sourced listing came from and when it was last read there: "Listed on edjoin.org · checked Nov 17".
+ * The date is left off when it is not known and carries its year once it is from another year.
+ * Empty for a posting made to the paper, and for a sourced one that does not name its source.
+ */
+export function jobSourceLine(job: Pick<JobView, "origin" | "sourceHost" | "sourceCheckedAt">, now: Date = new Date()): string {
+  if (job.origin !== "sourced" || !job.sourceHost) return "";
+  const checked = job.sourceCheckedAt ? new Date(job.sourceCheckedAt) : null;
+  if (!checked || Number.isNaN(checked.getTime())) return `Listed on ${job.sourceHost}`;
+  const year = (date: Date) => date.toLocaleDateString("en-US", { year: "numeric", timeZone: "America/Los_Angeles" });
+  const day = checked.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Los_Angeles",
+    ...(year(checked) === year(now) ? {} : { year: "numeric" as const }),
+  });
+  return `Listed on ${job.sourceHost} · checked ${day}`;
 }

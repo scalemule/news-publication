@@ -1,3 +1,10 @@
+## 0.0.120
+
+- Read the facts the jobs API now states as fields. `PublicJob` types `origin`, `employer_name`, `locality`, `region`, `apply_url`, `source_host` and `source_checked_at`; `parseJob` uses a filled field in place of the matching line in the posting's text and falls back to the text when the field is empty. Postings whose fields are empty (every posting today) read and render exactly as in 0.0.119. `apply_url` passes the same check as an address read from text: web addresses only, opened over https.
+- Sourced postings (`origin: "sourced"`): the text is the description as fetched, so it is not searched for facts and no line is taken out of it. The town is the stated `locality` or none; the headline and the description never stand in for it. The job page shows one line under the apply note saying where the listing was read and when it was last checked ("Listed on edjoin.org · checked Nov 17").
+- `jobBodyBlocks(paragraphs, { markdown: true })` reads a fetched Markdown description: paragraphs, `#` and underlined headings, a bold-only line as a heading, bullet and numbered lists, bold text and https links (`rich` on a block; `text` and `items` stay plain words). `JobView` gains `region`, `origin`, `sourceHost` and `sourceCheckedAt`; `jobSourceLine` is exported. Without the option the lines are read as before.
+- Not included: tables (a row becomes one line of its cells), nested and numbered list structure (shown as one flat bullet list), italics, pictures and raw HTML in a description. A sourced posting's pay comes from the typed salary fields only, and its sector and department are not read. Papers with their own job code (Lazy Tensor's board) need their own change to read the fields.
+
 ## 0.0.119
 
 - Rebuild the jobs board and job page (`JobsBoard`, `JobArticle`): openings grouped by profession, employer or pay; pay shown on every row; town, schedule and pay filters as plain links; a real Apply button naming the destination site; phone apply bar; long descriptions keep their sub-headings and bullet lists. No client JavaScript.

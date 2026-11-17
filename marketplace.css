@@ -274,6 +274,7 @@
 .np-job .prose ul { margin: 0 0 22px; padding: 0 0 0 22px; }
 .np-job .prose li { margin: 0 0 8px; padding-left: 4px; font: 400 18px/1.6 var(--pub-serif); overflow-wrap: anywhere; }
 .np-job .prose li::marker { color: var(--pub-accent, #bb171d); }
+.np-job .prose p:not(.more) > a, .np-job .prose li > a { text-decoration: underline; text-underline-offset: 3px; }
 .np-job .prose .more { margin-top: 28px; padding: 20px 24px 9px; background: var(--pub-soft, #f5f6f3); font: 400 15px/1.55 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-job .prose .more a { display: block; width: fit-content; max-width: 100%; margin-top: 2px; padding: 11px 0; color: var(--pub-accent, #bb171d); font-weight: 600; overflow-wrap: anywhere; }
 .np-job .facts { position: sticky; top: 16px; flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 20px; border-top: 3px solid var(--pub-ink, #171917); }
@@ -286,6 +287,7 @@
 .np-job .facts dd { margin: 0; text-align: right; font: 600 14px/1.45 var(--pub-sans); }
 .np-jobs a.apply { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 56px; padding: 0 20px; border-radius: 3px; background: var(--pub-accent, #bb171d); color: #fff; font: 700 16px/1.2 var(--pub-sans); text-align: center; transition: filter 0.15s ease; }
 .np-jobs a.apply:hover { filter: brightness(0.9); }
+.np-job .facts .source { display: block; margin-top: 6px; overflow-wrap: anywhere; }
 .np-job .applyBar { display: none; }
 .np-job .relatedGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px 72px; }
 .np-job .related { display: flex; flex-direction: column; min-width: 0; padding-top: 16px; border-top: 2px solid var(--pub-ink, #171917); }
