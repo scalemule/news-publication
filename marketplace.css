@@ -197,11 +197,11 @@
 .np-jobs .kicker { margin: 0; font: 600 12px/1.4 var(--pub-sans); letter-spacing: 0.08em; text-transform: uppercase; }
 .np-jobs .meta { margin: 0; font: 400 13px/1.45 var(--pub-sans); color: var(--pub-muted, #545c55); }
 
-.np-jobs .head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 28px 64px; padding-top: 24px; }
-.np-jobs .head > div { flex: 999 1 520px; min-width: 0; }
+.np-jobs .head { padding-top: 24px; }
+.np-jobs .intro { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px 64px; margin-top: 18px; }
 .np-jobs h1 { margin: 12px 0 0; font: 600 clamp(40px, 6.4vw, 88px)/1.02 var(--pub-serif); letter-spacing: -0.035em; text-wrap: balance; color: var(--pub-ink, #171917); }
-.np-jobs .lead { max-width: 56ch; margin: 18px 0 0; font: 400 19px/1.55 var(--pub-serif); color: var(--pub-muted, #545c55); }
-.np-jobs .stats { flex: 1 1 280px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 14px 0 4px; border-top: 2px solid var(--pub-ink, #171917); }
+.np-jobs .lead { flex: 999 1 420px; max-width: 56ch; margin: 0; font: 400 19px/1.55 var(--pub-serif); color: var(--pub-muted, #545c55); }
+.np-jobs .stats { flex: 0 1 300px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 14px 0 4px; border-top: 2px solid var(--pub-ink, #171917); }
 .np-jobs .stats div { display: flex; flex-direction: column-reverse; gap: 2px; }
 .np-jobs .stats dd { margin: 0; font: 600 34px/1.1 var(--pub-serif); letter-spacing: -0.02em; }
 .np-jobs .stats dt { font: 500 13px/1.4 var(--pub-sans); color: var(--pub-muted, #545c55); }
@@ -249,7 +249,7 @@
 .np-jobs .empty { max-width: 640px; margin-top: 40px; padding: 32px 0; border-block: 1px solid var(--pub-rule, #d7dcd7); }
 .np-jobs .empty h2 { margin: 0 0 8px; font: 600 28px/1.15 var(--pub-serif); }
 .np-jobs .empty p { margin: 0; font: 400 15px/1.5 var(--pub-sans); color: var(--pub-muted, #545c55); }
-.np-jobs .empty a { color: var(--pub-accent, #bb171d); text-decoration: underline; text-underline-offset: 4px; }
+.np-jobs .empty a { display: inline-block; padding: 11px 0; color: var(--pub-accent, #bb171d); text-decoration: underline; text-underline-offset: 4px; }
 
 .np-jobs .post { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 40px; margin-top: 48px; padding: 28px clamp(20px, 3vw, 32px); background: var(--pub-soft, #f5f6f3); border: 1px solid var(--pub-rule, #d7dcd7); }
 .np-jobs .post h2 { margin: 0 0 4px; font: 600 26px/1.15 var(--pub-serif); letter-spacing: -0.02em; }
@@ -274,11 +274,11 @@
 .np-job .prose ul { margin: 0 0 22px; padding: 0 0 0 22px; }
 .np-job .prose li { margin: 0 0 8px; padding-left: 4px; font: 400 18px/1.6 var(--pub-serif); overflow-wrap: anywhere; }
 .np-job .prose li::marker { color: var(--pub-accent, #bb171d); }
-.np-job .prose .more { margin-top: 28px; padding: 20px 24px; background: var(--pub-soft, #f5f6f3); font: 400 15px/1.55 var(--pub-sans); color: var(--pub-muted, #545c55); }
-.np-job .prose .more a { color: var(--pub-accent, #bb171d); font-weight: 600; white-space: nowrap; }
+.np-job .prose .more { margin-top: 28px; padding: 20px 24px 9px; background: var(--pub-soft, #f5f6f3); font: 400 15px/1.55 var(--pub-sans); color: var(--pub-muted, #545c55); }
+.np-job .prose .more a { display: block; width: fit-content; max-width: 100%; margin-top: 2px; padding: 11px 0; color: var(--pub-accent, #bb171d); font-weight: 600; overflow-wrap: anywhere; }
 .np-job .facts { position: sticky; top: 16px; flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 20px; border-top: 3px solid var(--pub-ink, #171917); }
 .np-job .payBlock { display: flex; flex-direction: column; gap: 4px; margin: 0; }
-.np-job .payBlock .figure { font: 600 clamp(28px, 2.6vw, 38px)/1.1 var(--pub-serif); letter-spacing: -0.03em; }
+.np-job .payBlock .figure { font: 600 clamp(26px, 2.1vw, 30px)/1.12 var(--pub-serif); letter-spacing: -0.03em; }
 .np-job .facts dl { margin: 0; border-top: 1px solid var(--pub-rule, #d7dcd7); }
 .np-job .facts > dl:first-child { margin-top: -20px; border-top: 0; }
 .np-job .facts dl div { display: flex; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid var(--pub-rule, #d7dcd7); }
@@ -298,6 +298,7 @@
   .np-jobs .chips { flex-wrap: nowrap; margin-inline: calc(-1 * var(--pub-gutter, 16px)); padding-inline: var(--pub-gutter, 16px); overflow-x: auto; scrollbar-width: none; }
   .np-jobs .chips::-webkit-scrollbar { display: none; }
   .np-jobs .views { flex-basis: 100%; }
+  .np-jobs .stats { flex-basis: 100%; }
   .np-jobs .leadGrid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 82%; gap: 0 28px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .np-jobs .leadGrid::-webkit-scrollbar { display: none; }
   .np-jobs .leadCard { scroll-snap-align: start; }

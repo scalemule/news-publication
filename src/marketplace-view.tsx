@@ -111,18 +111,18 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
   return (
     <div className="np-jobs">
       <header className="head">
-        <div>
-          <p className="kicker">Jobs</p>
-          <h1>Who’s hiring near {region}</h1>
+        <p className="kicker">Jobs</p>
+        <h1>Who’s hiring near {region}</h1>
+        <div className="intro">
           <p className="lead">Openings from employers in and around {region}. Browsing is free, and so is posting a job.</p>
+          {all.length > 0 ? (
+            <dl className="stats">
+              <div><dt>{all.length === 1 ? "opening" : "openings"}</dt><dd>{all.length}</dd></div>
+              <div><dt>{facets.employers === 1 ? "employer" : "employers"}</dt><dd>{facets.employers}</dd></div>
+              <div><dt>{facets.payListed === 1 ? "lists its pay" : "list their pay"}</dt><dd>{facets.payListed}</dd></div>
+            </dl>
+          ) : null}
         </div>
-        {all.length > 0 ? (
-          <dl className="stats">
-            <div><dt>{all.length === 1 ? "opening" : "openings"}</dt><dd>{all.length}</dd></div>
-            <div><dt>{facets.employers === 1 ? "employer" : "employers"}</dt><dd>{facets.employers}</dd></div>
-            <div><dt>{facets.payListed === 1 ? "lists its pay" : "list their pay"}</dt><dd>{facets.payListed}</dd></div>
-          </dl>
-        ) : null}
       </header>
 
       <div className="controls">
