@@ -17,7 +17,7 @@ import {
   relatedJobs,
   topPaidJobs,
 } from "./jobs";
-import type { PublicJob } from "./marketplace";
+import { jobPostingBody, prepareJobPost, type PublicJob } from "./marketplace";
 
 const seeded = (overrides: Partial<PublicJob> & { title: string }, lines: string[] = []): PublicJob => ({
   id: overrides.id ?? overrides.title,
@@ -93,9 +93,11 @@ describe("parseJob", () => {
     expect(parseJob(seeded({ title: "Clerk" }, ["Work the front desk. ".repeat(20)])).brief).toBe(false);
   });
 
-  it("refuses an application link that is not https", () => {
+  it("only ever links to an https web address", () => {
+    expect(parseJob(seeded({ title: "Clerk" }, ["Apply: jobs@example.com?bcc=other@example.net&body=x"])).applyEmail).toBeUndefined();
     expect(parseJob(seeded({ title: "Clerk" }, ["Apply: javascript:alert(1)"])).applyUrl).toBeUndefined();
-    expect(parseJob(seeded({ title: "Clerk" }, ["Apply on Acme's official career page: http://acme.example/jobs"])).applyUrl).toBeUndefined();
+    expect(parseJob(seeded({ title: "Clerk" }, ["Apply on Acme's official career page: http://acme.example/jobs"])).applyUrl).toBe("https://acme.example/jobs");
+    expect(parseJob(seeded({ title: "Clerk" }, ["Apply: data:text/html,hello"])).applyUrl).toBeUndefined();
   });
 });
 
@@ -201,5 +203,89 @@ describe("jobBodyBlocks", () => {
       { kind: "text", text: "お客様への対応をお願いします。" },
     ]);
     expect(jobBodyBlocks(["-5% is not a bullet, and neither is this.", "Email jobs@example.com", "Pay is $20-25 an hour."]).map(block => block.kind)).toEqual(["text", "text", "text"]);
+  });
+});
+
+describe("review regressions", () => {
+  const withPay = (line: string) => parseJob(seeded({ title: "Clerk" }, [`Compensation: ${line}`]));
+
+  it("reads pay as written and leaves a doubtful figure unlisted", () => {
+    expect(withPay("$65K – $80K per year").pay).toMatchObject({ min: 65000, max: 80000, period: "year" });
+    expect(withPay("$65k-$80k").pay).toMatchObject({ min: 65000, max: 80000, period: "year" });
+    expect(withPay("$22 hourly ($45,760 yearly)").pay).toMatchObject({ min: 22, max: 22, period: "hour" });
+    expect(withPay("$25/hour plus $1,000 signing bonus").pay).toMatchObject({ min: 25, max: 25, period: "hour" });
+    expect(withPay("$20,000/yr").pay).toMatchObject({ min: 20000, period: "year" });
+    expect(withPay("$4,500 – $5,200 per month").pay).toMatchObject({ min: 4500, max: 5200, period: "month" });
+    expect(withPay("$80,000 – $65,000 a year").pay).toMatchObject({ min: 65000, max: 80000 });
+    expect(withPay("$5,000 signing bonus; salary DOE").pay).toBeNull();
+    expect(withPay("$5,000 signing bonus; salary DOE").paragraphs).toEqual(["Compensation: $5,000 signing bonus; salary DOE"]);
+    expect(withPay("DOE").paragraphs).toEqual(["Compensation: DOE"]);
+    expect(parseJob({ ...county, salary_min_minor: null, salary_max_minor: 9_000_000, salary_period: null }).pay).toMatchObject({ min: 90000, max: 90000, period: "year" });
+    expect(parseJob({ ...county, body_md: "", salary_min_minor: 500_000, salary_period: null }).pay).toBeNull();
+    expect(parseJob({ ...county, body_md: "", salary_min_minor: 5_000_000, salary_currency: "EUR", salary_period: "yearly" }).pay).toBeNull();
+  });
+
+  it("keeps a line it could not turn into a button", () => {
+    const job = parseJob(seeded({ title: "Clerk" }, ["Apply: call 925-555-1212", "Apply on Acme's official career page: ftp://acme.example/jobs", "Employer website: ftp://acme.example"]));
+    expect(job.applyUrl).toBeUndefined();
+    expect(job.applyEmail).toBeUndefined();
+    expect(job.paragraphs).toEqual(["Apply: call 925-555-1212", "Apply on Acme's official career page: ftp://acme.example/jobs", "Employer website: ftp://acme.example"]);
+    expect(parseJob(seeded({ title: "Clerk" }, ["Apply: mailto:jobs@example.com"])).applyEmail).toBeUndefined();
+  });
+
+  it("does not hide real openings as duplicates", () => {
+    const cafes = dedupeJobs([parseJob({ id: "1", slug: "barista-a", title: "Barista", body_md: "Morning shifts." }), parseJob({ id: "2", slug: "barista-b", title: "Barista", body_md: "Evening shifts." })]);
+    expect(cafes).toHaveLength(2);
+    const shifts = dedupeJobs([
+      parseJob(seeded({ slug: "rn-days", title: "Registered Nurse - Days — John Muir Health (Walnut Creek, CA)" })),
+      parseJob(seeded({ slug: "rn-nights", title: "Registered Nurse - Nights — John Muir Health (Walnut Creek, CA)" })),
+    ]);
+    expect(shifts.map(job => job.title)).toEqual(["Registered Nurse - Days", "Registered Nurse - Nights"]);
+    const twin = seeded({ slug: "key-holder-2", title: "Key Holder — VICI Collection (Walnut Creek, CA)" });
+    const original = parseJob(seeded({ slug: "key-holder", title: "Key Holder — VICI Collection (Walnut Creek, CA)" }));
+    expect(relatedJobs(original, [original, parseJob(twin)]).sameEmployer).toEqual([]);
+  });
+
+  it("keeps the words of a role and of a headline", () => {
+    expect(cleanJobTitle("Housekeeper - Days Inn")).toBe("Housekeeper - Days Inn");
+    expect(cleanJobTitle("Nurse - Night Shift Supervisor")).toBe("Nurse - Night Shift Supervisor");
+    expect(cleanJobTitle("Nurse - Full Time Oncology")).toBe("Nurse - Full Time Oncology");
+    const plain = parseJob({ id: "1", slug: "barista", title: "Barista — weekend shifts", body_md: "Acme is hiring two baristas for our new shop in Alamo.\nCall 555-1212." });
+    expect(plain.title).toBe("Barista — weekend shifts");
+    expect(plain.employer).toBe("");
+    expect(plain.paragraphs).toEqual(["Acme is hiring two baristas for our new shop in Alamo.", "Call 555-1212."]);
+    expect(parseJob({ id: "1", slug: "x", title: "", body_md: "" }).title).toBe("Opening");
+  });
+
+  it("names the town and schedule the same way for the label and the filter", () => {
+    expect(parseJob(seeded({ title: "Clerk" }, ["Location: Alamo, CA 94507 (On-site)"])).town).toBe("Alamo");
+    expect(parseJob(seeded({ title: "Clerk", location_type: "remote" }, ["Location: Remote"]))).toMatchObject({ town: "", workplace: "Remote" });
+    expect(parseJob(seeded({ title: "Clerk", employment_type: "full_time" }, ["Employment Type: Part-time"]))).toMatchObject({ schedule: "Full-time", scheduleKey: "full_time" });
+    expect(parseJob(seeded({ title: "Clerk", employment_type: "temporary" }, ["Employment Type: Temporary / Seasonal"]))).toMatchObject({ schedule: "Temporary / Seasonal", scheduleKey: "temporary" });
+    expect(parseJob(seeded({ title: "Clerk", employment_type: undefined }, ["Employment Type: Volunteer"]))).toMatchObject({ schedule: "Volunteer", scheduleKey: "" });
+  });
+
+  it("files look-alike titles under the right calling", () => {
+    expect(classifyProfession("Principal Civil Engineer")).toBe("engineering");
+    expect(classifyProfession("Assistant Principal")).toBe("education");
+    expect(classifyProfession("Financial Planner")).toBe("finance");
+    expect(classifyProfession("Event Planner")).toBe("office");
+    expect(classifyProfession("Windows Server Administrator")).toBe("technology");
+    expect(classifyProfession("Air Traffic Controller")).not.toBe("finance");
+    expect(classifyProfession("Food Bank Coordinator")).toBe("office");
+  });
+
+  it("stays fast on hostile text", () => {
+    const started = Date.now();
+    parseJob({ id: "1", slug: "x", title: `${"a — ".repeat(8000)}`, body_md: `${"is hiring in ".repeat(3000)}\nMore.\n${"Apply on ".repeat(4000)}` });
+    cleanJobTitle(`Role${" ,;-".repeat(10000)}x`);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("publishes a reader-posted job with the facts needed to act on it", () => {
+    const prepared = prepareJobPost({ title: "Barista", company: "Sideboard Café", town: "Danville", employment_type: "part_time", description: "Morning shifts, tips shared. Experience preferred.", apply_email: "jobs@sideboard.example" }, ["Danville"]);
+    const posted = parseJob({ id: "1", slug: "barista", title: prepared.title, body_md: jobPostingBody(prepared).body_md, employment_type: prepared.employment_type });
+    expect(posted).toMatchObject({ title: "Barista", employer: "Sideboard Café", town: "Danville", applyEmail: "jobs@sideboard.example", schedule: "Part-time" });
+    expect(posted.paragraphs).toEqual(["Morning shifts, tips shared. Experience preferred."]);
   });
 });

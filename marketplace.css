@@ -187,9 +187,6 @@
 
 
 /* Jobs board and job page. Self-contained: does not inherit the 820px marketplace column. */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition { navigation: auto; }
-}
 .np-jobs { padding-top: 12px; color: var(--pub-ink, #171917); font-family: var(--pub-sans); font-variant-numeric: tabular-nums lining-nums; }
 .np-jobs a { color: inherit; text-decoration: none; }
 .np-jobs .label { margin: 0; font: 600 12px/1.4 var(--pub-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pub-muted, #545c55); }
@@ -214,6 +211,7 @@
 .np-jobs .views { display: flex; flex: 1 1 auto; border: 1px solid var(--pub-ink, #171917); border-radius: 3px; overflow: hidden; }
 .np-jobs .views a { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 16px; border-left: 1px solid var(--pub-ink, #171917); font: 600 13px/1.2 var(--pub-sans); white-space: nowrap; }
 .np-jobs .views a:first-child { border-left: 0; }
+.np-jobs .views a:focus-visible { outline: 2px solid var(--pub-accent, #bb171d); outline-offset: -3px; }
 .np-jobs .views a[aria-current] { background: var(--pub-ink, #171917); color: var(--pub-paper, #fff); }
 .np-jobs .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .np-jobs .chip { display: inline-flex; flex: none; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--pub-rule, #d7dcd7); border-radius: 22px; font: 500 13px/1.2 var(--pub-sans); white-space: nowrap; transition: border-color 0.15s ease; }
@@ -245,7 +243,9 @@
 .np-jobs .nopay { flex: none; font: 400 13px/1.4 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-jobs details > summary { display: inline-flex; align-items: center; min-height: 48px; color: var(--pub-accent, #bb171d); font: 600 14px/1.3 var(--pub-sans); cursor: pointer; list-style: none; }
 .np-jobs details > summary::-webkit-details-marker { display: none; }
-.np-jobs details[open] > summary { display: none; }
+.np-jobs details > summary .opened, .np-jobs details[open] > summary .closed { display: none; }
+.np-jobs details[open] > summary .opened { display: inline; }
+.np-jobs details[open] > summary { color: var(--pub-muted, #545c55); }
 .np-jobs .empty { max-width: 640px; margin-top: 40px; padding: 32px 0; border-block: 1px solid var(--pub-rule, #d7dcd7); }
 .np-jobs .empty h2 { margin: 0 0 8px; font: 600 28px/1.15 var(--pub-serif); }
 .np-jobs .empty p { margin: 0; font: 400 15px/1.5 var(--pub-sans); color: var(--pub-muted, #545c55); }
@@ -294,6 +294,10 @@
 @media (min-width: 900px) {
   .np-jobs .groupHead { position: sticky; top: 16px; }
 }
+/* Below two comfortable columns the pay, facts and Apply button lead the page instead of trailing the description. */
+@media (max-width: 960px) {
+  .np-job .facts { position: static; order: -1; flex-basis: 100%; }
+}
 @media (max-width: 760px) {
   .np-jobs .chips { flex-wrap: nowrap; margin-inline: calc(-1 * var(--pub-gutter, 16px)); padding-inline: var(--pub-gutter, 16px); overflow-x: auto; scrollbar-width: none; }
   .np-jobs .chips::-webkit-scrollbar { display: none; }
@@ -307,7 +311,6 @@
   .np-jobs .pay { flex-direction: row; align-items: baseline; gap: 6px; text-align: left; }
   .np-jobs .amount { font-size: 14px; }
   .np-job .sheet { margin-top: 24px; padding-bottom: 0; }
-  .np-job .facts { position: static; order: -1; flex-basis: 100%; }
   .np-job .facts a.apply { display: none; }
   .np-job .applyBar { position: sticky; bottom: 0; z-index: 5; display: flex; flex: 1 1 100%; align-items: center; gap: 16px; margin-inline: calc(-1 * var(--pub-gutter, 16px)); padding: 10px var(--pub-gutter, 16px) calc(10px + env(safe-area-inset-bottom)); background: var(--pub-paper, #fff); border-top: 1px solid var(--pub-ink, #171917); }
   .np-job .applyBar a.apply { flex: 1; min-height: 50px; }

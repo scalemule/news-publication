@@ -68,11 +68,24 @@ function JobPayFigure({ job }: { job: JobView }) {
   );
 }
 
+/** Ids come from the API; only name-safe characters reach the inline style. */
+function transitionName(id: string): string {
+  return `job-${String(id).replace(/[^A-Za-z0-9_-]/gu, "")}`;
+}
+
+/** Opts jobs pages, and only jobs pages, into the headline morph between the board and a job. */
+function JobsTransition() {
+  return <style>{"@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }"}</style>;
+}
+
+/** Employer-supplied destinations: no opener access and no endorsement passed to search engines. */
+const OUTBOUND = { target: "_blank", rel: "noopener nofollow" } as const;
+
 function JobRow({ job, view, morph = true }: { job: JobView; view: JobsBoardView; morph?: boolean }) {
   return (
     <a className="row" href={`/jobs/${encodeURIComponent(job.slug)}`}>
       <span className="what">
-        <span className="role" style={morph ? { viewTransitionName: `job-${job.id}` } : undefined}>{job.title}</span>
+        <span className="role" style={morph ? { viewTransitionName: transitionName(job.id) } : undefined}>{job.title}</span>
         <span className="meta">{jobMeta(job, view)}</span>
       </span>
       <JobPayFigure job={job} />
@@ -99,6 +112,10 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
   const board: JobsBoardState = state ?? { ...jobsBoardState(), query };
   const all = dedupeJobs(jobs.map(parseJob));
   const facets = jobFacets(all);
+  // Each chip counts what choosing it would show, given the other choices already made.
+  const towns = jobFacets(filterJobs(all, { ...board, town: "" })).towns;
+  const schedules = jobFacets(filterJobs(all, { ...board, schedule: "" })).schedules;
+  const payListed = jobFacets(filterJobs(all, { ...board, payOnly: false })).payListed;
   const shown = filterJobs(all, board);
   const filtered = hasJobFilters(board);
   const groups = groupJobs(shown, board.view);
@@ -110,6 +127,7 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
   );
   return (
     <div className="np-jobs">
+      <JobsTransition />
       <header className="head">
         <p className="kicker">Jobs</p>
         <h1>Who’s hiring near {region}</h1>
@@ -129,6 +147,10 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
         <form className="search" method="get" action="/jobs" role="search">
           <input name="q" type="search" defaultValue={board.query} aria-label="Search jobs" placeholder="Role, employer or department" maxLength={80} />
           {board.view !== "profession" ? <input type="hidden" name="view" value={board.view} /> : null}
+          {board.profession ? <input type="hidden" name="profession" value={board.profession} /> : null}
+          {board.town ? <input type="hidden" name="town" value={board.town} /> : null}
+          {board.schedule ? <input type="hidden" name="type" value={board.schedule} /> : null}
+          {board.payOnly ? <input type="hidden" name="pay" value="1" /> : null}
           <button type="submit">Search</button>
         </form>
         <nav className="views" aria-label="Arrange openings">
@@ -142,9 +164,9 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
         <nav className="chips" aria-label="Narrow openings">
           {filtered || board.query ? <a className="chip clear" href={jobsBoardHref({ ...jobsBoardState(), view: board.view })}>Clear all</a> : null}
           {board.profession ? chip(professionLabel(board.profession) || board.profession, shown.length, true, jobsBoardHref(board, { profession: "" })) : null}
-          {facets.towns.slice(0, 6).map(item => chip(item.label, item.count, board.town === item.value, jobsBoardHref(board, { town: board.town === item.value ? "" : item.value })))}
-          {facets.schedules.map(item => chip(item.label, item.count, board.schedule === item.value, jobsBoardHref(board, { schedule: board.schedule === item.value ? "" : item.value })))}
-          {facets.payListed > 0 ? chip("Pay listed", facets.payListed, board.payOnly, jobsBoardHref(board, { payOnly: !board.payOnly })) : null}
+          {towns.slice(0, 6).map(item => chip(item.label, item.count, board.town === item.value, jobsBoardHref(board, { town: board.town === item.value ? "" : item.value })))}
+          {schedules.map(item => chip(item.label, item.count, board.schedule === item.value, jobsBoardHref(board, { schedule: board.schedule === item.value ? "" : item.value })))}
+          {payListed > 0 ? chip("Pay listed", payListed, board.payOnly, jobsBoardHref(board, { payOnly: !board.payOnly })) : null}
         </nav>
       ) : null}
 
@@ -191,7 +213,7 @@ export function JobsBoard({ region, jobs, query, state, classifieds = true }: Jo
                   {first.map(job => <JobRow key={job.id} job={job} view={board.view} />)}
                   {rest.length > 0 ? (
                     <details>
-                      <summary>Show {rest.length} more in {group.label}</summary>
+                      <summary><span className="closed">Show {rest.length} more in {group.label}</span><span className="opened">Show fewer in {group.label}</span></summary>
                       {rest.map(job => <JobRow key={job.id} job={job} view={board.view} />)}
                     </details>
                   ) : null}
@@ -223,7 +245,7 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
   const others = relatedJobs(view, dedupeJobs(related.map(parseJob)));
   const applyHref = view.applyUrl ?? (view.applyEmail ? `mailto:${view.applyEmail}?subject=${encodeURIComponent(view.title)}` : undefined);
   const applyLabel = view.applyUrl ? `Apply at ${view.applyHost ?? "the employer’s site"}` : "Apply by email";
-  const external = view.applyUrl ? { target: "_blank", rel: "noopener" } : {};
+  const external = view.applyUrl ? OUTBOUND : {};
   const facts: Array<[string, string]> = [
     ["Employer", view.employer],
     ["Location", [view.town, view.workplace].filter(Boolean).join(" · ")],
@@ -239,6 +261,7 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
   const sameProfession = category ? [] : others.sameProfession;
   return (
     <article className="np-jobs np-job">
+      <JobsTransition />
       <nav className="crumbs" aria-label="Breadcrumb">
         <a href="/jobs">Jobs</a>
         {calling ? (
@@ -247,7 +270,7 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
       </nav>
       <header className="jobHead">
         {kicker ? <p className="label accent">{kicker}</p> : null}
-        <h1 style={{ viewTransitionName: `job-${view.id}` }}>{view.title}</h1>
+        <h1 style={{ viewTransitionName: transitionName(view.id) }}>{view.title}</h1>
         {view.employer ? <p className="deck">{[view.employer, view.sector].filter(Boolean).join(" · ")}</p> : null}
       </header>
       <div className="sheet">
@@ -285,7 +308,7 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
               <p className="meta">You apply directly with the employer{paper ? `. ${paper} does not collect applications.` : "."}</p>
             </>
           ) : null}
-          {view.website ? <a className="quiet" href={view.website} target="_blank" rel="noopener">{view.website.replace(/^https:\/\/(www\.)?/u, "").replace(/\/$/u, "")} <span aria-hidden="true">↗</span></a> : null}
+          {view.website && view.websiteHost ? <a className="quiet" href={view.website} {...OUTBOUND}>{view.websiteHost} <span aria-hidden="true">↗</span></a> : null}
         </aside>
         {applyHref ? (
           <div className="applyBar">

@@ -28,14 +28,16 @@ export type JobProfessionId = (typeof JOB_PROFESSIONS)[number]["id"];
 
 /** First match wins, so the specific callings sit above the broad ones. */
 const PROFESSION_RULES: ReadonlyArray<readonly [JobProfessionId, RegExp]> = [
+  ["finance", /\b(financial (planner|advis[eo]r|analyst)|wealth (manager|advis[eo]r))\b/iu],
+  ["office", /\b(event|meeting|wedding) planner\b/iu],
   ["legal", /\b(counsel|attorney|paralegal|legal|law clerk)\b/iu],
   ["public-safety", /\b(police|sheriff|dispatcher|firefighter|fire (captain|inspector|marshal|chief)|paramedic|emt|probation|correctional|public safety|security (officer|guard))\b/iu],
-  ["technology", /\b(software|programmer|developer|information systems|information technology|it (support|specialist|manager|analyst)|systems? (analyst|administrator)|data (engineer|scientist|analyst)|test automation|devops|cyber\w*|network (engineer|administrator)|machine learning|qa engineer|web designer)\b/iu],
+  ["technology", /\b(software|programmer|developer|information systems|information technology|it (support|specialist|manager|analyst)|systems? (analyst|administrator)|data (engineer|scientist|analyst)|test automation|devops|cyber\w*|network (engineer|administrator)|machine learning|qa engineer|web designer|(windows|linux|sql|database|server) (server )?(administrator|engineer)|site reliability|help ?desk)\b/iu],
   ["trades", /\b(janitor\w*|custodi\w*|maintenance|mechanic|electrician|plumber|carpenter|welder|hvac|driver|warehouse|groundskeeper|facilities|equipment operator|laborer|utility worker)\b/iu],
-  ["education", /\b(teacher|teaching|instructor|professor|tutor|principal|school|elementary|classroom|special education|noon supervisor|librar\w*|paraeducator|substitute|child ?care|preschool)\b/iu],
+  ["education", /\b(teacher|teaching|instructor|professor|tutor|(school|assistant|vice) principal|school|elementary|classroom|special education|noon supervisor|librar\w*|paraeducator|substitute|child ?care|preschool)\b/iu],
   ["healthcare", /\b(rn|lvn|cna|nurse|nursing|physician|physicist|pharmac\w*|psycholog\w*|psychiatr\w*|therapist|therapy|clinical|clinic|medical|medicine|mental health|patient|sterile processing|dental|dentist|surgical|surgery|radiolog\w*|oncology|laboratory|caregiver|health professional|veterinar\w*)\b/iu],
   ["engineering", /\b(engineer|engineering|planner|planning|surveyor|architect|drafter|inspector)\b/iu],
-  ["finance", /\b(account(ing|ant)s?|fund|controller|bookkeep\w*|payroll|audit\w*|financial|finance|tax|treasury|budget|loan|bank\w*|underwrit\w*|actuar\w*)\b/iu],
+  ["finance", /\b(account(ing|ant)s?|fund|(?<!traffic )controller|bookkeep\w*|payroll|audit\w*|financial|finance|tax|treasury|budget|loan|(?<!food )bank\w*|underwrit\w*|actuar\w*)\b/iu],
   ["marketing", /\b(marketing|communications|public relations|social media|brand|crm|copywriter|graphic design\w*|editor|reporter|journalist|content)\b/iu],
   ["retail", /\b(retail|sales|cashier|key holder|store|barista|server|cook|chef|bartender|restaurant|hospitality|merchandis\w*|customer service|stylist)\b/iu],
   ["parks", /\b(ranger|parks?|recreation|lifeguard|naturalist|gate attendant|visitor center|landscap\w*|gardener|trail)\b/iu],
@@ -89,6 +91,8 @@ export type JobView = {
   applyHost?: string;
   applyEmail?: string;
   website?: string;
+  /** Host of the employer's site, shown as the link text so the label cannot differ from the destination. */
+  websiteHost?: string;
   paragraphs: string[];
   /** The source text stops mid-sentence; the page says so instead of pretending it is whole. */
   truncated: boolean;
@@ -99,35 +103,51 @@ export type JobView = {
 
 const ANNUAL_FACTOR: Record<JobPayPeriod, number> = { year: 1, month: 12, hour: 2080 };
 
+const PERIOD_WORD = /\b(hourly|hours?|hr|monthly|months?|mo|yearly|years?|yr|annual(?:ly)?|annum)\b/iu;
+
 function payPeriod(text?: string | null): JobPayPeriod | null {
-  if (!text) return null;
-  if (/hour/iu.test(text)) return "hour";
-  if (/month/iu.test(text)) return "month";
-  if (/year|annual/iu.test(text)) return "year";
-  return null;
+  const word = text?.match(PERIOD_WORD)?.[1]?.toLowerCase();
+  if (!word) return null;
+  return word.startsWith("h") ? "hour" : word.startsWith("m") ? "month" : "year";
 }
 
-function makePay(min: number, max: number, period: JobPayPeriod): JobPay | null {
-  if (!Number.isFinite(min) || min <= 0) return null;
-  const top = Number.isFinite(max) && max >= min ? max : min;
-  return { min, max: top, period, annual: top * ANNUAL_FACTOR[period] };
+/** With no stated period only the unmistakable sizes are read; anything between stays unlisted. */
+function inferPeriod(amount: number): JobPayPeriod | null {
+  return amount < 200 ? "hour" : amount >= 15_000 ? "year" : null;
+}
+
+function makePay(low: number, high: number, period: JobPayPeriod | null): JobPay | null {
+  if (!period || !Number.isFinite(low) || low <= 0) return null;
+  const top = Number.isFinite(high) && high > 0 ? high : low;
+  const min = Math.min(low, top);
+  const max = Math.max(low, top);
+  // An hourly figure in the thousands or a yearly one in the hundreds is a misread, not a wage.
+  if ((period === "hour" && min > 1000) || (period === "year" && min < 1000)) return null;
+  return { min, max, period, annual: max * ANNUAL_FACTOR[period] };
 }
 
 function payFromFields(job: PublicJob): JobPay | null {
-  if (job.salary_min_minor == null || job.salary_min_minor <= 0) return null;
-  const min = job.salary_min_minor / 100;
-  const max = (job.salary_max_minor ?? job.salary_min_minor) / 100;
-  const period = payPeriod(job.salary_period) ?? (min < 250 ? "hour" : min < 25_000 ? "month" : "year");
-  return makePay(min, max, period);
+  if (job.salary_currency && job.salary_currency.toUpperCase() !== "USD") return null;
+  const low = job.salary_min_minor != null && job.salary_min_minor > 0 ? job.salary_min_minor / 100 : null;
+  const high = job.salary_max_minor != null && job.salary_max_minor > 0 ? job.salary_max_minor / 100 : null;
+  const min = low ?? high;
+  if (min == null) return null;
+  return makePay(min, high ?? min, payPeriod(job.salary_period) ?? inferPeriod(min));
 }
 
+/**
+ * Reads "$119,438 – $160,059 per year", "$65K–$80K", "$22/hr". The period is the first
+ * one stated after the first figure. A second figure more than ten times the first is
+ * something else (a yearly equivalent, a bonus) and is left out.
+ */
 function payFromText(line: string): JobPay | null {
-  const amounts = Array.from(line.matchAll(/\$\s?([\d,]+(?:\.\d+)?)/gu), match => Number(match[1].replace(/,/gu, "")));
-  if (amounts.length === 0) return null;
+  const found = Array.from(line.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)\s?([kK])?(?![\d\p{L}])/gu));
+  const amounts = found.map(match => Number(match[1].replace(/,/gu, "")) * (match[2] ? 1000 : 1)).filter(amount => Number.isFinite(amount) && amount > 0);
+  if (amounts.length === 0 || amounts.length !== found.length) return null;
   const min = amounts[0];
-  const max = amounts[1] ?? amounts[0];
-  const period = payPeriod(line) ?? (min < 250 ? "hour" : min < 25_000 ? "month" : "year");
-  return makePay(min, max, period);
+  const second = amounts[1] ?? min;
+  const max = second > min * 10 || second * 10 < min ? min : second;
+  return makePay(min, max, payPeriod(line.slice(found[0].index ?? 0)) ?? inferPeriod(min));
 }
 
 function dollars(amount: number, cents: boolean): string {
@@ -160,20 +180,37 @@ export function payUnit(pay: JobPay): string {
   return pay.period === "hour" ? "an hour" : pay.period === "month" ? "a month" : "a year";
 }
 
-const SHIFT_NOISE = /^(full[\s-]?time|part[\s-]?time|\d+\s?hours?|days?|nights?|evenings?|variable(\s+shift)?|day shift|night shift)(\s+[\p{L} .]+(,\s*[A-Z]{2})?)?…?$/iu;
+const SHIFT_NOISE = /^(full[\s-]?time|part[\s-]?time|\d+\s?hours?|days?|nights?|evenings?|variable(\s+shift)?|day shift|night shift)(\s+\p{Lu}[\p{L} .'-]*,\s*[A-Z]{2})?…?$/iu;
 
-/** Drops scheduling codes an applicant-tracking system appends to a role ("- Full Time - 8 Hour - Days"). */
+/** Longest text a rule will read; anything longer is cut on a character boundary first. */
+const TITLE_LIMIT = 300;
+const LINE_LIMIT = 2000;
+
+function clip(text: string, max: number): string {
+  // UTF8-SAFETY: counts and cuts by code point, never by UTF-16 unit.
+  return text.length <= max ? text : Array.from(text).slice(0, max).join("");
+}
+
+/**
+ * Drops the run of scheduling codes an applicant-tracking system appends to a role
+ * ("- Full Time - 8 Hour - Days Walnut Creek, CA"). A single trailing word such as
+ * "- Days" or "- Nights" is kept: it tells two real openings apart.
+ */
 export function cleanJobTitle(role: string): string {
-  const parts = role.trim().split(/\s+-\s+/u);
-  const kept = parts.filter((part, index) => index === 0 || !SHIFT_NOISE.test(part.trim()));
-  return kept.join(" - ").replace(/\s{2,}/gu, " ").replace(/[\s,;:–—-]+$/u, "").trim();
+  const parts = clip(role.trim(), TITLE_LIMIT).split(/\s+-\s+/u);
+  let keep = parts.length;
+  while (keep > 1 && SHIFT_NOISE.test(parts[keep - 1].trim())) keep -= 1;
+  const kept = parts.length - keep >= 2 ? parts.slice(0, keep) : parts;
+  return kept.join(" - ").replace(/\s{2,}/gu, " ").trim().replace(/[,;:–—-]+$/u, "").trim();
 }
 
 function httpsUrl(raw?: string | null): string | undefined {
   if (!raw) return undefined;
   try {
     const parsed = new URL(raw.trim().replace(/[).,;]+$/u, ""));
-    return parsed.protocol === "https:" ? parsed.href : undefined;
+    // Web addresses only, always opened over https; an "http://" careers link is upgraded rather than dropped.
+    if (parsed.protocol === "http:") parsed.protocol = "https:";
+    return parsed.protocol === "https:" && parsed.hostname.includes(".") ? parsed.href : undefined;
   } catch {
     return undefined;
   }
@@ -188,14 +225,22 @@ function hostOf(url?: string): string | undefined {
   }
 }
 
-function scheduleKey(job: PublicJob, label: string): string {
-  if (job.employment_type && employmentLabel(job.employment_type)) return job.employment_type;
+function scheduleKeyOf(label: string): string {
   const text = label.toLowerCase();
   if (/part/u.test(text)) return "part_time";
   if (/temp|season|per diem/u.test(text)) return "temporary";
   if (/contract/u.test(text)) return "contract";
   if (/intern/u.test(text)) return "internship";
-  return text ? "full_time" : "";
+  return /full/u.test(text) ? "full_time" : "";
+}
+
+/** The label a reader sees and the key a filter matches always come from the same source. */
+function scheduleOf(job: PublicJob, line: string): { label: string; key: string } {
+  const typed = employmentLabel(job.employment_type);
+  if (typed && job.employment_type) {
+    return { label: line && scheduleKeyOf(line) === job.employment_type ? line : typed, key: job.employment_type };
+  }
+  return { label: line, key: scheduleKeyOf(line) };
 }
 
 /** Reads the facts out of a posting. Every field degrades to empty rather than to a guess. */
@@ -238,10 +283,11 @@ export function jobBodyBlocks(paragraphs: readonly string[]): JobBodyBlock[] {
 }
 
 export function parseJob(job: PublicJob): JobView {
-  const rawTitle = (job.title ?? "").trim();
+  const rawTitle = clip((job.title ?? "").trim(), TITLE_LIMIT);
   const body = (job.body_md ?? "").trim();
   // "Role — Employer (Town, ST) [Track]". The employer may carry its own brackets: "District (EBMUD) (Alamo, CA)".
-  const titleMatch = rawTitle.match(/^(.*)\s+—\s+(.+?)(?:\s*\(([^()]+,\s*[A-Z]{2})\))?(?:\s*\[[^\]]+\])?$/u);
+  // Without the closing "(Town, ST)" a dash is just punctuation in someone's headline, not an employer.
+  const titleMatch = rawTitle.match(/^(.*)\s+—\s+(.+?)\s*\(([^()]+,\s*[A-Z]{2})\)(?:\s*\[[^\]]+\])?$/u);
   const role = cleanJobTitle(titleMatch?.[1]?.trim() || rawTitle.replace(/\s*\[[^\]]+\]$/u, ""));
   let employer = titleMatch?.[2]?.trim() ?? "";
   const titlePlace = titleMatch?.[3]?.trim() ?? "";
@@ -250,15 +296,18 @@ export function parseJob(job: PublicJob): JobView {
   let place = "";
   let scheduleLine = "";
   let department = "";
-  let payLine = "";
+  let textPay: JobPay | null = null;
   let applyUrl: string | undefined;
   let applyEmail: string | undefined;
   let website: string | undefined;
   const paragraphs: string[] = [];
 
+  // A labelled line is taken off the page only when its value was understood;
+  // "Apply: call 925-555-1212" or "Compensation: DOE" stays in the text as written.
   for (const rawLine of body.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line) continue;
+    if (line.length > LINE_LIMIT) { paragraphs.push(line); continue; }
     let match: RegExpMatchArray | null;
     if ((match = line.match(/^Location:\s*(.+)$/iu))) { place = match[1].trim(); continue; }
     if ((match = line.match(/^Town:\s*(.+)$/iu))) { if (!place) place = match[1].trim(); continue; }
@@ -270,52 +319,67 @@ export function parseJob(job: PublicJob): JobView {
     }
     if ((match = line.match(/^Employment Type:\s*(.+)$/iu))) { scheduleLine = match[1].trim(); continue; }
     if ((match = line.match(/^Department\s*\/\s*Division:\s*(.+)$/iu))) { department = match[1].trim(); continue; }
-    if ((match = line.match(/^Compensation:\s*(.+)$/iu))) { payLine = match[1].trim(); continue; }
-    if ((match = line.match(/^\[Apply on .*?\]\((\S+?)\)$/iu))) { applyUrl = httpsUrl(match[1]); continue; }
-    if ((match = line.match(/^Apply on .*?:\s*(\S+)$/iu))) { applyUrl = httpsUrl(match[1]); continue; }
+    if ((match = line.match(/^Compensation:\s*(.+)$/iu))) {
+      const read = payFromText(match[1]);
+      if (read) { textPay = read; continue; }
+    }
+    if ((match = line.match(/^\[Apply on [^\]]*\]\((\S+)\)$/iu) ?? line.match(/^Apply on [^:]*:\s*(\S+)$/iu))) {
+      const url = httpsUrl(match[1]);
+      if (url) { applyUrl = url; continue; }
+    }
     if ((match = line.match(/^Apply:\s*(.+)$/iu))) {
       const target = match[1].trim();
       const url = httpsUrl(target);
-      if (url) applyUrl = url;
-      else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(target)) applyEmail = target;
-      continue;
+      if (url) { applyUrl = url; continue; }
+      if (/^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(target)) { applyEmail = target; continue; }
     }
-    if ((match = line.match(/^Employer website:\s*(\S+)$/iu))) { website = httpsUrl(match[1]); continue; }
+    if ((match = line.match(/^Employer website:\s*(\S+)$/iu))) {
+      const url = httpsUrl(match[1]);
+      if (url) { website = url; continue; }
+    }
     if (/^\*\*Track:\*\*/u.test(line) || /^Technical Track:/iu.test(line) || /^Role Overview:$/iu.test(line)) continue;
     paragraphs.push(line);
   }
 
   const location = place || titlePlace;
-  const town = location.replace(/\s*\((On-site|Hybrid|Remote)\)\s*/giu, "").replace(/,\s*[A-Z]{2}$/u, "").trim();
+  const named = location
+    .replace(/\s*\((On-site|Hybrid|Remote)\)\s*/giu, "")
+    .replace(/,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/u, "")
+    .trim();
+  const town = /^(remote|hybrid|on-?site|anywhere)$/iu.test(named) ? "" : clip(named, 60);
   const workplace: JobWorkplace = /\bhybrid\b/iu.test(place) || job.location_type === "hybrid"
     ? "Hybrid"
     : /\bremote\b/iu.test(place) || job.location_type === "remote" || job.remote_allowed
       ? "Remote"
       : "On-site";
-  const schedule = scheduleLine || employmentLabel(job.employment_type);
+  const schedule = scheduleOf(job, scheduleLine);
 
-  // The seeded opening sentence repeats the headline; drop it when real text follows.
-  const prose = paragraphs.length > 1 && /\bis hiring\b.+\bin\b.+\.$/iu.test(paragraphs[0]) ? paragraphs.slice(1) : paragraphs;
+  // The seeded opening sentence ("Acme is hiring for Role in Town, CA.") repeats the headline; drop it when real text follows.
+  const opener = paragraphs[0] ?? "";
+  const seededOpener = paragraphs.length > 1 && employer !== "" && opener.length < 400
+    && opener.startsWith(`${employer} is hiring for `) && opener.endsWith(".");
+  const prose = seededOpener ? paragraphs.slice(1) : paragraphs;
   const last = prose[prose.length - 1] ?? "";
 
   return {
     id: job.id,
     slug: job.slug,
-    title: role || rawTitle,
+    title: role || rawTitle || "Opening",
     rawTitle,
     employer,
     sector,
     town,
     workplace,
-    schedule,
-    scheduleKey: scheduleKey(job, schedule),
+    schedule: schedule.label,
+    scheduleKey: schedule.key,
     department,
     profession: classifyProfession(role, department, sector),
-    pay: payFromFields(job) ?? (payLine ? payFromText(payLine) : null),
+    pay: payFromFields(job) ?? textPay,
     applyUrl,
     applyHost: hostOf(applyUrl),
     applyEmail,
     website,
+    websiteHost: hostOf(website),
     paragraphs: prose,
     truncated: /(\.\.\.|…)$/u.test(last),
     brief: Array.from(prose.join(" ")).length < 240,
@@ -372,11 +436,17 @@ export function hasJobFilters(state: JobsBoardState): boolean {
   return Boolean(state.town || state.schedule || state.profession || state.payOnly);
 }
 
-/** One posting per role, employer and town; a re-import must not show the same job twice. */
+/** Same full headline, employer and town. Empty when the posting names no employer: two shops may both need a "Barista". */
+function sameJobKey(job: JobView): string {
+  return job.employer ? `${job.rawTitle}|${job.employer}|${job.town}`.toLowerCase() : "";
+}
+
+/** A re-imported posting must not show the same job twice. Openings that differ in any stated way are all kept. */
 export function dedupeJobs(jobs: JobView[]): JobView[] {
   const seen = new Set<string>();
   return jobs.filter(job => {
-    const key = `${job.title}|${job.employer}|${job.town}`.toLowerCase();
+    const key = sameJobKey(job);
+    if (!key) return true;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -459,7 +529,8 @@ export function topPaidJobs(jobs: JobView[], count = 3): JobView[] {
 
 /** Other openings worth a look from a job page: the same employer, then the same calling elsewhere. */
 export function relatedJobs(job: JobView, all: JobView[], count = 4) {
-  const others = all.filter(other => other.slug !== job.slug);
+  const own = sameJobKey(job);
+  const others = all.filter(other => other.slug !== job.slug && (!own || sameJobKey(other) !== own));
   const sameEmployer = job.employer ? others.filter(other => other.employer === job.employer).sort(byPay).slice(0, count) : [];
   const sameProfession = job.profession === "other"
     ? []
