@@ -332,6 +332,18 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     aboutIntro:
       "SF Wall is an independent local publication devoted to the distinct neighborhoods, civic life, and small businesses of San Francisco. From the Mission, Castro, and Noe Valley to the Sunset, Richmond, North Beach, Chinatown, SoMa, and Bayview, we report on neighborhood planning, City Hall decisions, transit, parks, and the residents and merchants who shape block-by-block life across the city. We provide clear, constructive journalism that helps San Franciscans stay informed, connected, and engaged in the neighborhoods they call home.",
   },
+  {
+    slug: "sanjosewall",
+    name: "San Jose Wall",
+    url: "https://sanjosewall.com",
+    area: "San Jose",
+    center: { lat: 37.34, lng: -121.89 },
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent local news connecting the neighborhoods, people, civic life, and small businesses of San Jose.",
+    aboutIntro:
+      "San Jose Wall is an independent local publication devoted to the distinct neighborhoods, civic life, and small businesses of San Jose. From Downtown San Jose, Willow Glen, the Rose Garden, and Japantown to Santana Row, Almaden Valley, Cambrian, Evergreen, Silver Creek, and Berryessa, we report on neighborhood planning, City Hall decisions, transit, parks, and the residents and merchants who shape block-by-block life across the South Bay. We provide clear, constructive journalism that helps San Jose residents stay informed, connected, and engaged in the neighborhoods they call home.",
+  },
 ] as const;
 
 export const listedPublications: readonly PublicationNetworkItem[] = localPublications.filter(
