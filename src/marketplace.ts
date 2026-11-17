@@ -19,11 +19,28 @@ export const CLASSIFIED_CATEGORIES = [
 export type EmploymentType = (typeof JOB_EMPLOYMENT_TYPES)[number]["value"];
 export type ClassifiedCategory = (typeof CLASSIFIED_CATEGORIES)[number]["value"];
 
+/** `sourced` mirrors a listing on the employer's own page; `employer` was posted to the paper. */
+export type JobOrigin = "employer" | "sourced";
+
 export type PublicJob = {
   id: string;
   slug: string;
   title: string;
   body_md?: string;
+  /** Absent on an older jobs API; read as `employer`. */
+  origin?: JobOrigin | null;
+  /** Stated facts. When one is filled it is used instead of the matching line in `body_md`. */
+  employer_name?: string | null;
+  /** The town, e.g. "Pleasant Hill". */
+  locality?: string | null;
+  /** The state or region, e.g. "CA". */
+  region?: string | null;
+  /** The application page on the employer's site. */
+  apply_url?: string | null;
+  /** Where a sourced listing was read, e.g. "www.edjoin.org". */
+  source_host?: string | null;
+  /** When a sourced listing was last read at its source (ISO timestamp). */
+  source_checked_at?: string | null;
   employment_type?: string;
   location_type?: string;
   remote_allowed?: boolean;
