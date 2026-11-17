@@ -47,7 +47,7 @@ export function JobPostForm({ towns }: { towns: string[] }) {
       <label>Town<select name="town" required defaultValue=""><option value="" disabled>Choose a town</option>{towns.map(town => <option key={town} value={town}>{town}</option>)}</select></label>
       <label>Type<select name="employment_type" required defaultValue="full_time">{JOB_EMPLOYMENT_TYPES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <label>Description<textarea name="description" required minLength={20} maxLength={4000} rows={8} /></label>
-      <label>Apply email<input name="apply_email" type="email" maxLength={254} /></label>
+      <label>Apply email (shown on the listing so people can apply)<input name="apply_email" type="email" maxLength={254} /></label>
       {post.error && <p className="error" role="alert">{post.error}</p>}
       <button className="primary" disabled={post.busy}>{post.busy ? "Saving…" : "Post job"}</button>
     </form>

@@ -28,6 +28,13 @@ export type PublicJob = {
   location_type?: string;
   remote_allowed?: boolean;
   published_at?: string | null;
+  expires_at?: string | null;
+  employer_id?: string;
+  experience_level?: string | null;
+  salary_min_minor?: number | null;
+  salary_max_minor?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
 };
 
 export type PublicDealOffer = {
@@ -174,8 +181,14 @@ export function jobOpeningBody(job: PreparedJob) {
   };
 }
 
+/**
+ * The public posting carries the facts a reader needs to act on it — who is hiring, where,
+ * and how to apply — as labelled lines the job page reads back (`parseJob`). The public
+ * jobs API returns only this text, so anything left out here cannot be shown.
+ */
 export function jobPostingBody(job: PreparedJob) {
-  return { channel: "partner_board" as const, title_override: job.title, body_md: job.description, language: "en" };
+  const facts = [`Location: ${job.town}`, `Employer: ${job.company}`, job.apply_email ? `Apply: ${job.apply_email}` : ""].filter(Boolean).join("\n");
+  return { channel: "partner_board" as const, title_override: job.title, body_md: `${job.description}\n\n${facts}`, language: "en" };
 }
 
 export function prepareClassified(input: {
