@@ -28,6 +28,13 @@ export type PublicJob = {
   location_type?: string;
   remote_allowed?: boolean;
   published_at?: string | null;
+  expires_at?: string | null;
+  employer_id?: string;
+  experience_level?: string | null;
+  salary_min_minor?: number | null;
+  salary_max_minor?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
 };
 
 export type PublicDealOffer = {

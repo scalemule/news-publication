@@ -224,6 +224,28 @@ export type {
 } from "./types";
 export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource, SyncedPublication } from "./snapshot";
 export type { ClassifiedCategory, ClassifiedListing, EmploymentType, PreparedClassified, PreparedJob, PublicDeal, PublicDealOffer, PublicJob } from "./marketplace";
+export {
+  JOB_PROFESSIONS,
+  classifyProfession,
+  cleanJobTitle,
+  dedupeJobs,
+  filterJobs,
+  formatJobDate,
+  formatPayExact,
+  formatPayShort,
+  groupJobs,
+  hasJobFilters,
+  jobDescription,
+  jobFacets,
+  jobsBoardHref,
+  jobsBoardState,
+  parseJob,
+  payUnit,
+  professionLabel,
+  relatedJobs,
+  topPaidJobs,
+} from "./jobs";
+export type { JobFacet, JobGroup, JobPay, JobPayPeriod, JobProfessionId, JobView, JobWorkplace, JobsBoardState, JobsBoardView } from "./jobs";
 export type { MeetActivity, MeetupInput, PreparedMeetup, PublicPlace } from "./meet";
 export type {
   NeighborFeedPost,
