@@ -344,6 +344,18 @@ export const localPublications: readonly PublicationNetworkItem[] = [
     aboutIntro:
       "San Jose Wall is an independent local publication devoted to the distinct neighborhoods, civic life, and small businesses of San Jose. From Downtown San Jose, Willow Glen, the Rose Garden, and Japantown to Santana Row, Almaden Valley, Cambrian, Evergreen, Silver Creek, and Berryessa, we report on neighborhood planning, City Hall decisions, transit, parks, and the residents and merchants who shape block-by-block life across the South Bay. We provide clear, constructive journalism that helps San Jose residents stay informed, connected, and engaged in the neighborhoods they call home.",
   },
+  {
+    slug: "halfmoonbaynews",
+    name: "Half Moon Bay News",
+    url: "https://halfmoonbaynews.com",
+    area: "Half Moon Bay & San Mateo Coast",
+    center: { lat: 37.46, lng: -122.43 },
+    slogan: "Local stories. Stronger communities.",
+    description:
+      "Independent local news covering civic life, coastal resilience, harbor communities, farms, and small businesses across Half Moon Bay and the San Mateo County Coastside.",
+    aboutIntro:
+      "Half Moon Bay News is an independent local publication devoted to the coastal towns, harbors, farms, and neighborhoods of the San Mateo County Coastside. From historic Main Street in Half Moon Bay and the working waterfront of Pillar Point Harbor and Princeton-by-the-Sea to El Granada, Miramar, Moss Beach, Montara, San Gregorio, and Pescadero, we report on municipal decisions, coastal stewardship, schools, Highway 1 and Route 92 infrastructure, and the residents, fishermen, farmers, and small businesses who shape life along the coast. We provide clear, constructive journalism that helps Coastside neighbors stay informed, connected, and engaged in the communities they call home.",
+  },
 ] as const;
 
 export const listedPublications: readonly PublicationNetworkItem[] = localPublications.filter(
