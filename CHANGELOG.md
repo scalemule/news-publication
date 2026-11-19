@@ -1,3 +1,8 @@
+## 0.0.124
+
+- Shorten multi-label ATS tenant subdomains (`*.wd<N>.myworkdayjobs.com`, `job-boards.greenhouse.io`, `jobs.ashbyhq.com`, `jobs.lever.co`, `careers.*`) on the primary Apply button (`applyButtonHost`) and harden `.np-jobs a.apply`, `.np-jobs .button`, `.np-jobs .search button`, and `.np-market .primary/.secondary` button box-sizing and wrapping so long hostnames never overflow or clip on the job page.
+- Normalize Workday ERP legal-entity prefixes on `employer` (`100 Salesforce, Inc.`, `10 Peet's Coffee Inc.`, `2100 NVIDIA USA`, `00104 Equinix LLC`, `0061 Chevron...`, `ADUS-Adobe Inc.`) and composite Workday/ATS localities (`Illinois - Chicago Metro - Remote`, `California - San Francisco`, `USA, CA, Pleasanton`, `US, CA, Santa Clara`, `SAN JOSE 08`) in `parseJob`.
+
 ## 0.0.123
 
 - Depends on `@scalemule/sdk` 0.0.83 (was 0.0.80). No API or rendering changes.

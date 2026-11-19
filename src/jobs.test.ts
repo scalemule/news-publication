@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyButtonHost,
   classifyProfession,
+  cleanEmployerName,
   cleanJobTitle,
   dedupeJobs,
   filterJobs,
@@ -486,6 +488,50 @@ describe("facts the jobs API states as fields", () => {
     expect(jobSourceLine(parseJob(sourced({ source_checked_at: "2026-11-18T03:00:00Z" })), now)).toBe("Listed on edjoin.org · checked Nov 17");
     expect(jobSourceLine(parseJob(sourced({ source_checked_at: "2025-12-30T20:00:00Z" })), now)).toBe("Listed on edjoin.org · checked Dec 30, 2025");
     expect(jobSourceLine(parseJob({ ...county, source_host: "www.edjoin.org" }), now)).toBe("");
+  });
+
+  it("cleans Workday ERP prefixes, composite localities and long ATS button hostnames", () => {
+    expect(cleanEmployerName("100 Salesforce, Inc.")).toBe("Salesforce, Inc.");
+    expect(cleanEmployerName("10 Peet's Coffee Inc.")).toBe("Peet's Coffee Inc.");
+    expect(cleanEmployerName("2100 NVIDIA USA")).toBe("NVIDIA USA");
+    expect(cleanEmployerName("00104 Equinix LLC")).toBe("Equinix LLC");
+    expect(cleanEmployerName("0061 Chevron Products Company, a division of Chevron U.S.A. Inc.")).toBe("Chevron Products Company, a division of Chevron U.S.A. Inc.");
+    expect(cleanEmployerName("ADUS-Adobe Inc.")).toBe("Adobe Inc.");
+    expect(cleanEmployerName("24 Hour Fitness")).toBe("24 Hour Fitness");
+    expect(cleanEmployerName("99 Ranch Market")).toBe("99 Ranch Market");
+    expect(cleanEmployerName("10x Genomics")).toBe("10x Genomics");
+
+    expect(parseJob(sourced({ employer_name: "100 Salesforce, Inc.", locality: "Illinois - Chicago Metro - Remote" }))).toMatchObject({
+      employer: "Salesforce, Inc.",
+      town: "Illinois - Chicago Metro",
+      workplace: "Remote",
+    });
+    expect(parseJob(sourced({ employer_name: "100 Salesforce, Inc.", locality: "California - San Francisco" }))).toMatchObject({
+      employer: "Salesforce, Inc.",
+      town: "San Francisco",
+      region: "CA",
+      workplace: "On-site",
+    });
+    expect(parseJob(sourced({ locality: "USA, CA, Pleasanton", region: null }))).toMatchObject({
+      town: "Pleasanton",
+      region: "CA",
+    });
+    expect(parseJob(sourced({ locality: "US, CA, Santa Clara", region: null }))).toMatchObject({
+      town: "Santa Clara",
+      region: "CA",
+    });
+    expect(parseJob(sourced({ locality: "SAN JOSE 08", region: "CA" }))).toMatchObject({
+      town: "San Jose",
+      region: "CA",
+    });
+
+    expect(applyButtonHost("salesforce.wd12.myworkdayjobs.com")).toBe("myworkdayjobs.com");
+    expect(applyButtonHost("mechanicsbank.wd5.myworkdayjobs.com")).toBe("myworkdayjobs.com");
+    expect(applyButtonHost("job-boards.greenhouse.io")).toBe("greenhouse.io");
+    expect(applyButtonHost("jobs.ashbyhq.com")).toBe("ashbyhq.com");
+    expect(applyButtonHost("careers.contracosta.ca.gov")).toBe("contracosta.ca.gov");
+    expect(applyButtonHost("example.org")).toBe("example.org");
+    expect(applyButtonHost("extremely-long-employer-careers-portal-domain.com")).toBeUndefined();
   });
 });
 

@@ -234,6 +234,45 @@ function hostOf(url?: string): string | undefined {
   }
 }
 
+/**
+ * Concise destination host for the primary Apply button ("myworkdayjobs.com", "greenhouse.io")
+ * so long ATS tenant subdomains never overflow or wrap the button. Returns undefined when a
+ * custom hostname still exceeds 24 characters so the button reads "Apply at the employer’s site".
+ * The full hostname remains on `view.applyHost` and `view.sourceHost`.
+ */
+export function applyButtonHost(host?: string): string | undefined {
+  if (!host) return undefined;
+  const lower = host.toLowerCase().replace(/^www\./u, "");
+  const parts = lower.split(".");
+  const multiSuffix = parts.length >= 3 && /^(?:ca|co|com|org|net|gov|edu|ac)$/u.test(parts[parts.length - 2]) && parts[parts.length - 1].length <= 3;
+  const rootCount = multiSuffix ? 3 : 2;
+  let concise = lower;
+  if (parts.length > rootCount) {
+    if (/\.myworkdayjobs\.com$/u.test(lower)) {
+      concise = "myworkdayjobs.com";
+    } else if (/^(?:job-boards|boards|careers|jobs|recruiting\d*|apply|hire|join|app)\./u.test(lower)) {
+      concise = parts.slice(-rootCount).join(".");
+    }
+  }
+  return concise.length <= 24 ? concise : undefined;
+}
+
+/**
+ * Drops internal ERP legal-entity codes that Workday prepends to `hiringOrganization.name`
+ * ("100 Salesforce, Inc.", "00104 Equinix LLC", "10 Peet's Coffee Inc.", "ADUS-Adobe Inc.")
+ * while leaving real numeric brand names ("24 Hour Fitness", "99 Ranch Market", "10x Genomics") intact.
+ */
+export function cleanEmployerName(raw: string): string {
+  const text = raw.trim();
+  if (!text) return "";
+  return text
+    .replace(/^0\d+\s+(?=\p{Lu})/u, "")
+    .replace(/^\d{3,4}\s+(?=\p{Lu}[\p{L}\p{N}&.'()-]+(?:,?\s+(?:Inc\.?|LLC|Corp\.?|Corporation|Company|Co\.?|USA|U\.S\.A\.|Ltd\.?|L\.P\.|LLP)\b|\s+\p{Lu}))/u, "")
+    .replace(/^\d{1,2}\s+(?=\p{Lu}.*\b(?:Inc\.?|LLC|Corp\.?|Corporation|Company|U\.S\.A\.|Ltd\.?)\b)/u, "")
+    .replace(/^[A-Z]{2,5}-(?=\p{Lu}\p{Ll}+(?:\s|,)+(?:Inc\.?|LLC|Corp\.?|Corporation|Company|Ltd\.?)\b)/u, "")
+    .trim();
+}
+
 function scheduleKeyOf(label: string): string {
   const text = label.toLowerCase();
   if (/part/u.test(text)) return "part_time";
@@ -463,7 +502,7 @@ export function parseJob(job: PublicJob): JobView {
   const titleMatch = rawTitle.match(/^(.*)\s+—\s+(.+?)\s*\(([^()]+,\s*[A-Z]{2})\)(?:\s*\[[^\]]+\])?$/u);
   const role = cleanJobTitle(titleMatch?.[1]?.trim() || rawTitle.replace(/\s*\[[^\]]+\]$/u, ""));
   // The stated employer outranks the headline, and the headline outranks a line in the text.
-  let employer = stated(job.employer_name, 120) || (titleMatch?.[2]?.trim() ?? "");
+  let employer = cleanEmployerName(stated(job.employer_name, 120) || (titleMatch?.[2]?.trim() ?? ""));
   const titlePlace = titleMatch?.[3]?.trim() ?? "";
 
   let sector = "";
@@ -487,7 +526,7 @@ export function parseJob(job: PublicJob): JobView {
     if ((match = line.match(/^Town:\s*(.+)$/iu))) { if (!place) place = match[1].trim(); continue; }
     if ((match = line.match(/^Employer:\s*(.+)$/iu))) {
       const parts = match[1].split(/\s*·\s*/u);
-      if (!employer && parts[0]) employer = parts[0].trim();
+      if (!employer && parts[0]) employer = cleanEmployerName(parts[0]);
       if (parts[1]) sector = parts.slice(1).join(" · ").trim();
       continue;
     }
@@ -519,17 +558,36 @@ export function parseJob(job: PublicJob): JobView {
   // its headline and description are the employer's words, not a labelled fact, so an unstated town stays empty.
   const locality = stated(job.locality, 80);
   const location = locality || (sourced ? "" : place || titlePlace);
-  const unlabelled = location.replace(/\s*\((On-site|Hybrid|Remote)\)\s*/giu, "");
-  const state = unlabelled.match(/,\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/u);
-  // UTF8-SAFETY: the cut is at the comma the pattern matched.
-  const named = (state ? unlabelled.slice(0, state.index) : unlabelled).trim();
-  const town = /^(remote|hybrid|on-?site|anywhere)$/iu.test(named) ? "" : clip(named, 60);
   const where = locality ? `${locality} ${place}` : place;
   const workplace: JobWorkplace = /\bhybrid\b/iu.test(where) || job.location_type === "hybrid"
     ? "Hybrid"
     : /\bremote\b/iu.test(where) || job.location_type === "remote" || job.remote_allowed
       ? "Remote"
       : "On-site";
+  let unlabelled = location
+    .replace(/\s*\((On-?site|Hybrid|Remote)\)\s*/giu, " ")
+    .replace(/\s*(?:[-–—·,|/]\s*)+(?:On-?site|Hybrid|Remote)\s*$/iu, "")
+    .replace(/^(?:On-?site|Hybrid|Remote)\s*(?:[-–—·,|/]\s*)+/iu, "")
+    .trim();
+  let inferredRegion = "";
+  const usStateCity = unlabelled.match(/^US(?:A)?,\s*([A-Z]{2}),\s*(.+)$/iu);
+  if (usStateCity) {
+    inferredRegion = usStateCity[1].toUpperCase();
+    unlabelled = usStateCity[2].trim();
+  }
+  const caCity = unlabelled.match(/^California\s+[-–—]\s+(.+)$/iu);
+  if (caCity) {
+    inferredRegion = inferredRegion || "CA";
+    unlabelled = caCity[1].trim();
+  }
+  const state = unlabelled.match(/,\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/u);
+  // UTF8-SAFETY: the cut is at the comma the pattern matched.
+  let named = (state ? unlabelled.slice(0, state.index) : unlabelled).trim();
+  named = named.replace(/^([A-Za-z][A-Za-z .'-]{2,}?)\s+\d{1,3}$/u, "$1").trim();
+  if (/^[A-Z]{2,}(?:\s+[A-Z]{2,})+$/u.test(named)) {
+    named = named.toLowerCase().replace(/\b[a-z]/gu, ch => ch.toUpperCase());
+  }
+  const town = /^(remote|hybrid|on-?site|anywhere|us|usa|united states)$/iu.test(named) ? "" : clip(named, 60);
   const schedule = scheduleOf(job, scheduleLine);
   // The stated application page outranks an address found in the text; one that is not a web address is ignored.
   applyUrl = httpsUrl(job.apply_url, false) ?? applyUrl;
@@ -549,7 +607,7 @@ export function parseJob(job: PublicJob): JobView {
     employer,
     sector,
     town,
-    region: stated(job.region, 40) || (state?.[1] ?? ""),
+    region: stated(job.region, 40) || (state?.[1] ?? inferredRegion),
     workplace,
     schedule: schedule.label,
     scheduleKey: schedule.key,

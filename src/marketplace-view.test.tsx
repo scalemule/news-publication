@@ -192,4 +192,17 @@ describe("sourced postings", () => {
     expect(html).toContain("<dt>openings</dt><dd>6</dd>");
     expect(html).toContain('<span>Pleasant Hill</span><span class="n">2</span>');
   });
+
+  it("shortens long ATS tenant subdomains on the Apply button while keeping the full source host", () => {
+    const html = article(sourced({
+      employer_name: "100 Salesforce, Inc.",
+      locality: "Illinois - Chicago Metro - Remote",
+      apply_url: "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site/job/Illinois---Chicago-Metro---Remote/Senior-Agentic-Experience-Specialist_JR319291",
+      source_host: "salesforce.wd12.myworkdayjobs.com",
+    }));
+    expect(html).toContain("<dt>Employer</dt><dd>Salesforce, Inc.</dd>");
+    expect(html).toContain("<dt>Location</dt><dd>Illinois - Chicago Metro · Remote</dd>");
+    expect(html).toContain(">Apply at myworkdayjobs.com<span");
+    expect(html).toContain('<span class="source">Listed on salesforce.wd12.myworkdayjobs.com · checked Nov 17</span>');
+  });
 });
