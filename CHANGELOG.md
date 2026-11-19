@@ -1,3 +1,7 @@
+## 0.0.123
+
+- Depends on `@scalemule/sdk` 0.0.83 (was 0.0.80). No API or rendering changes.
+
 ## 0.0.120
 
 - Read the facts the jobs API now states as fields. `PublicJob` types `origin`, `employer_name`, `locality`, `region`, `apply_url`, `source_host` and `source_checked_at`; `parseJob` uses a filled field in place of the matching line in the posting's text and falls back to the text when the field is empty. Postings whose fields are empty (every posting today) read and render exactly as in 0.0.119. `apply_url` passes the same check as an address read from text: web addresses only, opened over https.
