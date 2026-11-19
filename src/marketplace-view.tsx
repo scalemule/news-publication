@@ -8,6 +8,7 @@ import {
   type PublicJob,
 } from "./marketplace";
 import {
+  applyButtonHost,
   dedupeJobs,
   filterJobs,
   formatJobDate,
@@ -260,7 +261,8 @@ export function JobArticle({ job, related = [], region, paper, category }: JobAr
   const view = parseJob(job);
   const others = relatedJobs(view, dedupeJobs(related.map(parseJob)));
   const applyHref = view.applyUrl ?? (view.applyEmail ? `mailto:${view.applyEmail}?subject=${encodeURIComponent(view.title)}` : undefined);
-  const applyLabel = view.applyUrl ? `Apply at ${view.applyHost ?? "the employer’s site"}` : "Apply by email";
+  const buttonHost = applyButtonHost(view.applyHost);
+  const applyLabel = view.applyUrl ? `Apply at ${buttonHost ?? "the employer’s site"}` : "Apply by email";
   const external = view.applyUrl ? OUTBOUND : {};
   const sourced = view.origin === "sourced";
   const source = jobSourceLine(view);

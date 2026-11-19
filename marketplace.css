@@ -12,10 +12,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   min-height: 44px;
   padding: 10px 18px;
   font: 700 13px/1.2 var(--pub-sans);
   text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
   border-radius: 3px;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -207,7 +209,8 @@
 .np-jobs .search { flex: 999 1 320px; display: flex; gap: 8px; min-width: 0; }
 .np-jobs .search input { flex: 1; min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(--pub-muted, #8a918b); border-radius: 3px; background: var(--pub-paper, #fff); color: var(--pub-ink, #171917); font: 16px/1.4 var(--pub-sans); }
 .np-jobs .search input:focus-visible { outline: 3px solid #a95c00; outline-offset: 2px; }
-.np-jobs .search button { min-height: 48px; padding: 0 18px; border: 1px solid var(--pub-rule, #d7dcd7); border-radius: 3px; background: var(--pub-soft, #f5f6f3); color: var(--pub-ink, #171917); font: 700 13px/1.2 var(--pub-sans); cursor: pointer; }
+.np-jobs .search button { flex: none; min-height: 48px; padding: 0 18px; border: 1px solid var(--pub-rule, #d7dcd7); border-radius: 3px; background: var(--pub-soft, #f5f6f3); color: var(--pub-ink, #171917); font: 700 13px/1.2 var(--pub-sans); white-space: nowrap; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease; }
+.np-jobs .search button:hover { border-color: var(--pub-ink, #171917); background: var(--pub-paper, #fff); }
 .np-jobs .views { display: flex; flex: 1 1 auto; border: 1px solid var(--pub-ink, #171917); border-radius: 3px; overflow: hidden; }
 .np-jobs .views a { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 16px; border-left: 1px solid var(--pub-ink, #171917); font: 600 13px/1.2 var(--pub-sans); white-space: nowrap; }
 .np-jobs .views a:first-child { border-left: 0; }
@@ -255,9 +258,9 @@
 .np-jobs .post h2 { margin: 0 0 4px; font: 600 26px/1.15 var(--pub-serif); letter-spacing: -0.02em; }
 .np-jobs .post p { margin: 0; font: 400 15px/1.5 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-jobs .postActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
-.np-jobs .button { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border: 1px solid var(--pub-ink, #171917); border-radius: 3px; background: var(--pub-paper, #fff); color: var(--pub-ink, #171917); font: 700 14px/1.2 var(--pub-sans); }
+.np-jobs .button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 48px; padding: 12px 22px; border: 1px solid var(--pub-ink, #171917); border-radius: 3px; background: var(--pub-paper, #fff); color: var(--pub-ink, #171917); font: 700 14px/1.2 var(--pub-sans); white-space: nowrap; transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease; }
 .np-jobs .button:hover { border-color: var(--pub-accent, #bb171d); color: var(--pub-accent, #bb171d); }
-.np-jobs .quiet { display: inline-flex; align-items: center; min-height: 44px; color: var(--pub-ink, #171917); font: 600 14px/1.3 var(--pub-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.np-jobs .quiet { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; color: var(--pub-ink, #171917); font: 600 14px/1.3 var(--pub-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
 
 .np-job .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 500 13px/1.4 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-job .crumbs a { display: inline-flex; align-items: center; min-height: 44px; }
@@ -277,15 +280,15 @@
 .np-job .prose p:not(.more) > a, .np-job .prose li > a { text-decoration: underline; text-underline-offset: 3px; }
 .np-job .prose .more { margin-top: 28px; padding: 20px 24px 9px; background: var(--pub-soft, #f5f6f3); font: 400 15px/1.55 var(--pub-sans); color: var(--pub-muted, #545c55); }
 .np-job .prose .more a { display: block; width: fit-content; max-width: 100%; margin-top: 2px; padding: 11px 0; color: var(--pub-accent, #bb171d); font-weight: 600; overflow-wrap: anywhere; }
-.np-job .facts { position: sticky; top: 16px; flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 20px; border-top: 3px solid var(--pub-ink, #171917); }
+.np-job .facts { position: sticky; top: 16px; flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding-top: 20px; border-top: 3px solid var(--pub-ink, #171917); }
 .np-job .payBlock { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 .np-job .payBlock .figure { font: 600 clamp(26px, 2.1vw, 30px)/1.12 var(--pub-serif); letter-spacing: -0.03em; }
 .np-job .facts dl { margin: 0; border-top: 1px solid var(--pub-rule, #d7dcd7); }
 .np-job .facts > dl:first-child { margin-top: -20px; border-top: 0; }
 .np-job .facts dl div { display: flex; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid var(--pub-rule, #d7dcd7); }
 .np-job .facts dt { flex: none; font: 400 14px/1.45 var(--pub-sans); color: var(--pub-muted, #545c55); }
-.np-job .facts dd { margin: 0; text-align: right; font: 600 14px/1.45 var(--pub-sans); }
-.np-jobs a.apply { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 56px; padding: 0 20px; border-radius: 3px; background: var(--pub-accent, #bb171d); color: #fff; font: 700 16px/1.2 var(--pub-sans); text-align: center; transition: filter 0.15s ease; }
+.np-job .facts dd { margin: 0; min-width: 0; text-align: right; font: 600 14px/1.45 var(--pub-sans); overflow-wrap: break-word; }
+.np-jobs a.apply { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; width: 100%; max-width: 100%; min-height: 56px; padding: 14px 16px; border-radius: 3px; background: var(--pub-accent, #bb171d); color: #fff; font: 700 15px/1.25 var(--pub-sans); text-align: center; overflow-wrap: anywhere; transition: filter 0.15s ease; }
 .np-jobs a.apply:hover { filter: brightness(0.9); }
 .np-job .facts .source { display: block; margin-top: 6px; overflow-wrap: anywhere; }
 .np-job .applyBar { display: none; }
@@ -315,7 +318,7 @@
   .np-job .sheet { margin-top: 24px; padding-bottom: 0; }
   .np-job .facts a.apply { display: none; }
   .np-job .applyBar { position: sticky; bottom: 0; z-index: 5; display: flex; flex: 1 1 100%; align-items: center; gap: 16px; margin-inline: calc(-1 * var(--pub-gutter, 16px)); padding: 10px var(--pub-gutter, 16px) calc(10px + env(safe-area-inset-bottom)); background: var(--pub-paper, #fff); border-top: 1px solid var(--pub-ink, #171917); }
-  .np-job .applyBar a.apply { flex: 1; min-height: 50px; }
+  .np-job .applyBar a.apply { flex: 1; width: auto; min-height: 50px; }
   .np-job .barPay { flex: none; max-width: 45%; font: 400 12px/1.4 var(--pub-sans); color: var(--pub-muted, #545c55); }
   .np-job .barPay strong { display: block; font: 600 15px/1.3 var(--pub-sans); color: var(--pub-ink, #171917); }
   .np-job .relatedGrid { margin-top: 40px; }

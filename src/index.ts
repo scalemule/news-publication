@@ -226,7 +226,9 @@ export type { PublicationRecord, PublicationSnapshot, SnapshotHooks, SyncSource,
 export type { ClassifiedCategory, ClassifiedListing, EmploymentType, JobOrigin, PreparedClassified, PreparedJob, PublicDeal, PublicDealOffer, PublicJob } from "./marketplace";
 export {
   JOB_PROFESSIONS,
+  applyButtonHost,
   classifyProfession,
+  cleanEmployerName,
   cleanJobTitle,
   dedupeJobs,
   filterJobs,
