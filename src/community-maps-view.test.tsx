@@ -56,3 +56,37 @@ describe("past-season contributor access", () => {
     expect(fetcher.mock.calls.every(([url]) => url === "/api/community-maps/collections/halloween-2026/submissions")).toBe(true);
   });
 });
+
+describe("neighborhoods inside a community map", () => {
+  it("passes places and the focused place through to the city guide", () => {
+    // The geography request never settles, so no map engine loads.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(
+      <PublicationCommunityMapPage
+        collection={collection}
+        mode="map"
+        areaId="area"
+        basePath="/holiday-lights"
+        atlas={{
+          ...atlas,
+          places: [
+            { id: "lozenets", name: "Лозенец", coordinates: [23.32, 42.67] },
+            { id: "center", name: "Център 🎄", coordinates: [23.32, 42.69] },
+          ],
+          focusPlace: "center",
+        }}
+      />,
+    );
+    const row = screen.getByRole("navigation", { name: "Neighborhoods in София" });
+    const buttons = Array.from(row.querySelectorAll("button"));
+    expect(buttons.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+      ["Лозенец", "false"],
+      ["Център 🎄", "true"],
+    ]);
+  });
+  it("shows no neighborhood row without places", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<PublicationCommunityMapPage collection={collection} mode="map" areaId="area" basePath="/holiday-lights" atlas={atlas} />);
+    expect(container.querySelector(".smca-places")).toBeNull();
+  });
+});

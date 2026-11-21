@@ -1,3 +1,7 @@
+## 0.0.125
+
+- Requires `@scalemule/react` 0.0.29 (peer, dev and dependency pins). `PublicationCommunityMapPage` passes the atlas config through unchanged, so a publication's `places` and `focusPlace` reach the city guide: a "Neighborhoods" row, neighborhood labels on the map, and a map that opens centred on the focused neighborhood. Pages without `places` are unchanged.
+
 ## 0.0.124
 
 - Shorten multi-label ATS tenant subdomains (`*.wd<N>.myworkdayjobs.com`, `job-boards.greenhouse.io`, `jobs.ashbyhq.com`, `jobs.lever.co`, `careers.*`) on the primary Apply button (`applyButtonHost`) and harden `.np-jobs a.apply`, `.np-jobs .button`, `.np-jobs .search button`, and `.np-market .primary/.secondary` button box-sizing and wrapping so long hostnames never overflow or clip on the job page.
