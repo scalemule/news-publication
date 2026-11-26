@@ -302,9 +302,9 @@
     "jsdom": "^29.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.3.0",
-    "tsup": "^8.5.0",
+    "tsup": "^9.0.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "scalemule",
