@@ -442,6 +442,10 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     const value = payload(response);
     if (typeof value.url !== "string" || typeof value.state !== "string" || !value.state) throw new Error("authorize");
     const url = authorizeUrl(value.url, value.state, callback, mode, c.issuerOrigin, input.selectAccount === true, c.clientId);
+    if (provider === "apple") {
+      const upstreams = new URL(url).searchParams.getAll("upstream");
+      if (upstreams.length !== 1 || upstreams[0] !== "apple_web") throw new Error("Apple provider was not selected");
+    }
     const cookies: CookieInstruction[] = [
       ...staleSession,
       { name: c.names.flow, value: sealReaderFlow({ state: value.state, subscribe: input.subscribe === true && mode === "interactive", returnTo: next, mode, provider, tx }, c.key, c.now()), maxAge: READER_SSO_FLOW_SECONDS },

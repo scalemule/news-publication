@@ -103,7 +103,8 @@ export function createCommunityReaderAuth(options: {
       }
       if (action === 'callback' && request.method === 'GET') {
         const result = await completeSignIn(config, {url, cookies: callbackCookies(jar, url.searchParams.get('state'), config.key)});
-        if (result.kind === 'signed-in' && names.signedOut !== PAW_SIGNED_OUT_COOKIE) result.cookies.push({name: PAW_SIGNED_OUT_COOKIE, value: '', maxAge: 0});
+        if (result.kind === 'signed-in' && jar(PAW_SIGNED_OUT_COOKIE) && names.signedOut !== PAW_SIGNED_OUT_COOKIE)
+          result.cookies.push({name: PAW_SIGNED_OUT_COOKIE, value: '', maxAge: 0});
         if (jar(PAW_FLOW_COOKIE)) result.cookies.push({name: PAW_FLOW_COOKIE, value: '', maxAge: 0});
         return authRedirect(origin, result.location, result.cookies);
       }
@@ -119,6 +120,8 @@ export function createCommunityReaderAuth(options: {
         }
         const result = await startSignIn(config, {mode: silent ? 'silent' : 'interactive',
           selectAccount: !silent && url.searchParams.get('select_account') === '1', provider, next: url.searchParams.get('next') || account, cookies: jar});
+        if (!silent && result.ok && jar(PAW_SIGNED_OUT_COOKIE) && names.signedOut !== PAW_SIGNED_OUT_COOKIE)
+          result.cookies.push({name: PAW_SIGNED_OUT_COOKIE, value: '', maxAge: 0});
         if (silent) {
           if (!result.ok) return authRedirect(origin, result.redirect, result.cookies);
           const response = authJson({}, 303, result.cookies);

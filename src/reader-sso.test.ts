@@ -60,7 +60,7 @@ function harness(options: { users?: Users; exchange?: ReaderSsoResponse; link?: 
       if (path.startsWith("/v1/auth/oauth/ledvery/authorize")) {
         const query = new URL(path, ORIGIN).searchParams;
         const prompt = query.get("prompt");
-        return options.authorize ?? { status: 200, body: { data: { url: `https://api.ledvery.com/authorize?client_id=napsite-paper&response_type=code&scope=openid+email+profile&nonce=n-1&state=st-1&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=abc${prompt ? `&prompt=${prompt}` : ""}`, state: "st-1" } } };
+        return options.authorize ?? { status: 200, body: { data: { url: `https://api.ledvery.com/authorize?client_id=napsite-paper&response_type=code&scope=openid+email+profile&nonce=n-1&state=st-1&redirect_uri=${encodeURIComponent(CALLBACK)}&code_challenge_method=S256&code_challenge=abc${query.get("upstream") ? `&upstream=${query.get("upstream")}` : ""}${prompt ? `&prompt=${prompt}` : ""}`, state: "st-1" } } };
       }
       if (path.startsWith("/v1/auth/oauth/ledvery/callback")) return options.exchange ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later, user: {}, is_new_user: true } } };
       if (path === "/v1/auth/oauth/ledvery/link") return options.link ?? { status: 200, body: { data: { session_token: "new-token", expires_at: later } } };
@@ -202,6 +202,18 @@ describe("startSignIn", () => {
       expect(openReaderFlow(result.cookies[0].value, KEY, NOW)).toMatchObject({ provider: "apple", subscribe });
     }
   });
+  it("does not redirect an Apple reader to a different or ambiguous provider", async () => {
+    const base = new URL("https://api.ledvery.com/authorize");
+    base.search = new URLSearchParams({ client_id: "napsite-paper", response_type: "code", scope: "openid email",
+      nonce: "n-1", state: "st-1", redirect_uri: CALLBACK, code_challenge_method: "S256", code_challenge: "abc" }).toString();
+    for (const suffix of ["", "&upstream=google", "&upstream=apple_web&upstream=google"]) {
+      const h = harness({ authorize: { status: 200, body: { data: { url: base.href + suffix, state: "st-1" } } } });
+      h.config.appleSignIn = true;
+      expect(await startSignIn(h.config, { mode: "interactive", provider: "apple", cookies: jar({}) }))
+        .toMatchObject({ ok: false, cookies: [], reason: "unavailable" });
+    }
+  });
+
   it("explicit sign-out suppresses a handoff but an old negative cache never blocks a new click", async () => {
     const signedOut = harness();
     const suppressed = await startSignIn(signedOut.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.signedOut]: "1" }) });
