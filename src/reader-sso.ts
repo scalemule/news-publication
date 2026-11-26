@@ -11,7 +11,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export type ReaderSsoMode = "interactive" | "silent";
-export type ReaderSsoProvider = "google" | "email";
+export type ReaderSsoProvider = "google" | "email" | "apple";
 export type ReaderSsoMethod = ReaderSsoProvider | "link" | "switch" | "unknown";
 
 export const READER_SSO_FLOW_SECONDS = 600;
@@ -167,6 +167,8 @@ export type ReaderSsoConfig = {
   issuerOrigin?: string;
   /** Explicit email sign-in through Ledvery (env LEDVERY_EMAIL_SIGNIN); off by default. */
   emailSignIn?: boolean;
+  /** Enable after this publication is registered with the network Apple Services ID. */
+  appleSignIn?: boolean;
   /** Emergency off switch for all Ledvery sign-in. */
   enabled?: boolean;
   /** Validates a local return path per mode; returns "" when the path is not allowed. */
@@ -294,7 +296,7 @@ export function openReaderFlow(
   if (typeof raw.expires !== "number" || !Number.isFinite(raw.expires) || raw.expires <= now) return null;
   const returnTo = typeof raw.returnTo === "string" ? raw.returnTo : "";
   if (returnTo && returnPath(returnTo, mode) !== returnTo) return null;
-  const provider = raw.provider === "google" || raw.provider === "email" ? raw.provider : undefined;
+  const provider = raw.provider === "google" || raw.provider === "email" || raw.provider === "apple" ? raw.provider : undefined;
   const tx = typeof raw.tx === "string" && /^[a-f0-9]{1,64}$/.test(raw.tx) ? raw.tx : undefined;
   // Newsletter consent is interactive-only: a silent check never subscribes,
   // whatever a (signed) flow cookie claims.
@@ -341,7 +343,7 @@ export function openPendingSession(cookie: string | undefined, key: string, now 
     userId: raw.userId,
     name: typeof raw.name === "string" ? raw.name : "",
     mode: raw.mode === "silent" ? "silent" : "interactive",
-    method: raw.method === "google" || raw.method === "email" || raw.method === "link" ? raw.method : "unknown",
+    method: raw.method === "google" || raw.method === "email" || raw.method === "apple" || raw.method === "link" ? raw.method : "unknown",
     returnTo: localReturnPath(raw.returnTo),
     subscribe: raw.subscribe === true,
     tx: typeof raw.tx === "string" ? raw.tx : undefined,
@@ -396,9 +398,12 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   const mode = input.mode === "silent" ? "silent" : "interactive";
   const next = c.returnPath(input.next ?? "", mode);
   const redirect = next || (mode === "silent" ? "/" : c.accountPath);
-  const provider: ReaderSsoProvider | undefined = mode === "silent" ? undefined : input.provider === "email" ? "email" : "google";
+  const provider: ReaderSsoProvider | undefined = mode === "silent" ? undefined : (input.provider ?? "google");
   if (c.enabled === false) {
     return { ok: false, status: 503, error: "Sign-in is temporarily unavailable. Please try again shortly.", reason: "disabled", redirect, cookies: [] };
+  }
+  if (provider === "apple" && !c.appleSignIn) {
+    return { ok: false, status: 404, error: "Apple sign-in is not available on this publication yet.", reason: "provider", redirect, cookies: [] };
   }
   if (provider === "email" && !c.emailSignIn) {
     return { ok: false, status: 404, error: "Email sign-in is not available on this publication yet.", reason: "provider", redirect, cookies: [] };
@@ -428,7 +433,8 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
   if (mode === "silent") query.set("prompt", "none");
   else {
     if (input.selectAccount === true) query.set("prompt", "select_account");
-    query.set("upstream", provider === "email" ? "scalemule_consumer" : "google");
+    const upstream: Record<ReaderSsoProvider, string> = { google: "google", email: "scalemule_consumer", apple: "apple_web" };
+    query.set("upstream", upstream[provider ?? "google"]);
   }
   try {
     const response = await c.request(`/v1/auth/oauth/ledvery/authorize?${query}`, { method: "GET" });
@@ -436,6 +442,10 @@ export async function startSignIn(config: ReaderSsoConfig, input: StartSignInInp
     const value = payload(response);
     if (typeof value.url !== "string" || typeof value.state !== "string" || !value.state) throw new Error("authorize");
     const url = authorizeUrl(value.url, value.state, callback, mode, c.issuerOrigin, input.selectAccount === true, c.clientId);
+    if (provider === "apple") {
+      const upstreams = new URL(url).searchParams.getAll("upstream");
+      if (upstreams.length !== 1 || upstreams[0] !== "apple_web") throw new Error("Apple provider was not selected");
+    }
     const cookies: CookieInstruction[] = [
       ...staleSession,
       { name: c.names.flow, value: sealReaderFlow({ state: value.state, subscribe: input.subscribe === true && mode === "interactive", returnTo: next, mode, provider, tx }, c.key, c.now()), maxAge: READER_SSO_FLOW_SECONDS },

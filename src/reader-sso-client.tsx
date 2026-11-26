@@ -6,7 +6,7 @@
  */
 import { useEffect, useId, useState } from "react";
 
-export type ReaderSsoProvider = "google" | "email";
+export type ReaderSsoProvider = "google" | "email" | "apple";
 
 // ---------------------------------------------------------------------------
 // Legacy silent sign-in helpers remain exported for compatibility. The SDK no
@@ -242,6 +242,10 @@ function GoogleMark() {
     </svg>
   );
 }
+// Apple-provided medium mark from the Sign in with Apple JS button.
+function AppleMark() {
+  return <svg width="20" height="24" viewBox="7 9 17 22" aria-hidden="true"><path fill="currentColor" d="M15.7099491,14.8846154 C16.5675461,14.8846154 17.642562,14.3048315 18.28274,13.5317864 C18.8625238,12.8312142 19.2852829,11.852829 19.2852829,10.8744437 C19.2852829,10.7415766 19.2732041,10.6087095 19.2490464,10.5 C18.2948188,10.5362365 17.1473299,11.140178 16.4588366,11.9494596 C15.9152893,12.56548 15.4200572,13.5317864 15.4200572,14.5222505 C15.4200572,14.6671964 15.4442149,14.8121424 15.4562937,14.8604577 C15.5166879,14.8725366 15.6133185,14.8846154 15.7099491,14.8846154 Z M12.6902416,29.5 C13.8618881,29.5 14.3812778,28.714876 15.8428163,28.714876 C17.3285124,28.714876 17.6546408,29.4758423 18.9591545,29.4758423 C20.2395105,29.4758423 21.0971074,28.292117 21.9063891,27.1325493 C22.8123013,25.8038779 23.1867451,24.4993643 23.2109027,24.4389701 C23.1263509,24.4148125 20.6743484,23.4122695 20.6743484,20.5979021 C20.6743484,18.1579784 22.6069612,17.0588048 22.7156707,16.974253 C21.4353147,15.1382708 19.490623,15.0899555 18.9591545,15.0899555 C17.5217737,15.0899555 16.3501271,15.9596313 15.6133185,15.9596313 C14.8161157,15.9596313 13.7652575,15.1382708 12.521138,15.1382708 C10.1536872,15.1382708 7.75,17.0950413 7.75,20.7911634 C7.75,23.0861411 8.64383344,25.513986 9.74300699,27.0842339 C10.6851558,28.4129053 11.5065162,29.5 12.6902416,29.5 Z" /></svg>;
+}
 function MailMark() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -252,6 +256,7 @@ function MailMark() {
 }
 
 export const LEDVERY_BUTTON_LABELS: Record<ReaderSsoProvider, { label: string; busy: string }> = {
+  apple: { label: "Continue with Apple", busy: "Opening Apple…" },
   google: { label: "Continue with Google", busy: "Opening Google…" },
   email: { label: "Continue with email", busy: "Opening sign-in…" },
 };
@@ -288,6 +293,7 @@ export function LedveryButton({
       <button
         type="button"
         className={classNames.button}
+        style={provider === "apple" ? { background: "#000", color: "#fff", minHeight: 44, paddingInline: 16, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 } : undefined}
         disabled={busy || disabled}
         aria-describedby={description ? descriptionId : undefined}
         onClick={async () => {
@@ -306,7 +312,9 @@ export function LedveryButton({
           }
         }}
       >
-        {provider === "google" ? <GoogleMark /> : <MailMark />}
+        {provider === "google" && <GoogleMark />}
+        {provider === "apple" && <AppleMark />}
+        {provider === "email" && <MailMark />}
         <span>{busy ? busyLabel ?? labels.busy : label ?? labels.label}</span>
       </button>
       {description && <p id={descriptionId} className={classNames.fine}>{description}</p>}
@@ -436,4 +444,23 @@ export function AccountSwitchPrompt({
       {error && <p role="alert" className={classNames.error}>{error}</p>}
     </div>
   );
+}
+
+/** Reader registration and ownership proof for standalone community accounts. */
+export function CommunityReaderSignIn({ next, challenge, switching, apple, email, accountName, policyOrigin }: {
+  next: string; challenge?: string; switching?: { current: string; pending: string } | null;
+  apple: boolean; email: boolean; accountName: string; policyOrigin: string;
+}) {
+  if (challenge) return <AccountLinkForm challengeId={challenge} next={next} endpoint="/api/paw-auth/ledvery-link" />;
+  if (switching) return <AccountSwitchPrompt currentName={switching.current} pendingName={switching.pending} endpoint="/api/paw-auth/switch" />;
+  const providers: ReaderSsoProvider[] = ["google"];
+  if (apple) providers.push("apple");
+  if (email) providers.push("email");
+  return <section aria-label="Reader sign-in">
+    <h1>Sign in or create a reader account</h1>
+    <p>Use your {accountName} account with Ledvery.</p>
+    {providers.map(provider => <LedveryButton key={provider} provider={provider} returnTo={next}
+      startPath={"/api/paw-auth/start?" + new URLSearchParams({provider, next})} />)}
+    <p><a href={new URL("/terms", policyOrigin).href}>Network Terms</a> · <a href={new URL("/privacy", policyOrigin).href}>Privacy Policy</a></p>
+  </section>;
 }

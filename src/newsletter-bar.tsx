@@ -20,7 +20,7 @@ import { NEWSLETTER_CONFIRMED_HASH } from "./newsletter-confirmation";
 
 export { NEWSLETTER_CONFIRMED_HASH, isPublicReadingPath, newsletterConfirmedLocation } from "./newsletter-confirmation";
 
-export type NewsletterBarChannel = "google" | "email";
+export type NewsletterBarChannel = "google" | "email" | "apple";
 export type NewsletterBarEvent =
   | { name: "viewed" }
   | { name: "dismissed" }
@@ -28,7 +28,7 @@ export type NewsletterBarEvent =
   | { name: "signup_started"; channel: NewsletterBarChannel }
   | { name: "signup_failed"; channel: NewsletterBarChannel; error: string }
   | { name: "confirmation_sent"; channel: "email" }
-  | { name: "confirmed"; channel: "google" };
+  | { name: "confirmed"; channel: "google" | "apple" | "reader_account" };
 
 /** Every visible and announced string, so a site can speak its readers' language. */
 export interface NewsletterBarLabels {
@@ -45,6 +45,7 @@ export interface NewsletterBarLabels {
   tryAgain: string;
   /** Fine print after the frequency: the consent sentence. */
   consent(publicationName: string, withGoogle: boolean): ReactNode;
+  accountConsent?(publicationName: string): ReactNode;
   privacy: string;
   /** @deprecated Kept for compatibility; the phone email choice now uses `emailToggle`. */
   useEmailInstead: string;
@@ -68,6 +69,7 @@ export const NEWSLETTER_BAR_LABELS_EN: NewsletterBarLabels = {
   invalidEmail: "Enter a valid email address.",
   tryAgain: "Please try again.",
   consent: (name, withGoogle) => `By subscribing you agree to receive ${name} emails${withGoogle ? "; with Google you also get a free reader account" : ""}. Unsubscribe anytime.`,
+  accountConsent: (name) => `Continuing with a sign-in provider creates or opens your free reader account and subscribes you to ${name} emails. Unsubscribe anytime.`,
   privacy: "Privacy",
   useEmailInstead: "Use email instead",
   emailToggle: "Or sign up with email",
@@ -124,6 +126,8 @@ export interface NewsletterBarProps {
   subscribedStorageKey?: string;
   /** Offer "Continue with Google" through Ledvery. Default true. */
   googleSignIn?: boolean;
+  /** Offer Apple for this publication’s explicit newsletter opt-in. Default false. */
+  appleSignIn?: boolean;
   /** Offer email-only sign-up with double opt-in. Default true. */
   emailSignUp?: boolean;
   startPath?: string;
@@ -182,6 +186,7 @@ export function NewsletterBar({
   confirmed = false,
   subscribedStorageKey,
   googleSignIn = true,
+  appleSignIn = false,
   emailSignUp = true,
   startPath = "/api/news/ledvery-start",
   emailEndpoint = "/api/news/email-subscribe",
@@ -202,7 +207,7 @@ export function NewsletterBar({
   const [email, setEmail] = useState<EmailState>({ status: "idle", error: "" });
   const [path, setPath] = useState(pathname ?? "");
   useEffect(() => { setPath(pathname ?? window.location.pathname); }, [pathname]);
-  if (!googleSignIn && !emailSignUp) return null;
+  if (!googleSignIn && !appleSignIn && !emailSignUp) return null;
 
   const emit = (event: NewsletterBarEvent) => { try { onEvent?.(event); } catch { /* analytics never breaks the bar */ } };
   const sent = email.status === "sent";
@@ -219,6 +224,13 @@ export function NewsletterBar({
         onStart={() => emit({ name: "signup_started", channel: "google" })}
       />
     : null;
+  const apple = appleSignIn && !sent
+    ? <LedveryButton provider="apple" subscribe startPath={startPath} returnTo={path}
+        description={labels.googleDescription(publicationName)}
+        classNames={{ wrapper: "sm-newsletter-bar__google", button: "sm-newsletter-bar__google-button", fine: "sm-conversion-bar__sr", error: "sm-newsletter-bar__error" }}
+        onStart={() => emit({ name: "signup_started", channel: "apple" })} />
+    : null;
+  const federated = Boolean(google || apple);
   const form = emailSignUp && !sent
     ? <EmailForm
         labels={labels}
@@ -227,7 +239,7 @@ export function NewsletterBar({
         cadence={cadence}
         path={path}
         state={email}
-        compact={Boolean(google)}
+        compact={federated}
         onState={setEmail}
         // Not converted until the reader confirms; the confirmed form sets the subscribed marker.
         onSent={() => { markConversionBarDismissed(id); emit({ name: "confirmation_sent", channel: "email" }); }}
@@ -243,11 +255,11 @@ export function NewsletterBar({
       title={sent ? labels.sentTitle : title ?? labels.title(publicationName)}
       description={sent ? undefined : description}
       brand={brand}
-      actions={sent ? null : google ? <div className="sm-newsletter-bar__primary">{google}{form && <EmailChoice label={labels.emailToggle} />}</div> : form}
-      secondary={google ? form : null}
+      actions={sent ? null : federated ? <div className="sm-newsletter-bar__primary">{google}{apple}{form && <EmailChoice label={labels.emailToggle} />}</div> : form}
+      secondary={federated ? form : null}
       fine={sent
         ? <Sent message={labels.sentMessage(publicationName)} />
-        : <Fine labels={labels} publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} />}
+        : <Fine labels={labels} publicationName={publicationName} frequency={frequency} privacyHref={privacyHref} google={Boolean(google)} apple={Boolean(apple)} />}
       pathname={path || undefined}
       suppressed={suppressed}
       suppressWhen={() => readSubscribed(subscribedStorageKey)}
@@ -261,7 +273,7 @@ export function NewsletterBar({
       onView={() => emit({ name: "viewed" })}
       onDismiss={() => emit({ name: "dismissed" })}
       onExpand={(open) => { if (open) emit({ name: "expanded" }); }}
-      onConfirm={() => emit({ name: "confirmed", channel: "google" })}
+      onConfirm={() => emit({ name: "confirmed", channel: appleSignIn ? "reader_account" : "google" })}
     />
   );
 }
@@ -295,10 +307,10 @@ function EmailChoice({ label }: { label: string }) {
   );
 }
 
-function Fine({ labels, publicationName, frequency, privacyHref, google }: { labels: NewsletterBarLabels; publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean }) {
+function Fine({ labels, publicationName, frequency, privacyHref, google, apple }: { labels: NewsletterBarLabels; publicationName: string; frequency: ReactNode; privacyHref: string; google: boolean; apple: boolean }) {
   return (
     <p>
-      {frequency} {labels.consent(publicationName, google)}{" "}
+      {frequency} {apple && labels.accountConsent ? labels.accountConsent(publicationName) : labels.consent(publicationName, google)}{" "}
       <a href={privacyHref}>{labels.privacy}</a>
     </p>
   );
