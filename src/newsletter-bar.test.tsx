@@ -74,6 +74,17 @@ describe("NewsletterBar", () => {
     expect(assign).toHaveBeenCalledWith("https://api.ledvery.com/authorize?x=1");
     expect(events).toContainEqual({ name: "signup_started", channel: "google" });
   });
+  it("Apple starts a subscribing Ledvery sign-in that returns to the story", async () => {
+    const events: NewsletterBarEvent[] = [];
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ url: "https://api.ledvery.com/authorize?x=1" }) });
+    render(<NewsletterBar appleSignIn publicationName="Lazy Tensor" pathname="/news/the-story" trigger={immediate} onEvent={(e) => events.push(e)} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Continue with Apple/ })); });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/news/ledvery-start");
+    expect(JSON.parse(init.body)).toEqual({ provider: "apple", subscribe: true, consent: true, returnTo: "/news/the-story" });
+    expect(assign).toHaveBeenCalledWith("https://api.ledvery.com/authorize?x=1");
+    expect(events).toContainEqual({ name: "signup_started", channel: "apple" });
+  });
 
   it("email sign-up posts consent with placement and story, then asks the reader to confirm", async () => {
     const events: NewsletterBarEvent[] = [];

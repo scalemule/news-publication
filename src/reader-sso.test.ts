@@ -189,6 +189,19 @@ describe("startSignIn", () => {
     expect(result.ok).toBe(true);
     expect(h.calls[0].path).toContain("upstream=scalemule_consumer");
   });
+  it("gates Apple and preserves the selected provider and explicit newsletter consent", async () => {
+    const h = harness();
+    expect(await startSignIn(h.config, { mode: "interactive", provider: "apple", cookies: jar({}) })).toMatchObject({ ok: false, status: 404 });
+    expect(h.calls).toHaveLength(0);
+    h.config.appleSignIn = true;
+    for (const subscribe of [false, true]) {
+      const result = await startSignIn(h.config, { mode: "interactive", provider: "apple", subscribe, cookies: jar({}) });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("Apple start failed");
+      expect(h.calls.at(-1)?.path).toContain("upstream=apple_web");
+      expect(openReaderFlow(result.cookies[0].value, KEY, NOW)).toMatchObject({ provider: "apple", subscribe });
+    }
+  });
   it("explicit sign-out suppresses a handoff but an old negative cache never blocks a new click", async () => {
     const signedOut = harness();
     const suppressed = await startSignIn(signedOut.config, { mode: "silent", next: "/news/x", cookies: jar({ [names.signedOut]: "1" }) });
