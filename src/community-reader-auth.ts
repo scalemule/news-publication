@@ -53,6 +53,7 @@ export function createCommunityReaderAuth(options: {
   issuerOrigin: string;
   enabled: boolean;
   appleSignIn: boolean;
+  emailSignIn: boolean;
 }) {
   const names = readerSsoCookieNames(options.prefix);
   const account = options.accountPath;
@@ -72,7 +73,7 @@ export function createCommunityReaderAuth(options: {
       prefix: options.prefix, key: config.apiKey, origin: new URL(config.origin).origin,
       clientId: options.clientId, callbackPath: '/api/paw-auth/callback', accountPath: account,
       issuerOrigin: options.issuerOrigin,
-      enabled: options.enabled, emailSignIn: true,
+      enabled: options.enabled, emailSignIn: options.emailSignIn,
       appleSignIn: options.appleSignIn,
       request: async (path, init) => {
         if (!path.startsWith('/v1/auth/') || path.includes('..')) throw new Error('Invalid auth path');

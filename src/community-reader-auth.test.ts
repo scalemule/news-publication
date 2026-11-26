@@ -7,7 +7,7 @@ function reader(appleSignIn = false) {
   return createCommunityReaderAuth({
     resolve: async () => ({ origin, apiKey: "fixture", gatewayUrl: "https://gateway.example", collectionSlug: "pets", clientContext: {} }),
     clientId: "network-reader", prefix: "__Host-toy", accountPath: "/account",
-    issuerOrigin: "https://identity.example", enabled: true, appleSignIn,
+    issuerOrigin: "https://identity.example", enabled: true, appleSignIn, emailSignIn: false,
   });
 }
 describe("community reader adoption", () => {
@@ -27,6 +27,12 @@ describe("community reader adoption", () => {
       expect(res.status).toBe(status);
       expect(res.headers.get("set-cookie")).toBeNull();
     }
+  });
+  it("keeps shared email off until the site's ownership flow is ready", async () => {
+    const response = await reader().route(new Request(origin + "/api/paw-auth/start?provider=email",
+      {method:"POST",headers:{origin,"content-type":"application/json"}}), "start");
+    expect(response.status).toBe(404);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
   it("preserves an existing reader session when Auth cannot verify its status", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({error:{code:"UPSTREAM_ERROR"}},{status:503})));

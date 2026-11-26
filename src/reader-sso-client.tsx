@@ -447,13 +447,15 @@ export function AccountSwitchPrompt({
 }
 
 /** Reader registration and ownership proof for standalone community accounts. */
-export function CommunityReaderSignIn({ next, challenge, switching, apple, accountName, policyOrigin }: {
+export function CommunityReaderSignIn({ next, challenge, switching, apple, email, accountName, policyOrigin }: {
   next: string; challenge?: string; switching?: { current: string; pending: string } | null;
-  apple: boolean; accountName: string; policyOrigin: string;
+  apple: boolean; email: boolean; accountName: string; policyOrigin: string;
 }) {
   if (challenge) return <AccountLinkForm challengeId={challenge} next={next} endpoint="/api/paw-auth/ledvery-link" />;
   if (switching) return <AccountSwitchPrompt currentName={switching.current} pendingName={switching.pending} endpoint="/api/paw-auth/switch" />;
-  const providers: ReaderSsoProvider[] = apple ? ["google", "apple", "email"] : ["google", "email"];
+  const providers: ReaderSsoProvider[] = ["google"];
+  if (apple) providers.push("apple");
+  if (email) providers.push("email");
   return <section aria-label="Reader sign-in">
     <h1>Sign in or create a reader account</h1>
     <p>Use your {accountName} account with Ledvery.</p>
