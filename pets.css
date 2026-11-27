@@ -1734,3 +1734,36 @@
     text-align: left;
   }
 }
+
+/* Shelter listings: lost and found notices and adoptable pets. */
+.paw-listings {
+  margin-bottom: 34px;
+}
+.paw-listing .paw-photo img {
+  aspect-ratio: 1/1;
+  background: var(--paw-green);
+}
+.paw-listing .paw-photo-empty {
+  aspect-ratio: 1/1;
+}
+.paw-listing .paw-source {
+  margin: 10px 0 0;
+  line-height: 1.6;
+}
+.paw-listing .paw-source small {
+  color: var(--paw-muted);
+  font-size: inherit;
+}
+.paw-listing .paw-source a {
+  min-height: 0;
+  padding: 8px 0 2px;
+}
+.paw-listing-pages {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 0 0 34px;
+  color: var(--paw-muted);
+  font-size: 14px;
+}

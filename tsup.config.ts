@@ -9,6 +9,8 @@ export default defineConfig({
     "pets-interactions": "src/pets-interactions.tsx",
     "pets-publication": "src/pets-publication.tsx",
     "pets-server": "src/pets-server.ts",
+    "pets-listings": "src/pets-listings.ts",
+    "pets-listings-view": "src/pets-listings-view.tsx",
     "community-reader-auth": "src/community-reader-auth.ts",
     "pets-auth-server": "src/pets-auth-server.ts",
     "reader-sso": "src/reader-sso.ts",

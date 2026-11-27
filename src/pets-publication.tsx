@@ -4,9 +4,12 @@ import { PetCommunityMemory } from "@scalemule/news-publication/pets-interaction
 import {
   petRequest,
   petAcknowledgments,
+  petListingsOrNone,
   resolvePetReferences,
   type PetScope,
 } from "./pets-server";
+import { selectPetListings, type PetListingKind } from "./pets-listings";
+import { PetListingSection, PET_LISTING_TEXT } from "./pets-listings-view";
 import {
   resolvePetCommunity,
   type PetCommunity,
@@ -33,9 +36,12 @@ export async function PublicationPetsSection({
   walksUrl,
   native = false,
   cleanCaption = (v) => v,
+  publication,
 }: {
   scope: PetScope;
   query: PetPageQuery;
+  /** The paper's name in the shelter datasets; omit to list the whole Bay Area. */
+  publication?: string;
   region: string;
   canonicalOrigin: string;
   defaultCommunity?: string;
@@ -95,7 +101,27 @@ export async function PublicationPetsSection({
       week: monday.toISOString().split("T")[0],
     });
     if (chosen) weekly.set("area_id", chosen.id);
-    const [feeds, spotlights, acknowledgments] = await Promise.all([
+    // Shelter listings: the paper's own area, or the town a reader chose.
+    const picked = query.community ? chosen?.slug : undefined;
+    const browse = native ? "/pets/browse" : canonicalOrigin + "/browse";
+    const shelterListings = async (kind: PetListingKind) => {
+      const listings = selectPetListings(await petListingsOrNone(scope, kind), {
+        publication,
+        areaSlug: picked,
+      });
+      if (!listings.length) return undefined;
+      return (
+        <PetListingSection
+          listings={listings}
+          heading={PET_LISTING_TEXT[kind].heading}
+          limit={6}
+          moreHref={`${browse}/${kind}${picked ? "?community=" + encodeURIComponent(picked) : ""}`}
+          moreLabel={kind === "adoption" ? `See all ${listings.length} pets` : `See all ${listings.length} notices`}
+          gateway={new URL(scope.gatewayUrl).origin}
+        />
+      );
+    };
+    const [feeds, spotlights, acknowledgments, lostFoundListings, adoptionListings] = await Promise.all([
       Promise.all(
         ["neighbors", "lost_found", "celebration", "adoption"].map((kind) => {
           const q = new URLSearchParams(filter);
@@ -109,6 +135,8 @@ export async function PublicationPetsSection({
       ),
       petRequest<{ items: PetResource[] }>(scope, root + "/pets?" + weekly),
       petAcknowledgments(scope, chosen?.slug),
+      shelterListings("lost_found"),
+      shelterListings("adoption"),
     ]);
     const clean = (r: PetResource) => ({
       ...r,
@@ -138,6 +166,8 @@ export async function PublicationPetsSection({
           accountUrl={native ? "/pets/account" : undefined}
           communities={collection.areas}
           community={chosen}
+          lostFoundListings={lostFoundListings}
+          adoptionListings={adoptionListings}
           acknowledgments={acknowledgments}
           resources={feeds.flatMap((feed) => feed.items).map(clean)}
           spotlight={spotlights.items[0] && clean(spotlights.items[0])}

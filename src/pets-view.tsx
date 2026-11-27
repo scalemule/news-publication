@@ -369,6 +369,9 @@ export type PetsSectionProps = {
   browseBasePath?: string;
   eventsUrl?: string;
   accountUrl?: string;
+  /** Shelter listings shown in the lost-and-found and adoption sections. */
+  lostFoundListings?: React.ReactNode;
+  adoptionListings?: React.ReactNode;
 };
 export function PetsSection({
   name = "Bay Area Paw",
@@ -391,6 +394,8 @@ export function PetsSection({
   browseBasePath = "/browse",
   eventsUrl,
   accountUrl,
+  lostFoundListings,
+  adoptionListings,
 }: PetsSectionProps) {
   const cover = resolveCover(coverPhoto);
   const coverCreditUrl = safeCoverUrl(cover.credit_url);
@@ -645,6 +650,7 @@ export function PetsSection({
               <h2>Let’s help them get home.</h2>
               <p>Lost & found is always free.</p>
             </div>
+            {lostFoundListings}
             {notices.length ? (
               <div className="paw-gallery">
                 {notices.map((r) => (
@@ -658,7 +664,7 @@ export function PetsSection({
                 ))}
               </div>
             ) : (
-              <p>No current, reviewed notices in this community.</p>
+              !lostFoundListings && <p>No current, reviewed notices in this community.</p>
             )}
             <p className="paw-safety">{PET_SAFETY.recovery}</p>
             <a
@@ -711,6 +717,7 @@ export function PetsSection({
                   organizations.
                 </p>
               </div>
+              {adoptionListings}
               {adoptions.length ? (
                 <div className="paw-gallery">
                   {adoptions.map((r) => (
@@ -723,7 +730,7 @@ export function PetsSection({
                     />
                   ))}
                 </div>
-              ) : (
+              ) : adoptionListings ? null : (
                 <p className="paw-empty">
                   Our editors are gathering official shelter and rescue
                   listings. Check directly with your local organization for
