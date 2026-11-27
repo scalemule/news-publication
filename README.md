@@ -310,30 +310,6 @@ and its current reader token. Mount publication pages at `/pets/account`,
 `/pets/submit`, `/pets/:id` and `/pets/browse/:kind`. `native` on the publication
 section, references and calendar keeps resource links inside the publication.
 
-### Shelter listings (lost and found, adoptable pets)
-
-`pets-listings` and `pets-listings-view` show two published Knowledge datasets
-(`us.ca.pets.lost_found`, `us.ca.pets.adoptable`) the way a paper shows its
-business directory: on the paper's own pages, with no reader byline, each card
-linking to the shelter's or the notice's own page. `petListings(scope, kind)` in
-`pets-server` reads a dataset with the host's own key (no reader session) and
-keeps it for ten minutes; `selectPetListings` filters by paper, town, species
-and lost/found; `PetListingSection` renders a page of cards.
-`PublicationPetsSection` and `PetBrowsePage` take a `publication` name (the
-paper's name in the datasets, for example `walnutcreektimes`) and place the
-listings above what neighbors shared; without it they list the whole Bay Area.
-
-What a card may show is decided in `pets-listings.ts`, not by the host. The
-records are other people's typing, so nothing is taken on trust: a notice's
-free text is never shown (it carries phone numbers and house addresses); a
-short field (breed, shelter name) is shown only when it holds no long number,
-`@` or `#`; a house or apartment number is never shown with where a pet was
-last seen; the only phone number is a shelter's own line on a stray-hold
-notice, and only when the field is one plain number; a named pet reported twice
-the same day is shown once; a listing nobody has checked for 14 days is left
-out. The list is kept for ten minutes, then served stale while one read
-refreshes it, so a platform outage never empties or slows a page.
-
 Configure `createPawAuthHandler` with the host’s existing `sessionCookie`,
 `callbackPath` and `accountPath`. An existing callback should dispatch to this
 handler only when `openPawFlow(pawCookie(request, PAW_FLOW_COOKIE), state, key)`
