@@ -1,6 +1,8 @@
 /** Native server-rendered pet pages. The host supplies its existing reader session. */
 import React from "react";
-import { petRequest, type PetScope } from "./pets-server";
+import { petRequest, petListingsOrNone, type PetScope } from "./pets-server";
+import { isPetListingKind, selectPetListings } from "./pets-listings";
+import { PetListingSection, PET_LISTING_TEXT } from "./pets-listings-view";
 import {
   PET_UUID,
   PET_SAFETY,
@@ -442,16 +444,37 @@ export async function PetBrowsePage({
   kind,
   query,
   paths = publicationPetPaths,
+  publication,
 }: {
   scope: PetScope;
   kind: string;
   query: Record<string, string | undefined>;
   paths?: PetPluginPaths;
+  /** The paper's name in the shelter datasets; omit to list the whole Bay Area. */
+  publication?: string;
 }) {
   let body: React.ReactNode;
   try {
     const collection = await petCollectionRequest<Collection>(scope),
       chosen = resolvePetCommunity(collection.areas, query.community);
+    // Shelter listings come first: lost and found notices, adoptable pets.
+    const listings = isPetListingKind(kind)
+      ? selectPetListings(await petListingsOrNone(scope, kind), {
+          publication,
+          areaSlug: chosen?.slug,
+          species: query.species,
+          notice: query.notice,
+        })
+      : [];
+    const listingPage = (page: number) => {
+      const address = new URLSearchParams(
+        Object.entries(query).filter(
+          (e): e is [string, string] => typeof e[1] === "string" && e[0] !== "after" && e[0] !== "listings",
+        ),
+      );
+      if (page > 1) address.set("listings", String(page));
+      return "?" + address;
+    };
     const filter = new URLSearchParams({ kind });
     if (chosen) filter.set("area_id", chosen.id);
     for (const key of ["after", "species", "category"])
@@ -494,8 +517,32 @@ export async function PetBrowsePage({
             Species
             <input name="species" maxLength={50} defaultValue={query.species} />
           </label>
+          {kind === "lost_found" && (
+            <label>
+              Notices
+              <select name="notice" defaultValue={query.notice || ""}>
+                <option value="">Lost and found</option>
+                <option value="lost">Lost</option>
+                <option value="found">Found</option>
+              </select>
+            </label>
+          )}
           <button>Browse</button>
         </form>
+        {isPetListingKind(kind) && (
+          <PetListingSection
+            listings={listings}
+            {...PET_LISTING_TEXT[kind]}
+            page={Number(query.listings) || 1}
+            pageHref={listingPage}
+            gateway={new URL(scope.gatewayUrl).origin}
+          />
+        )}
+        {listings.length > 0 && (
+          <div className="paw-section-heading">
+            <h2>Shared by neighbors</h2>
+          </div>
+        )}
         {result.items.length ? (
           <div className="paw-gallery">
             {result.items.map((r) => (

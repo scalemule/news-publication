@@ -2,6 +2,13 @@
 import { buildClientContextHeaders, type ClientContext } from "@scalemule/sdk";
 import type { PublicAcknowledgment } from "./sponsorships";
 import { PET_SLUG, PET_UUID, petReferences, type PetResource } from "./pets";
+import {
+  PET_LISTING_DATASETS,
+  petListing,
+  type PetListing,
+  type PetListingKind,
+  type PetListingRecord,
+} from "./pets-listings";
 export type PetScope = {
   apiKey: string;
   gatewayUrl: string;
@@ -361,6 +368,73 @@ export async function petAcknowledgments(
     return groups.flat().slice(0, 2);
   } catch {
     console.warn("paw.sponsorship_delivery_unavailable");
+    return [];
+  }
+}
+
+const LISTING_TTL_MS = 10 * 60 * 1000;
+const LISTING_PAGES = 30;
+const listingCache = new Map<string, { at: number; value: Promise<PetListing[]> }>();
+/** Tests start from an empty list. */
+export function forgetPetListings() {
+  listingCache.clear();
+}
+/** Every listing of one published dataset (lost and found, or adoptable
+ * pets), read with the host's own key and no reader session, and kept for ten
+ * minutes so a page does not read the dataset again for every visitor. When
+ * the platform cannot be reached the last list is served; with none, it throws. */
+export function petListings(
+  scope: PetScope,
+  kind: PetListingKind,
+  options: { dataset?: string; fetcher?: typeof fetch; now?: () => number } = {},
+): Promise<PetListing[]> {
+  const dataset = options.dataset || PET_LISTING_DATASETS[kind];
+  if (!/^[a-z0-9._-]{1,120}$/.test(dataset)) return Promise.reject(new Error("Invalid dataset"));
+  const now = (options.now || Date.now)();
+  const key = [scope.gatewayUrl, scope.apiKey, dataset, kind].join("\n");
+  const kept = listingCache.get(key);
+  if (kept && now - kept.at < LISTING_TTL_MS) return kept.value;
+  // The list is the same for every reader: no session, no reader address.
+  const anonymous: PetScope = { ...scope, accessToken: undefined, clientContext: {} };
+  const value = (async () => {
+    const listings: PetListing[] = [];
+    let after: string | undefined;
+    for (let page = 0; page < LISTING_PAGES; page++) {
+      const query = new URLSearchParams({ entity_type: "BUSINESS", limit: "100" });
+      if (after) query.set("after", after);
+      const body = await petRequest<{ items?: PetListingRecord[]; next_cursor?: string | null }>(
+        anonymous,
+        `/v1/knowledge/datasets/${dataset}/search?${query}`,
+        {},
+        options.fetcher,
+      );
+      const items = Array.isArray(body?.items) ? body.items : [];
+      for (const record of items) {
+        const listing = petListing(kind, record);
+        if (listing) listings.push(listing);
+      }
+      if (!items.length || !body.next_cursor) break;
+      after = body.next_cursor;
+    }
+    return listings;
+  })();
+  listingCache.set(key, { at: now, value });
+  value.catch(() => {
+    if (listingCache.get(key)?.value !== value) return;
+    if (kept) listingCache.set(key, { at: now - LISTING_TTL_MS + 60_000, value: kept.value });
+    else listingCache.delete(key);
+  });
+  return kept ? value.catch(() => kept.value) : value;
+}
+/** The same, for a page that must still render when the list cannot be read. */
+export async function petListingsOrNone(
+  scope: PetScope,
+  kind: PetListingKind,
+  options?: Parameters<typeof petListings>[2],
+): Promise<PetListing[]> {
+  try {
+    return await petListings(scope, kind, options);
+  } catch {
     return [];
   }
 }
