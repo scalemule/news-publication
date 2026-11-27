@@ -98,7 +98,7 @@ export function PetListingCard({
           </a>
         )}
         {listing.shelterPhone && shelter && (
-          <a href={`tel:${listing.shelterPhone.replace(/[^\d+]/g, "")}`}>
+          <a href={`tel:${listing.shelterPhone}`}>
             Call {possessive(shelter)} line: {petListingPhone(listing.shelterPhone)}
           </a>
         )}

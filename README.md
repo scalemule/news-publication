@@ -323,11 +323,16 @@ and lost/found; `PetListingSection` renders a page of cards.
 paper's name in the datasets, for example `walnutcreektimes`) and place the
 listings above what neighbors shared; without it they list the whole Bay Area.
 
-What a card may show is decided in `pets-listings.ts`, not by the host: a
-notice's free text is never shown (it carries phone numbers and house
-addresses), a house number is dropped from where a pet was last seen, the only
-phone number is the shelter's own line on a stray-hold notice, a pet reported
-twice is shown once, and a listing nobody has checked for 14 days is left out.
+What a card may show is decided in `pets-listings.ts`, not by the host. The
+records are other people's typing, so nothing is taken on trust: a notice's
+free text is never shown (it carries phone numbers and house addresses); a
+short field (breed, shelter name) is shown only when it holds no long number,
+`@` or `#`; a house or apartment number is never shown with where a pet was
+last seen; the only phone number is a shelter's own line on a stray-hold
+notice, and only when the field is one plain number; a named pet reported twice
+the same day is shown once; a listing nobody has checked for 14 days is left
+out. The list is kept for ten minutes, then served stale while one read
+refreshes it, so a platform outage never empties or slows a page.
 
 Configure `createPawAuthHandler` with the host’s existing `sessionCookie`,
 `callbackPath` and `accountPath`. An existing callback should dispatch to this
