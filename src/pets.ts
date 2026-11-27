@@ -54,7 +54,57 @@ export type PetResource = {
   media: PetPhoto[];
   expires_at?: string | null;
   reunited_at?: string | null;
+  /** "shelter_record": a card made from a shelter's or a public board's own list. */
+  origin?: string | null;
+  /** The town the record itself names. `area_id` only says which paper it is local to. */
+  locality?: string | null;
+  listing?: {
+    custody?: "shelter_hold" | "owner_report" | "finder_report" | "public_report" | null;
+    named?: boolean;
+    happened_on?: string | null;
+    place?: string | null;
+    shelter?: string | null;
+    shelter_phone?: string | null;
+    checked_at?: string | null;
+  } | null;
 };
+/** Who a card is from: a neighbor shared it, a person posted a notice, or a shelter listed it. */
+export function petCredit(resource: PetResource): string | null {
+  const who = resource.content.attribution?.trim();
+  if (!who) return null;
+  if (resource.origin !== "shelter_record") return `Shared by ${who}`;
+  const custody = resource.listing?.custody;
+  return custody && custody !== "shelter_hold"
+    ? `Posted by ${who}`
+    : `From ${who}`;
+}
+/** The heading of a pet's own page. */
+export function petHeadline(resource: PetResource): string {
+  const c = resource.content;
+  if (c.category === "memorial") return `Remembering ${c.name}.`;
+  if (resource.kind === "lost" || resource.kind === "found") {
+    // An unnamed notice is already called "Found cat".
+    if (resource.listing?.named === false) return `${c.name}.`;
+    return `${resource.kind === "lost" ? "Lost" : "Found"}: ${c.name}.`;
+  }
+  return `Meet ${c.name}.`;
+}
+/** A shelter's own line, for a link and for reading: "+19256088400" → "(925) 608-8400". */
+export function shelterPhone(
+  resource: PetResource,
+): { href: string; text: string } | null {
+  const line = resource.listing?.shelter_phone;
+  const digits = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(line || "");
+  if (!line || !digits) return null;
+  return {
+    href: `tel:${line}`,
+    text: `(${digits[1]}) ${digits[2]}-${digits[3]}`,
+  };
+}
+/** The town printed on a card: the record's own town, or else the view's community. */
+export function petPlace(resource: PetResource, community: string): string {
+  return resource.locality?.trim() || community;
+}
 export type OwnPetResource = PetResource & {
   visibility: "public" | "private";
   status:

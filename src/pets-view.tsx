@@ -3,6 +3,8 @@ import { PawBayIllustration } from "./pets-art";
 import {
   adoptionAvailability,
   PET_SAFETY,
+  petCredit,
+  petPlace,
   safePetLink,
   type PetCommunity,
   type PetResource,
@@ -126,12 +128,18 @@ function ResourceCard(
   props: ResourceProps & { label: string; memorial?: boolean },
 ) {
   const href = safePetLink(props.href);
+  const credit = petCredit(props.resource);
+  // A shelter record says where and under which number: what someone needs to recognize a pet.
+  const facts =
+    props.resource.origin === "shelter_record"
+      ? props.resource.content.personality?.trim()
+      : "";
   return (
     <article className={`paw-resource${props.memorial ? " paw-memorial" : ""}`}>
       <Photo {...props} />
       <div className="paw-resource-copy">
         <p className="paw-context">
-          {props.label} · {props.community}
+          {props.label} · {petPlace(props.resource, props.community)}
         </p>
         <h3>
           {href ? (
@@ -141,11 +149,8 @@ function ResourceCard(
           )}
         </h3>
         <p>{props.resource.content.story}</p>
-        {props.resource.content.attribution && (
-          <p className="paw-credit">
-            Shared by {props.resource.content.attribution}
-          </p>
-        )}
+        {facts && <p className="paw-credit">{facts}</p>}
+        {credit && <p className="paw-credit">{credit}</p>}
       </div>
     </article>
   );
@@ -166,11 +171,13 @@ export function PetCelebrationCard(props: ResourceProps) {
     />
   );
 }
-export function LostPetNotice(props: ResourceProps) {
+/** `safety={false}` where the list prints the safety note once under all its notices. */
+export function LostPetNotice(props: ResourceProps & { safety?: boolean }) {
+  const { safety = true, ...card } = props;
   return (
     <div className="paw-notice">
       <ResourceCard
-        {...props}
+        {...card}
         label={
           props.resource.reunited_at
             ? "Reported reunited"
@@ -179,7 +186,7 @@ export function LostPetNotice(props: ResourceProps) {
               : "Lost pet"
         }
       />
-      <p className="paw-safety">{PET_SAFETY.recovery}</p>
+      {safety && <p className="paw-safety">{PET_SAFETY.recovery}</p>}
     </div>
   );
 }
@@ -650,6 +657,7 @@ export function PetsSection({
                 {notices.map((r) => (
                   <LostPetNotice
                     key={r.id}
+                    safety={false}
                     resource={r}
                     community={local(r.area_id)}
                     href={link(r.id)}
