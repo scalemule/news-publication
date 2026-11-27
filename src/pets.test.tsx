@@ -251,6 +251,23 @@ describe("shelter record cards", () => {
     expect(
       petCredit(record({ origin: undefined, listing: undefined })),
     ).toBe("Shared by Contra Costa County Animal Services (Martinez)");
+    // An organizer's own calendar is not a neighbor's post.
+    const organizers = (attribution: string) =>
+      record({
+        kind: "event",
+        origin: "organizer",
+        listing: undefined,
+        content: { ...record({}).content, attribution },
+      });
+    expect(petCredit(organizers("East Bay SPCA"))).toBe(
+      "From East Bay SPCA’s calendar",
+    );
+    expect(petCredit(organizers("Joybound People & Pets"))).toBe(
+      "From Joybound People & Pets’ calendar",
+    );
+    expect(petCredit(organizers("Приют «Лапа» 🐾"))).toBe(
+      "From Приют «Лапа» 🐾’s calendar",
+    );
     expect(petPlace(record({ locality: "  " }), "Pleasant Hill")).toBe(
       "Pleasant Hill",
     );

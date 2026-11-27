@@ -88,7 +88,13 @@ function Photo({
     return (
       <div className="paw-photo-empty">
         <PawMark size={64} />
-        <span>A story from your community</span>
+        <span>
+          {resource.origin === "organizer"
+            ? "From the organizer’s calendar"
+            : resource.origin === "shelter_record"
+              ? "No picture"
+              : "A story from your community"}
+        </span>
       </div>
     );
   const separator = src.includes("?") ? "&" : "?";
@@ -224,7 +230,14 @@ export function PetEventCard(props: ResourceProps) {
     source = props.resource.content.source;
   return (
     <div>
-      <ResourceCard {...props} label="Pet community event" />
+      <ResourceCard
+        {...props}
+        label={
+          props.resource.origin === "organizer"
+            ? "Pet event"
+            : "Pet community event"
+        }
+      />
       {event && (
         <p className="paw-source">
           <time dateTime={event.starts_at}>

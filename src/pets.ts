@@ -54,7 +54,10 @@ export type PetResource = {
   media: PetPhoto[];
   expires_at?: string | null;
   reunited_at?: string | null;
-  /** "shelter_record": a card made from a shelter's or a public board's own list. */
+  /**
+   * "shelter_record": a card made from a shelter's or a public board's own list.
+   * "organizer": an event read from the organizer's own published calendar.
+   */
   origin?: string | null;
   /** The town the record itself names. `area_id` only says which paper it is local to. */
   locality?: string | null;
@@ -68,10 +71,16 @@ export type PetResource = {
     checked_at?: string | null;
   } | null;
 };
-/** Who a card is from: a neighbor shared it, a person posted a notice, or a shelter listed it. */
+/**
+ * Who a card is from: a neighbor shared it, a person posted a notice, a
+ * shelter listed it, or an organizer put it on their own calendar. Nobody
+ * should take an organizer's event for a neighbor's post, or the other way.
+ */
 export function petCredit(resource: PetResource): string | null {
   const who = resource.content.attribution?.trim();
   if (!who) return null;
+  if (resource.origin === "organizer")
+    return `From ${who}${/s$/i.test(who) ? "’" : "’s"} calendar`;
   if (resource.origin !== "shelter_record") return `Shared by ${who}`;
   const custody = resource.listing?.custody;
   return custody && custody !== "shelter_hold"
