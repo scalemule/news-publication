@@ -114,6 +114,7 @@ export async function PublicationPetsSection({
         <PetListingSection
           listings={listings}
           heading={PET_LISTING_TEXT[kind].heading}
+          inside
           limit={6}
           moreHref={`${browse}/${kind}${picked ? "?community=" + encodeURIComponent(picked) : ""}`}
           moreLabel={kind === "adoption" ? `See all ${listings.length} pets` : `See all ${listings.length} notices`}

@@ -1767,3 +1767,18 @@
   color: var(--paw-muted);
   font-size: 14px;
 }
+/* On the front of the pets section the listings sit inside a section that
+   already has a heading; in the half-width column they go two a row. */
+.paw-listings-title {
+  font-size: 22px;
+  margin: 0 0 18px;
+}
+.paw-discover-pair .paw-listings .paw-gallery {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+@media (max-width: 480px) {
+  .paw-discover-pair .paw-listings .paw-gallery {
+    grid-template-columns: 1fr;
+  }
+}

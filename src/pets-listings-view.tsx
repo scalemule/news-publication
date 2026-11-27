@@ -119,10 +119,13 @@ export function PetListingSection({
   moreLabel,
   now = new Date(),
   gateway,
+  inside = false,
 }: {
   listings: readonly PetListing[];
   heading: string;
   intro?: string;
+  /** Inside a section that has its own heading: a smaller heading, no intro. */
+  inside?: boolean;
   limit?: number;
   page?: number;
   /** The address of another page of the same list (the browse pages). */
@@ -138,11 +141,15 @@ export function PetListingSection({
   const current = Math.min(Math.max(1, Math.trunc(page) || 1), pages);
   const shown = listings.slice((current - 1) * limit, current * limit);
   return (
-    <div className="paw-listings">
-      <div className="paw-section-heading">
-        <h2>{heading}</h2>
-        {intro && <p>{intro}</p>}
-      </div>
+    <div className={inside ? "paw-listings paw-listings-inside" : "paw-listings"}>
+      {inside ? (
+        <h3 className="paw-listings-title">{heading}</h3>
+      ) : (
+        <div className="paw-section-heading">
+          <h2>{heading}</h2>
+          {intro && <p>{intro}</p>}
+        </div>
+      )}
       <div className="paw-gallery">
         {shown.map((listing) => (
           <PetListingCard key={listing.id} listing={listing} now={now} gateway={gateway} />

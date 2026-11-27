@@ -230,6 +230,12 @@ describe("the listings a page shows", () => {
     expect(html).toContain("Page 2 of 2");
     expect(html).toContain('href="?listings=1"');
     expect(renderToStaticMarkup(<PetListingSection listings={[]} heading="Waiting" />)).toBe("");
+    // Inside a section with its own heading: a smaller heading and a link to the whole list.
+    const front = renderToStaticMarkup(<PetListingSection listings={many} heading="Waiting" inside limit={6} moreHref="/browse/adoption" moreLabel="See all 30 pets" now={now} />);
+    expect(front).toContain("<h3");
+    expect(front).not.toContain("<h2");
+    expect(front.match(/<article/g)).toHaveLength(6);
+    expect(front).toContain('href="/browse/adoption"');
   });
 });
 
