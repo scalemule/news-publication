@@ -3,11 +3,15 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   adoptionAvailability,
+  petCredit,
+  petHeadline,
+  petPlace,
   petProfileMetadata,
   petReferences,
   preparePawWalk,
   resolvePetCommunity,
   safePetLink,
+  shelterPhone,
   type PetResource,
 } from "./pets";
 import { PetsSection, SponsorAcknowledgment } from "./pets-view";
@@ -179,6 +183,99 @@ describe("pet publication boundaries", () => {
       />,
     );
     expect(html).toBe("");
+  });
+});
+describe("shelter record cards", () => {
+  const record = (over: Partial<PetResource>): PetResource => ({
+    id,
+    kind: "found",
+    area_id: id,
+    revision: 1,
+    content: {
+      name: "Found cat",
+      species: "Cat",
+      story:
+        "Male Domestic Shorthair. Came in Nov 26. Held at Contra Costa County Animal Services (Martinez). Shelters hold strays for only a few days.",
+      breed: "Domestic Shorthair",
+      personality: "Detroit Ave, Concord Ca · ID #A1056526",
+      activities: [],
+      category: "",
+      attribution: "Contra Costa County Animal Services (Martinez)",
+    },
+    media: [],
+    origin: "shelter_record",
+    locality: "Martinez",
+    listing: {
+      custody: "shelter_hold",
+      named: false,
+      shelter: "Contra Costa County Animal Services (Martinez)",
+      shelter_phone: "+19256088400",
+    },
+    ...over,
+  });
+  const section = (resources: PetResource[]) =>
+    renderToStaticMarkup(
+      <PetsSection
+        communities={[{ id, slug: "us-ca-pleasant-hill", name: "Pleasant Hill" }]}
+        resources={resources}
+        mediaUrl={(resource, media) => `/api/pets/${resource}/media/${media}`}
+        regionLabel="Diablo Valley"
+      />,
+    );
+  it("prints the record's own town, not the paper's area", () => {
+    const html = section([record({})]);
+    expect(html).toContain("Found pet · Martinez");
+    expect(html).not.toContain("Found pet · Pleasant Hill");
+    // A neighbor's own post has no town of its own: it keeps the community.
+    const own = section([
+      record({ origin: undefined, locality: undefined, listing: undefined }),
+    ]);
+    expect(own).toContain("Found pet · Pleasant Hill");
+  });
+  it("credits a shelter, a person's notice and a neighbor differently", () => {
+    expect(petCredit(record({}))).toBe(
+      "From Contra Costa County Animal Services (Martinez)",
+    );
+    const owners = record({
+      kind: "lost",
+      listing: { custody: "owner_report", named: true },
+      content: {
+        ...record({}).content,
+        name: "Мила 🐾",
+        attribution: "the owner, on 24PetConnect",
+      },
+    });
+    expect(petCredit(owners)).toBe("Posted by the owner, on 24PetConnect");
+    expect(petHeadline(owners)).toBe("Lost: Мила 🐾.");
+    expect(petHeadline(record({}))).toBe("Found cat.");
+    expect(
+      petCredit(record({ origin: undefined, listing: undefined })),
+    ).toBe("Shared by Contra Costa County Animal Services (Martinez)");
+    expect(petPlace(record({ locality: "  " }), "Pleasant Hill")).toBe(
+      "Pleasant Hill",
+    );
+    expect(petPlace(record({ locality: "小樽" }), "Pleasant Hill")).toBe("小樽");
+    const html = section([record({})]);
+    expect(html).toContain("Detroit Ave, Concord Ca · ID #A1056526");
+    expect(html).not.toContain("Shared by");
+  });
+  it("says the safety note once for a list of notices", () => {
+    const html = section([
+      record({}),
+      record({ id: "019a1234-1234-7123-8123-123456789abd" }),
+      record({ id: "019a1234-1234-7123-8123-123456789abe" }),
+    ]);
+    expect(html.split("Never send money").length - 1).toBe(1);
+  });
+  it("gives a shelter's own line only when it is a plain US number", () => {
+    expect(shelterPhone(record({}))).toEqual({
+      href: "tel:+19256088400",
+      text: "(925) 608-8400",
+    });
+    expect(
+      shelterPhone(record({ listing: { shelter_phone: "925-608-8400 x5" } })),
+    ).toBeNull();
+    expect(shelterPhone(record({ listing: null }))).toBeNull();
   });
 });
 describe("network sign-in CSRF binding", () => {

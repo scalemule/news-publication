@@ -4,6 +4,10 @@ import { petRequest, type PetScope } from "./pets-server";
 import {
   PET_UUID,
   PET_SAFETY,
+  petCredit,
+  petHeadline,
+  petPlace,
+  shelterPhone,
   safePetLink,
   resolvePetCommunity,
   type PetCommunity,
@@ -354,19 +358,23 @@ export function PetStoryPage({
 }) {
   const c = resource.content,
     photoUrl = (photo: string) => `/api/pets/${resource.id}/media/${photo}`,
-    source = c.source && safePetLink(c.source.official_url);
+    source = c.source && safePetLink(c.source.official_url),
+    shelterRecord = resource.origin === "shelter_record",
+    held = resource.listing?.custody === "shelter_hold",
+    phone = shelterPhone(resource),
+    credit = petCredit(resource);
   return (
     <Shell paths={paths}>
       <article
         className={`paw-story${c.category === "memorial" ? " paw-memorial" : ""}`}
       >
         <p className="paw-context">
-          {communities.find((a) => a.id === resource.area_id)?.name}
+          {petPlace(
+            resource,
+            communities.find((a) => a.id === resource.area_id)?.name || "",
+          )}
         </p>
-        <h1>
-          {c.category === "memorial" ? "Remembering " : "Meet "}
-          {c.name}.
-        </h1>
+        <h1>{petHeadline(resource)}</h1>
         {resource.media.map((photo, index) => (
           <figure key={photo.id}>
             <picture>
@@ -391,21 +399,41 @@ export function PetStoryPage({
         {c.activities.length > 0 && (
           <p>Favorite things: {c.activities.join(", ")}.</p>
         )}
-        {c.attribution && (
-          <p className="paw-credit">Shared by {c.attribution}</p>
-        )}
+        {credit && <p className="paw-credit">{credit}</p>}
         {["lost", "found"].includes(resource.kind) && (
           <aside className="paw-safety">
             <p>
               {resource.reunited_at
                 ? "Reported reunited."
-                : "A community report."}
+                : held
+                  ? "A shelter’s record of a stray it is holding."
+                  : shelterRecord
+                    ? "A notice a person posted on a public lost-and-found board."
+                    : "A community report."}
             </p>
             <p>{PET_SAFETY.recovery}</p>
-            <p>
-              Private recovery contact is not available yet. Do not post contact
-              details in public.
-            </p>
+            {held ? (
+              <p>
+                If this is your pet, contact {resource.listing?.shelter}
+                {phone && (
+                  <>
+                    {" "}
+                    at <a href={phone.href}>{phone.text}</a>
+                  </>
+                )}{" "}
+                soon: shelters hold strays for only a few days.
+              </p>
+            ) : shelterRecord ? (
+              <p>
+                To reach the person who posted it, open the notice on the board
+                below. Bay Area Paw does not pass messages on.
+              </p>
+            ) : (
+              <p>
+                Private recovery contact is not available yet. Do not post
+                contact details in public.
+              </p>
+            )}
           </aside>
         )}
         {source && (
@@ -501,6 +529,7 @@ export async function PetBrowsePage({
             {result.items.map((r) => (
               <Card
                 key={r.id}
+                {...(kind === "lost_found" ? { safety: false } : {})}
                 resource={r}
                 community={
                   collection.areas.find((a) => a.id === r.area_id)?.name ||
@@ -515,6 +544,9 @@ export async function PetBrowsePage({
           <p className="paw-empty">
             No reviewed public contributions match these filters.
           </p>
+        )}
+        {kind === "lost_found" && result.items.length > 0 && (
+          <p className="paw-safety">{PET_SAFETY.recovery}</p>
         )}
         {result.next_cursor && (
           <a className="paw-button" href={"?" + next}>
